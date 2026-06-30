@@ -1,3 +1,5 @@
+import QuoteForm from "./QuoteForm";
+
 export const metadata = {
   title: {
     absolute: "Get an Instant Dog Poop Removal Quote | Ohio Pet Waste Pros",
@@ -17,30 +19,6 @@ export const metadata = {
   },
 };
 
-const inputStyle = {
-  width: "100%",
-  padding: "13px 14px",
-  border: "1.5px solid #dfe2da",
-  borderRadius: "10px",
-  fontSize: "15px",
-  fontFamily: "inherit",
-};
-
-const labelStyle = {
-  fontSize: "13px",
-  fontWeight: 700,
-  color: "#46545d",
-  display: "block",
-  marginBottom: "7px",
-};
-
-const freqOptions = [
-  { label: "Twice a Week", active: false },
-  { label: "Once a Week", active: true },
-  { label: "Bi-Weekly", active: false },
-  { label: "Once a Month", active: false },
-];
-
 const reviews = [
   {
     text: "So far so good! Very thorough and very easy to get ahold of. Our 3 dog household couldn't be happier!",
@@ -59,16 +37,9 @@ const reviews = [
 export default function FreeQuotePage() {
   return (
     <div style={{ fontFamily: "'Hanken Grotesk',sans-serif", color: "#1C2A33" }}>
-      <style>{`
-        input[type=range].opwp-range { -webkit-appearance:none; appearance:none; width:100%; height:8px; border-radius:99px; background:#dfe5dc; outline:none; }
-        input[type=range].opwp-range::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:30px; height:30px; border-radius:50%; background:#4F9E3A; border:4px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.25); cursor:pointer; }
-        input[type=range].opwp-range::-moz-range-thumb { width:30px; height:30px; border-radius:50%; background:#4F9E3A; border:4px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.25); cursor:pointer; }
-      `}</style>
-
       <section
         style={{
-          background:
-            "linear-gradient(165deg,#1F4566 0%,#1A3C5A 60%,#14304A 100%)",
+          background: "linear-gradient(165deg,#1F4566 0%,#1A3C5A 60%,#14304A 100%)",
           padding: "48px 0 70px",
         }}
       >
@@ -111,187 +82,8 @@ export default function FreeQuotePage() {
               alignItems: "start",
             }}
           >
-            {/* FORM CARD */}
-            <div
-              style={{
-                background: "#fff",
-                borderRadius: "22px",
-                padding: "34px",
-                boxShadow: "0 30px 60px -28px rgba(0,0,0,.5)",
-              }}
-            >
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "18px",
-                  marginBottom: "22px",
-                }}
-              >
-                <div>
-                  <label style={labelStyle}>Zip Code</label>
-                  <input placeholder="43528" style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Coupon Code</label>
-                  <input placeholder="Optional" style={inputStyle} />
-                </div>
-              </div>
-
-              <div style={{ marginBottom: "26px" }}>
-                <label
-                  style={{
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    color: "#46545d",
-                    display: "block",
-                    marginBottom: "14px",
-                  }}
-                >
-                  Number of dogs:{" "}
-                  <span
-                    style={{
-                      color: "#4F9E3A",
-                      fontFamily: "'Bricolage Grotesque'",
-                      fontSize: "16px",
-                    }}
-                  >
-                    1
-                  </span>
-                </label>
-                <input
-                  type="range"
-                  min="1"
-                  max="4"
-                  defaultValue="1"
-                  className="opwp-range"
-                />
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    color: "#8a96a0",
-                    marginTop: "8px",
-                    padding: "0 2px",
-                  }}
-                >
-                  <span>1</span>
-                  <span>2</span>
-                  <span>3</span>
-                  <span>4+</span>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: "26px" }}>
-                <label
-                  style={{
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    color: "#46545d",
-                    display: "block",
-                    marginBottom: "12px",
-                  }}
-                >
-                  Cleanup frequency
-                </label>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(4,1fr)",
-                    gap: "8px",
-                  }}
-                >
-                  {freqOptions.map((f) => (
-                    <button
-                      key={f.label}
-                      type="button"
-                      style={{
-                        border: `1.5px solid ${f.active ? "#4F9E3A" : "#dfe2da"}`,
-                        background: f.active ? "#4F9E3A" : "#fff",
-                        color: f.active ? "#fff" : "#46545d",
-                        borderRadius: "10px",
-                        padding: "12px 6px",
-                        fontWeight: 700,
-                        fontSize: "13px",
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                        lineHeight: 1.25,
-                      }}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ marginBottom: "20px" }}>
-                <label style={labelStyle}>Cell Phone Number</label>
-                <input placeholder="(419) 000-0000" style={inputStyle} />
-              </div>
-
-              <label
-                style={{
-                  display: "flex",
-                  gap: "10px",
-                  alignItems: "flex-start",
-                  fontSize: "12px",
-                  lineHeight: 1.5,
-                  color: "#7c8891",
-                  marginBottom: "22px",
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  style={{
-                    marginTop: "2px",
-                    width: "16px",
-                    height: "16px",
-                    accentColor: "#4F9E3A",
-                  }}
-                />
-                <span>
-                  I consent to receive marketing and service messages from Ohio
-                  Pet Waste Pros at the phone number provided. Message frequency
-                  may vary; message &amp; data rates may apply. Reply STOP to opt
-                  out.
-                </span>
-              </label>
-
-              <a
-                href="https://ohiopetwastepros.com/sng/ohio-pet-waste-pros-qkr3c-client-onboarding/"
-                className="hov-cta"
-                style={{
-                  display: "block",
-                  textAlign: "center",
-                  width: "100%",
-                  background: "#4F9E3A",
-                  color: "#fff",
-                  textDecoration: "none",
-                  borderRadius: "12px",
-                  padding: "17px",
-                  fontFamily: "'Bricolage Grotesque'",
-                  fontWeight: 800,
-                  fontSize: "18px",
-                  cursor: "pointer",
-                  boxShadow: "0 14px 28px -12px rgba(79,158,58,.7)",
-                }}
-              >
-                See My Instant Price &amp; Sign Up &rarr;
-              </a>
-              <div
-                style={{
-                  textAlign: "center",
-                  fontSize: "12px",
-                  color: "#9aa6ae",
-                  marginTop: "12px",
-                }}
-              >
-                🔒 Secure signup powered by Sweep&amp;Go
-              </div>
-            </div>
+            {/* INTERACTIVE QUOTE TOOL */}
+            <QuoteForm />
 
             {/* REVIEWS PANEL */}
             <div
@@ -315,13 +107,7 @@ export default function FreeQuotePage() {
                 >
                   Trusted by NW Ohio dog owners
                 </div>
-                <div
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "9px",
-                  }}
-                >
+                <div style={{ display: "inline-flex", alignItems: "center", gap: "9px" }}>
                   <span
                     style={{
                       fontFamily: "'Bricolage Grotesque'",
@@ -332,65 +118,24 @@ export default function FreeQuotePage() {
                   >
                     5.0
                   </span>
-                  <span
-                    style={{
-                      color: "#E7A734",
-                      letterSpacing: "2px",
-                      fontSize: "18px",
-                    }}
-                  >
+                  <span style={{ color: "#E7A734", letterSpacing: "2px", fontSize: "18px" }}>
                     ★★★★★
                   </span>
                 </div>
-                <div
-                  style={{
-                    fontSize: "13px",
-                    color: "#7c8891",
-                    marginTop: "4px",
-                  }}
-                >
-                  100+ verified Google reviews
+                <div style={{ fontSize: "13px", color: "#7c8891", marginTop: "4px" }}>
+                  5.0 stars · 159 reviews
                 </div>
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "14px",
-                }}
-              >
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                 {reviews.map((r) => (
-                  <div
-                    key={r.name}
-                    style={{
-                      background: "#F6F5EF",
-                      borderRadius: "14px",
-                      padding: "18px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        color: "#E7A734",
-                        letterSpacing: "2px",
-                        fontSize: "14px",
-                        marginBottom: "8px",
-                      }}
-                    >
+                  <div key={r.name} style={{ background: "#F6F5EF", borderRadius: "14px", padding: "18px" }}>
+                    <div style={{ color: "#E7A734", letterSpacing: "2px", fontSize: "14px", marginBottom: "8px" }}>
                       ★★★★★
                     </div>
-                    <p
-                      style={{
-                        margin: "0 0 10px",
-                        fontSize: "14px",
-                        lineHeight: 1.5,
-                        color: "#36424b",
-                      }}
-                    >
+                    <p style={{ margin: "0 0 10px", fontSize: "14px", lineHeight: 1.5, color: "#36424b" }}>
                       &quot;{r.text}&quot;
                     </p>
-                    <div style={{ fontWeight: 700, fontSize: "13.5px" }}>
-                      — {r.name}
-                    </div>
+                    <div style={{ fontWeight: 700, fontSize: "13.5px" }}>— {r.name}</div>
                   </div>
                 ))}
               </div>
@@ -421,14 +166,7 @@ export default function FreeQuotePage() {
             }}
           >
             Prefer to talk first? Call or text{" "}
-            <a
-              href="tel:419-262-2371"
-              style={{
-                color: "#fff",
-                fontWeight: 700,
-                textDecoration: "none",
-              }}
-            >
+            <a href="tel:419-262-2371" style={{ color: "#fff", fontWeight: 700, textDecoration: "none" }}>
               419-262-2371
             </a>{" "}
             — we&apos;re a local, family-owned team and happy to help.

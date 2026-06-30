@@ -65,8 +65,8 @@ export default function Footer() {
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 28px", display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center", justifyContent: "space-between", fontSize: 13, color: "#8499aa" }}>
           <span>© 2026 Ohio Pet Waste Pros. All rights reserved.</span>
           <span style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-            <a href="https://ohiopetwastepros.com/privacy-policy/" style={{ textDecoration: "none", color: "#8499aa" }}>Privacy Policy</a>
-            <a href="https://ohiopetwastepros.com/terms-of-service/" style={{ textDecoration: "none", color: "#8499aa" }}>Terms of Service</a>
+            <a href="/privacy-policy/" style={{ textDecoration: "none", color: "#8499aa" }}>Privacy Policy</a>
+            <a href="/terms-of-service/" style={{ textDecoration: "none", color: "#8499aa" }}>Terms of Service</a>
             <span>Proudly serving NW Ohio &amp; SE Michigan</span>
           </span>
         </div>
