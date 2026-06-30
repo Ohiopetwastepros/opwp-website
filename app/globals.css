@@ -1,0 +1,61 @@
+/* ===========================================================
+   Ohio Pet Waste Pros — dark-navy design
+   Pages reproduce the .dc source which uses inline styles.
+   This stylesheet provides resets, fonts, fixed-header offset,
+   responsive grid/padding helpers, and :hover behaviors.
+   =========================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--font-hanken), "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #1C2A33;
+  background: #fff;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-bricolage), "Bricolage Grotesque", system-ui, sans-serif;
+}
+
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+
+/* Fixed-header offset: header is position:fixed, push content down. */
+main { display: block; padding-top: 104px; }
+@media (max-width: 1000px) { main { padding-top: 96px; } }
+
+/* ---------- Reveal-on-scroll (matches source motion classes) ---------- */
+.opwp-reveal { opacity: 0; transform: translateY(22px); }
+.opwp-reveal.opwp-in {
+  opacity: 1; transform: none;
+  transition: opacity .8s cubic-bezier(.16,.84,.44,1), transform .8s cubic-bezier(.16,.84,.44,1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .opwp-reveal, .opwp-reveal.opwp-in { opacity: 1 !important; transform: none !important; transition: none !important; }
+}
+
+/* ---------- :hover support (replaces source style-hover attribute) ---------- */
+a, button { transition: background-color .22s ease, color .22s ease, box-shadow .28s ease, border-color .22s ease; }
+
+.hov-cta:hover { background: #46902F !important; }
+.hov-soft:hover { background: #F1F3EE !important; }
+.hov-cream:hover { background: #eef0e9 !important; }
+.hov-white-08:hover { background: rgba(255,255,255,.16) !important; }
+
+/* ---------- Responsive helpers (mirror source media queries) ---------- */
+@media (max-width: 1000px) and (min-width: 769px) {
+  .opwp-g4 { grid-template-columns: repeat(2, 1fr) !important; }
+  .opwp-g5 { grid-template-columns: repeat(3, 1fr) !important; }
+  .opwp-gfoot { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 768px) {
+  .opwp-g4, .opwp-g5 { grid-template-columns: repeat(2, 1fr) !important; }
+  .opwp-g3, .opwp-g2, .opwp-gsplit { grid-template-columns: 1fr !important; }
+  .opwp-gfoot { grid-template-columns: repeat(2, 1fr) !important; }
+  .opwp-padbig { padding-top: 46px !important; padding-bottom: 46px !important; }
+  .opwp-padhero { padding-top: 38px !important; padding-bottom: 46px !important; }
+}
