@@ -78,6 +78,7 @@ export default function QuoteForm() {
   const [consent,    setConsent]    = useState(false);
   const [selected,   setSelected]   = useState({});     // add-on ids
   const [showExtras, setShowExtras] = useState(false);
+  const [showCoupon, setShowCoupon] = useState(false);
   const [livePrice,  setLivePrice]  = useState(null);
 
   // ── Step 2 ──────────────────────────────────────────────────────────────
@@ -206,6 +207,7 @@ export default function QuoteForm() {
         zip: zipClean, phone, email,
         dogs, frequency, yard_size: yardSize,
         quote_monthly: monthlyTotal,
+        coupon: coupon || undefined,
       }),
     }).catch(() => {});
   }, [inArea, phoneReady, emailReady, zipClean, phone, email, dogs, frequency, yardSize, monthlyTotal]);
@@ -335,6 +337,7 @@ export default function QuoteForm() {
           name: qName, phone: qPhone, email: qEmail, question: qText,
           zip: zipClean, dogs, frequency, yard_size: yardSize,
           quote_monthly: monthlyTotal,
+          coupon: coupon || undefined,
           selected_addons: Object.keys(selected).filter((k) => selected[k]),
         }),
       });
@@ -450,20 +453,14 @@ export default function QuoteForm() {
 
       <StepBar />
 
-      {/* ZIP + coupon */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px", marginBottom: "22px" }}>
-        <div>
-          <label style={lbl}>Zip Code</label>
-          <input
-            value={zip} onChange={(e) => setZip(e.target.value.replace(/[^0-9]/g, ""))}
-            inputMode="numeric" maxLength={5} placeholder="43560"
-            style={{ ...inp, borderColor: zipReady ? (inArea ? "#4F9E3A" : "#d9534f") : "#dfe2da" }}
-          />
-        </div>
-        <div>
-          <label style={lbl}>Coupon Code</label>
-          <input value={coupon} onChange={(e) => setCoupon(e.target.value)} placeholder="Optional" style={inp} />
-        </div>
+      {/* ZIP — required to start */}
+      <div style={{ marginBottom: "22px" }}>
+        <label style={lbl}>Zip Code {req}</label>
+        <input
+          value={zip} onChange={(e) => setZip(e.target.value.replace(/[^0-9]/g, ""))}
+          inputMode="numeric" maxLength={5} placeholder="43560"
+          style={{ ...inp, borderColor: zipReady ? (inArea ? "#4F9E3A" : "#d9534f") : "#dfe2da" }}
+        />
       </div>
 
       {/* Out-of-area lead capture */}
@@ -649,6 +646,23 @@ export default function QuoteForm() {
             </div>
           )}
 
+          {/* Coupon — subtle, tucked under extras */}
+          <div style={{ marginBottom: "22px" }}>
+            {!showCoupon && !coupon ? (
+              <button type="button" onClick={() => setShowCoupon(true)} style={{
+                background: "none", border: "none", padding: 0, color: "#7c8891",
+                fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+              }}>
+                Have a coupon code?
+              </button>
+            ) : (
+              <div>
+                <label style={lbl}>Coupon code {opt}</label>
+                <input value={coupon} onChange={(e) => setCoupon(e.target.value)} placeholder="Enter code" style={{ ...inp, maxWidth: "260px" }} />
+              </div>
+            )}
+          </div>
+
           {/* Phone + email + consent — required before the quote is revealed */}
           <div style={{ marginBottom: "16px" }}>
             <label style={lbl}>Cell Phone Number {req}</label>
@@ -826,7 +840,7 @@ export default function QuoteForm() {
                       />
                     </div>
                     <div style={{ fontSize: "11.5px", color: "#9aa6ae", lineHeight: 1.5, marginBottom: "14px" }}>
-                      We include your ZIP, dog count, frequency, live price, and selected add-ons so the follow-up has your full quote context.
+                      We include your ZIP, dog count, frequency, live price, coupon, and selected add-ons so the follow-up has your full quote context.
                     </div>
                     <button
                       type="button"
