@@ -85,7 +85,7 @@ export default function PrivacyPolicyPage() {
             </li>
             <li style={li}>
               <strong>Payment information</strong> &mdash; card details are collected and
-              processed by our payment processor (Stripe). We do not store full card
+              processed by our payment processor (Fiserv/CardPointe). We do not store full card
               numbers on our own systems.
             </li>
             <li style={li}>
@@ -119,7 +119,7 @@ export default function PrivacyPolicyPage() {
           <p style={p}>
             We do not sell your personal information. We share it only with service
             providers who help us operate, including our scheduling and customer-management
-            platform (Sweep &amp; Go) and our payment processor (Stripe), and only as needed
+            platform (Sweep &amp; Go) and our payment processor (Fiserv/CardPointe), and only as needed
             to provide our services. We may also disclose information when required by law or
             to protect the safety, rights, or property of OPWP, our customers, or others.
           </p>

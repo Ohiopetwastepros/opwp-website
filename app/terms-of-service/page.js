@@ -113,7 +113,7 @@ export default function TermsOfServicePage() {
           <ul style={{ paddingLeft: 22, margin: "0 0 14px" }}>
             <li style={li}>
               Recurring service is billed on a subscription basis through our payment
-              processor (Stripe) using the payment method on file.
+              processor (Fiserv/CardPointe) using the payment method on file.
             </li>
             <li style={li}>
               By providing a payment method, you authorize us to charge it for the services
