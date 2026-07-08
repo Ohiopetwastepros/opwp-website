@@ -10,16 +10,10 @@ import {
 const ORG_PHONE    = "(419) 262-2371";
 const SNG_PAY_URL  = "https://client.sweepandgo.com/ohio-pet-waste-pros-qkr3c/register";
 
-const NOTIFICATION_MESSAGES = [
-  { id: "on_the_way",    label: "On my way" },
-  { id: "job_completed", label: "Job completed (with photo)" },
-  { id: "both",          label: "Both" },
-  { id: "none",          label: "No notifications" },
-];
-const NOTIFICATION_TYPES = [
-  { id: "text",  label: "Text / SMS" },
-  { id: "email", label: "Email" },
-  { id: "both",  label: "Both text and email" },
+// Areas we service — mirrors the "Areas To Clean" options enabled in Sweep & Go.
+const AREA_OPTIONS = [
+  "Back Yard", "Behind Shed", "Kids Play Area",
+  "Area With Mulch", "Area With Rocks", "Pool Area", "Area With Pine Straw",
 ];
 const HEARD_ABOUT = [
   { id: "google_search",   label: "Google Search" },
@@ -101,8 +95,11 @@ export default function QuoteForm() {
   const [doggieDoor,          setDoggieDoor]          = useState("");
   const [garbageCan,          setGarbageCan]          = useState("");
   const [areasToClean,        setAreasToClean]        = useState([]);
-  const [notifMessage,        setNotifMessage]        = useState("");
-  const [notifType,           setNotifType]           = useState("");
+  const [areasOpen,           setAreasOpen]           = useState(false);
+  // Notifications are auto-set (no longer asked on the form):
+  // "Job completed (with photo)" delivered by text — the completion photo is proof of service.
+  const notifMessage = "job_completed";
+  const notifType    = "text";
   const [heardAbout,          setHeardAbout]          = useState("");
   const [additionalComments,  setAdditionalComments]  = useState("");
   const [termsAgreed,         setTermsAgreed]         = useState(false);
@@ -187,7 +184,7 @@ export default function QuoteForm() {
     email.trim().includes("@") &&
     address.trim() && city.trim() && usState.trim() &&
     safeDog && gateLocation.trim() && garbageCan.trim() &&
-    notifMessage && notifType && heardAbout && termsAgreed;
+    heardAbout && termsAgreed;
 
   // ── Build account note ──────────────────────────────────────────────────
   const buildAccountNote = () => {
@@ -741,11 +738,10 @@ export default function QuoteForm() {
       </div>
       <div style={{ marginBottom: "14px" }}>
         <label style={lbl}>Is it safe for our team to be in the yard with your dog? {req}</label>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "8px" }}>
           {[
             ["yes",      "Yes — completely safe"],
-            ["leash",    "Leash or separate first"],
-            ["indoors",  "Keep indoors during service"],
+            ["indoors",  "No — keep indoors during service"],
           ].map(([val, label]) => (
             <Btn key={val} active={safeDog === val} onClick={() => setSafeDog(val)}>{label}</Btn>
           ))}
@@ -780,37 +776,36 @@ export default function QuoteForm() {
         <label style={lbl}>Where is the garbage can located? {req}</label>
         <input value={garbageCan} onChange={(e) => setGarbageCan(e.target.value)} placeholder="e.g. Right side of house" style={inp} />
       </div>
-      <div style={{ marginBottom: "22px" }}>
+      <div style={{ marginBottom: "22px", position: "relative" }}>
         <label style={{ ...lbl, marginBottom: "10px" }}>Which areas should we clean? {opt}</label>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {[["back","Back yard"],["front","Front yard"],["side","Side yard(s)"]].map(([val, label]) => {
-            const on = areasToClean.includes(val);
-            return (
-              <Btn key={val} active={on} onClick={() => toggleArea(val)}>
-                {on ? "✓ " : ""}{label}
-              </Btn>
-            );
-          })}
+        <div
+          onClick={() => setAreasOpen((o) => !o)}
+          style={{ ...inp, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}
+        >
+          <span style={{ color: areasToClean.length ? "#1A3C5A" : "#9aa6ae", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {areasToClean.length ? areasToClean.join(", ") : "Select all that apply…"}
+          </span>
+          <span style={{ color: "#9aa6ae", fontSize: "11px", flexShrink: 0 }}>{areasOpen ? "▲" : "▼"}</span>
         </div>
-      </div>
-
-      {/* ── Notification preferences ── */}
-      <div style={secHead()}>Cleanup Notifications</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "22px" }}>
-        <div>
-          <label style={lbl}>What message do you want? {req}</label>
-          <select value={notifMessage} onChange={(e) => setNotifMessage(e.target.value)} style={inp}>
-            <option value="">Select…</option>
-            {NOTIFICATION_MESSAGES.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={lbl}>How would you like to receive it? {req}</label>
-          <select value={notifType} onChange={(e) => setNotifType(e.target.value)} style={inp}>
-            <option value="">Select…</option>
-            {NOTIFICATION_TYPES.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-          </select>
-        </div>
+        {areasOpen && (
+          <div style={{ position: "absolute", zIndex: 20, left: 0, right: 0, marginTop: "4px", background: "#fff", border: "1.5px solid #dfe2da", borderRadius: "10px", boxShadow: "0 14px 30px -14px rgba(0,0,0,.4)", padding: "6px", maxHeight: "252px", overflowY: "auto" }}>
+            {AREA_OPTIONS.map((label) => {
+              const on = areasToClean.includes(label);
+              return (
+                <div
+                  key={label}
+                  onClick={() => toggleArea(label)}
+                  style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 10px", borderRadius: "8px", cursor: "pointer", background: on ? "#f3f9f0" : "transparent" }}
+                >
+                  <span style={{ width: "18px", height: "18px", flexShrink: 0, borderRadius: "5px", border: on ? "1.5px solid #4F9E3A" : "1.5px solid #cfd6cf", background: on ? "#4F9E3A" : "#fff", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: 700 }}>
+                    {on ? "✓" : ""}
+                  </span>
+                  <span style={{ fontSize: "14px", color: on ? "#1A3C5A" : "#31424c", fontWeight: on ? 700 : 400 }}>{label}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ── How heard + comments ── */}
