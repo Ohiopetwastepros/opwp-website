@@ -656,7 +656,7 @@ export default function QuoteForm() {
                         <span>{a.name}</span>
                         <span style={{ color: "#4F9E3A", whiteSpace: "nowrap" }}>
                           +{money(price)}{CHARGE_LABEL[a.charge]}
-                          <span style={{ color: "#9aa6ae", fontWeight: 600 }}> + tax</span>
+                          {a.charge === "product" && <span style={{ color: "#9aa6ae", fontWeight: 600 }}> + tax</span>}
                         </span>
                       </span>
                       <span style={{ fontSize: "12px", color: "#8a96a0", lineHeight: 1.4 }}>{a.desc}</span>
@@ -763,11 +763,6 @@ export default function QuoteForm() {
                     </div>
                   )}
                 </>
-              )}
-              {!notOffered && (
-                <div style={{ marginTop: "12px", fontSize: "11.5px", color: "#9aa6ae", borderTop: "1px dashed #ddd9cc", paddingTop: "10px" }}>
-                  Prices shown are before applicable sales tax.
-                </div>
               )}
             </div>
           )}
