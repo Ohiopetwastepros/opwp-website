@@ -161,6 +161,7 @@ export default function QuoteForm() {
   );
   const monthlyAddonTotal = monthlyAddons.reduce((s, a) => s + a.price, 0);
   const monthlyTotal = monthly != null ? monthly + monthlyAddonTotal : null;
+  const extrasCount  = Object.values(selected).filter(Boolean).length;
 
   const toggle     = (id) => setSelected((s) => ({ ...s, [id]: !s[id] }));
   const toggleArea = (a)  => setAreasToClean((p) =>
@@ -555,13 +556,40 @@ export default function QuoteForm() {
             </div>
           )}
 
-          {/* Extras */}
-          <button type="button" onClick={() => setShowExtras((v) => !v)} style={{
-            background: "none", border: "none", padding: 0, color: "#4F9E3A",
-            fontWeight: 700, fontSize: "14px", cursor: "pointer",
-            marginBottom: showExtras ? "14px" : "22px", fontFamily: "inherit",
-          }}>
-            {showExtras ? "− Hide extras" : "+ Add extras (front yard, deodorize, sanitize, dog food)"}
+          {/* Extras — prominent strip so it isn't missed */}
+          <button
+            type="button"
+            onClick={() => setShowExtras((v) => !v)}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+              gap: "10px", background: "#f3f9f0", border: "1.5px solid #bcd9ad",
+              borderRadius: "12px", padding: "14px 16px", cursor: "pointer",
+              fontFamily: "inherit", textAlign: "left",
+              marginBottom: showExtras ? "14px" : "22px",
+            }}
+          >
+            <span style={{ display: "flex", alignItems: "center", gap: "11px" }}>
+              <span style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: "26px", height: "26px", borderRadius: "50%", flexShrink: 0,
+                background: "#4F9E3A", color: "#fff", fontWeight: 800, fontSize: "17px", lineHeight: 1,
+              }}>{showExtras ? "−" : "+"}</span>
+              <span>
+                <span style={{ display: "block", fontWeight: 800, fontSize: "15.5px", color: "#1A3C5A" }}>
+                  Add extras
+                </span>
+                <span style={{ display: "block", fontSize: "12px", color: "#6f7686", marginTop: "1px" }}>
+                  Front yard, deodorize, sanitize, dog food
+                </span>
+              </span>
+            </span>
+            <span style={{
+              background: "#fff", border: "1.5px solid #bcd9ad", borderRadius: "999px",
+              padding: "3px 12px", fontSize: "12.5px", fontWeight: 700, flexShrink: 0,
+              color: extrasCount > 0 ? "#4F9E3A" : "#7c8891", whiteSpace: "nowrap",
+            }}>
+              {extrasCount > 0 ? `${extrasCount} selected` : "View"}
+            </span>
           </button>
           {showExtras && (
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "22px" }}>
@@ -603,8 +631,8 @@ export default function QuoteForm() {
             <span>I consent to receive marketing and service messages from Ohio Pet Waste Pros at the phone number provided. Message frequency may vary; message &amp; data rates may apply. Reply STOP to opt out.</span>
           </label>
 
-          {/* Price panel — revealed only after a phone number is entered */}
-          {inArea && phoneReady && (
+          {/* Price panel — revealed only after phone + email are entered */}
+          {inArea && phoneReady && emailReady && (
             <div style={{ background: "#F6F5EF", border: "1.5px solid #e9e6da", borderRadius: "16px", padding: "20px 22px", marginBottom: "22px" }}>
               {frequency === "one_time" ? (
                 <>
