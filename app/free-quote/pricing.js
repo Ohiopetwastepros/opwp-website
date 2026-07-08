@@ -74,6 +74,17 @@ export const PRICING = {
   ],
 };
 
+// Yard-size upcharge tiers (monthly, added to subscription rate)
+// upcharge: null = custom quote (over 3/4 acre)
+export const YARD_TIERS = [
+  { id: "tiny",   label: "Up to 1/8 acre",   sub: "≤ 5,445 sq ft",        upcharge: 0  },
+  { id: "small",  label: "1/8 – 1/4 acre",   sub: "5,446 – 10,890 sq ft", upcharge: 10 },
+  { id: "medium", label: "1/4 – 1/2 acre",   sub: "10,891 – 21,780 sq ft",upcharge: 20 },
+  { id: "large",  label: "1/2 – 3/4 acre",   sub: "21,781 – 32,670 sq ft",upcharge: 30 },
+  { id: "xlarge", label: "Over 3/4 acre",     sub: "32,671+ sq ft",        upcharge: null },
+  { id: "unsure", label: "Not sure",          sub: "We'll confirm at first visit", upcharge: 0 },
+];
+
 export const CHARGE_LABEL = {
   monthly: "/mo",
   one_time: " one-time",
