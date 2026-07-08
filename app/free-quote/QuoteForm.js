@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   PRICING, YARD_TIERS, CHARGE_LABEL,
   isInArea, haulAwayPrice, calcLocalQuote,
@@ -171,12 +171,32 @@ export default function QuoteForm() {
   const overMax   = frequency !== "one_time" && dogs > freqMax;
   const notOffered= frequency !== "one_time" && monthly == null && !yardIsXL;
 
-  // Step 1 gate: must have in-area ZIP, phone, consent, yard size (recurring)
+  // Step 1 gate: must have in-area ZIP, phone, email, consent, yard size (recurring)
   const yardSizeSelected = frequency === "one_time" || yardSize !== null;
+  const phoneReady = phone.replace(/\D/g, "").length >= 10;
+  const emailReady = email.trim().includes("@");
   const canContinue = inArea && consent
-    && phone.replace(/\D/g, "").length >= 10
+    && phoneReady && emailReady
     && (frequency === "one_time" || !notOffered)
     && yardSizeSelected;
+
+  // Partial-lead capture — fires once when phone + email are both valid, so we can
+  // follow up on quotes that never complete signup (SNG-style abandoned-quote email).
+  const leadSentRef = useRef(false);
+  useEffect(() => {
+    if (!inArea || !phoneReady || !emailReady || leadSentRef.current) return;
+    leadSentRef.current = true;
+    fetch("/api/lead", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: "partial_quote",
+        zip: zipClean, phone, email,
+        dogs, frequency, yard_size: yardSize,
+        quote_monthly: monthlyTotal,
+      }),
+    }).catch(() => {});
+  }, [inArea, phoneReady, emailReady, zipClean, phone, email, dogs, frequency, yardSize, monthlyTotal]);
 
   // Step 2 gate
   const step2Valid =
@@ -567,8 +587,22 @@ export default function QuoteForm() {
             </div>
           )}
 
-          {/* Price panel */}
-          {inArea && (
+          {/* Phone + email + consent — required before the quote is revealed */}
+          <div style={{ marginBottom: "16px" }}>
+            <label style={lbl}>Cell Phone Number {req}</label>
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="(419) 000-0000" style={inp} />
+          </div>
+          <div style={{ marginBottom: "16px" }}>
+            <label style={lbl}>Email Address {req}</label>
+            <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@example.com" style={inp} />
+          </div>
+          <label style={{ display: "flex", gap: "10px", alignItems: "flex-start", fontSize: "12px", lineHeight: 1.5, color: "#7c8891", marginBottom: "22px", cursor: "pointer" }}>
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: "2px", width: "16px", height: "16px", accentColor: "#4F9E3A" }} />
+            <span>I consent to receive marketing and service messages from Ohio Pet Waste Pros at the phone number provided. Message frequency may vary; message &amp; data rates may apply. Reply STOP to opt out.</span>
+          </label>
+
+          {/* Price panel — revealed only after a phone number is entered */}
+          {inArea && phoneReady && (
             <div style={{ background: "#F6F5EF", border: "1.5px solid #e9e6da", borderRadius: "16px", padding: "20px 22px", marginBottom: "22px" }}>
               {frequency === "one_time" ? (
                 <>
@@ -636,16 +670,6 @@ export default function QuoteForm() {
             </div>
           )}
 
-          {/* Phone + consent */}
-          <div style={{ marginBottom: "20px" }}>
-            <label style={lbl}>Cell Phone Number {req}</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="(419) 000-0000" style={inp} />
-          </div>
-          <label style={{ display: "flex", gap: "10px", alignItems: "flex-start", fontSize: "12px", lineHeight: 1.5, color: "#7c8891", marginBottom: "22px", cursor: "pointer" }}>
-            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: "2px", width: "16px", height: "16px", accentColor: "#4F9E3A" }} />
-            <span>I consent to receive marketing and service messages from Ohio Pet Waste Pros at the phone number provided. Message frequency may vary; message &amp; data rates may apply. Reply STOP to opt out.</span>
-          </label>
-
           {/* CTA */}
           <button
             type="button"
@@ -661,7 +685,8 @@ export default function QuoteForm() {
           >
             {!zipReady          ? "Enter your ZIP to start →"
             : !inArea           ? "Enter a ZIP in our service area"
-            : !phone.replace(/\D/g,"").length ? "Enter your phone number to continue"
+            : !phoneReady       ? "Enter your phone number to continue"
+            : !emailReady       ? "Enter your email to continue"
             : !consent          ? "Check the box to continue"
             : !yardSizeSelected ? "Select your yard size to continue"
             : notOffered        ? "Try Weekly or 2×/week"
