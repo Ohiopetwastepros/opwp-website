@@ -169,7 +169,9 @@ export default function QuoteForm() {
 
   const freqMax   = PRICING.frequencies.find((f) => f.id === frequency)?.maxDogs ?? 7;
   const overMax   = frequency !== "one_time" && dogs > freqMax;
-  const notOffered= frequency !== "one_time" && monthly == null && !yardIsXL;
+  // Over the frequency's dog cap always blocks (e.g. Monthly = 1 dog only), even if a
+  // stray price exists in the table; a null price only blocks when it's not an XL/custom yard.
+  const notOffered= frequency !== "one_time" && (overMax || (monthly == null && !yardIsXL));
 
   // Step 1 gate: must have in-area ZIP, phone, email, consent, yard size (recurring)
   const yardSizeSelected = frequency === "one_time" || yardSize !== null;
