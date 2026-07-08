@@ -205,7 +205,7 @@ export default function QuoteForm() {
       body: JSON.stringify({
         source: "partial_quote",
         zip: zipClean, phone, email,
-        dogs, frequency, yard_size: yardSize,
+        dogs, frequency, last_cleaned: lastCleaned, yard_size: yardSize,
         quote_monthly: monthlyTotal,
         coupon: coupon || undefined,
       }),
@@ -344,7 +344,7 @@ export default function QuoteForm() {
         body: JSON.stringify({
           source: "question",
           name: qName, phone: qPhone, email: qEmail, question: qText,
-          zip: zipClean, dogs, frequency, yard_size: yardSize,
+          zip: zipClean, dogs, frequency, last_cleaned: lastCleaned, yard_size: yardSize,
           quote_monthly: monthlyTotal,
           coupon: coupon || undefined,
           selected_addons: Object.keys(selected).filter((k) => selected[k]),
