@@ -110,6 +110,15 @@ export default function QuoteForm() {
   const [ooaPhone,   setOoaPhone]   = useState("");
   const [ooaConsent, setOoaConsent] = useState(false);
 
+  // "Have questions?" — ask before committing; sends the question + live quote context.
+  const [showQuestions, setShowQuestions] = useState(false);
+  const [qName,    setQName]    = useState("");
+  const [qPhone,   setQPhone]   = useState("");
+  const [qEmail,   setQEmail]   = useState("");
+  const [qText,    setQText]    = useState("");
+  const [qSending, setQSending] = useState(false);
+  const [qSent,    setQSent]    = useState(false);
+
   // ── Navigation / submission ──────────────────────────────────────────────
   const [step,        setStep]       = useState(1);   // 1 | 2 | "done" | "ooa-done"
   const [submitting,  setSubmitting] = useState(false);
@@ -309,6 +318,29 @@ export default function QuoteForm() {
     } catch { /* ignore */ }
     setSubmitting(false);
     setStep("ooa-done");
+  };
+
+  const qValid = qName.trim() && qText.trim() &&
+    (qPhone.replace(/\D/g, "").length >= 10 || qEmail.trim().includes("@"));
+  const handleQuestionSubmit = async () => {
+    if (!qValid || qSending) return;
+    setQSending(true);
+    // Reuse the lead endpoint so the question rides in with the live quote context.
+    try {
+      await fetch("/api/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: "question",
+          name: qName, phone: qPhone, email: qEmail, question: qText,
+          zip: zipClean, dogs, frequency, yard_size: yardSize,
+          quote_monthly: monthlyTotal,
+          selected_addons: Object.keys(selected).filter((k) => selected[k]),
+        }),
+      });
+    } catch { /* ignore — fire-and-forget */ }
+    setQSending(false);
+    setQSent(true);
   };
 
   // ── Terminal states ────────────────────────────────────────────────────
@@ -724,6 +756,96 @@ export default function QuoteForm() {
           </button>
           <div style={{ textAlign: "center", fontSize: "12px", color: "#9aa6ae", marginTop: "12px" }}>
             🔒 No payment on this step
+          </div>
+
+          {/* Have questions? — ask before committing; sends the question with live quote context */}
+          <div style={{ marginTop: "18px", borderTop: "1px solid #ecebe3", paddingTop: "18px" }}>
+            <button
+              type="button"
+              onClick={() => {
+                if (!showQuestions) {
+                  if (!qPhone && phone) setQPhone(phone);
+                  if (!qEmail && email) setQEmail(email);
+                }
+                setShowQuestions((v) => !v);
+              }}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                gap: "10px", background: "#eef3f7", border: "1.5px solid #cfdce6",
+                borderRadius: "12px", padding: "13px 16px", cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              <span style={{ fontWeight: 800, fontSize: "15px", color: "#1A3C5A" }}>Have questions?</span>
+              <span style={{ fontSize: "13px", fontWeight: 700, color: "#4F9E3A" }}>
+                {showQuestions ? "Hide" : "Ask before you commit →"}
+              </span>
+            </button>
+
+            {showQuestions && (
+              <div style={{ marginTop: "12px", background: "#f7f9fb", border: "1.5px solid #e3e9ef", borderRadius: "14px", padding: "18px" }}>
+                {qSent ? (
+                  <div style={{ textAlign: "center", padding: "10px 4px" }}>
+                    <div style={{ fontSize: "30px", marginBottom: "6px" }}>✅</div>
+                    <div style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: "18px", color: "#1A3C5A", marginBottom: "4px" }}>
+                      Got it{qName.trim() ? `, ${qName.trim().split(" ")[0]}` : ""}!
+                    </div>
+                    <div style={{ fontSize: "13.5px", color: "#6f7686", lineHeight: 1.5 }}>
+                      We&apos;ll get back to you shortly with real details on your quote.
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: "17px", color: "#1A3C5A", marginBottom: "4px" }}>
+                      Ask before you commit
+                    </div>
+                    <div style={{ fontSize: "13px", color: "#6f7686", lineHeight: 1.5, marginBottom: "14px" }}>
+                      Send your question and we&apos;ll include your live quote details so we can answer with real numbers.
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "12px" }}>
+                      <div>
+                        <label style={lbl}>First name {req}</label>
+                        <input value={qName} onChange={(e) => setQName(e.target.value)} placeholder="First name" style={inp} />
+                      </div>
+                      <div>
+                        <label style={lbl}>Phone</label>
+                        <input value={qPhone} onChange={(e) => setQPhone(e.target.value)} inputMode="tel" placeholder="(419) 000-0000" style={inp} />
+                      </div>
+                      <div>
+                        <label style={lbl}>Email</label>
+                        <input value={qEmail} onChange={(e) => setQEmail(e.target.value)} type="email" placeholder="you@example.com" style={inp} />
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: "8px" }}>
+                      <label style={lbl}>What do you want clarified? {req}</label>
+                      <textarea
+                        value={qText}
+                        onChange={(e) => setQText(e.target.value)}
+                        rows={3}
+                        placeholder="e.g. Is weekly enough for two dogs on a smaller yard, and how soon could service start?"
+                        style={{ ...inp, resize: "vertical", minHeight: "84px" }}
+                      />
+                    </div>
+                    <div style={{ fontSize: "11.5px", color: "#9aa6ae", lineHeight: 1.5, marginBottom: "14px" }}>
+                      We include your ZIP, dog count, frequency, live price, and selected add-ons so the follow-up has your full quote context.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleQuestionSubmit}
+                      disabled={!qValid || qSending}
+                      style={{
+                        display: "block", width: "100%", textAlign: "center",
+                        background: qValid && !qSending ? "#4F9E3A" : "#bcd3b1", color: "#fff",
+                        border: "none", borderRadius: "11px", padding: "14px",
+                        fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: "16px",
+                        cursor: qValid && !qSending ? "pointer" : "not-allowed",
+                      }}
+                    >
+                      {qSending ? "Sending…" : "Send my question"}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </>
       )}
