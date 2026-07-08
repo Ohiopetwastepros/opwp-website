@@ -212,6 +212,15 @@ export default function QuoteForm() {
     }).catch(() => {});
   }, [inArea, phoneReady, emailReady, zipClean, phone, email, dogs, frequency, yardSize, monthlyTotal]);
 
+  // If the dog count pushes the current frequency past its cap (e.g. Monthly + 2 dogs),
+  // fall back to Weekly so the form never sits on a disabled option.
+  useEffect(() => {
+    const fm = PRICING.frequencies.find((f) => f.id === frequency);
+    if (frequency !== "one_time" && fm && dogs > (fm.maxDogs ?? 7)) {
+      setFrequency("once_a_week");
+    }
+  }, [dogs, frequency]);
+
   // Step 2 gate
   const step2Valid =
     firstName.trim() && lastName.trim() &&
@@ -525,14 +534,23 @@ export default function QuoteForm() {
             <label style={{ ...lbl, marginBottom: "12px" }}>Cleanup frequency</label>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px" }}>
               {PRICING.frequencies.map((f) => {
-                const active = f.id === frequency;
+                const active   = f.id === frequency;
+                const disabled = f.id !== "one_time" && dogs > (f.maxDogs ?? 7);
                 return (
-                  <button key={f.id} type="button" onClick={() => setFrequency(f.id)} style={{
-                    border: `1.5px solid ${active ? "#4F9E3A" : "#dfe2da"}`,
-                    background: active ? "#4F9E3A" : "#fff", color: active ? "#fff" : "#46545d",
-                    borderRadius: "10px", padding: "11px 6px", fontWeight: 700, fontSize: "12.5px",
-                    cursor: "pointer", fontFamily: "inherit", lineHeight: 1.25,
-                  }}>
+                  <button
+                    key={f.id}
+                    type="button"
+                    disabled={disabled}
+                    title={disabled ? `Not available for ${dogs}${dogs === 7 ? "+" : ""} dogs` : undefined}
+                    onClick={() => { if (!disabled) setFrequency(f.id); }}
+                    style={{
+                      border: `1.5px solid ${active ? "#4F9E3A" : disabled ? "#eaece6" : "#dfe2da"}`,
+                      background: active ? "#4F9E3A" : disabled ? "#f4f5f1" : "#fff",
+                      color: active ? "#fff" : disabled ? "#b6bdb2" : "#46545d",
+                      borderRadius: "10px", padding: "11px 6px", fontWeight: 700, fontSize: "12.5px",
+                      cursor: disabled ? "not-allowed" : "pointer", fontFamily: "inherit", lineHeight: 1.25,
+                    }}
+                  >
                     {f.name}
                   </button>
                 );
@@ -636,7 +654,10 @@ export default function QuoteForm() {
                     <span style={{ flex: 1 }}>
                       <span style={{ display: "flex", justifyContent: "space-between", gap: "8px", fontSize: "13.5px", fontWeight: 700, color: "#36424b" }}>
                         <span>{a.name}</span>
-                        <span style={{ color: "#4F9E3A", whiteSpace: "nowrap" }}>+{money(price)}{CHARGE_LABEL[a.charge]}</span>
+                        <span style={{ color: "#4F9E3A", whiteSpace: "nowrap" }}>
+                          +{money(price)}{CHARGE_LABEL[a.charge]}
+                          <span style={{ color: "#9aa6ae", fontWeight: 600 }}> + tax</span>
+                        </span>
                       </span>
                       <span style={{ fontSize: "12px", color: "#8a96a0", lineHeight: 1.4 }}>{a.desc}</span>
                     </span>
@@ -742,6 +763,11 @@ export default function QuoteForm() {
                     </div>
                   )}
                 </>
+              )}
+              {!notOffered && (
+                <div style={{ marginTop: "12px", fontSize: "11.5px", color: "#9aa6ae", borderTop: "1px dashed #ddd9cc", paddingTop: "10px" }}>
+                  Prices shown are before applicable sales tax.
+                </div>
               )}
             </div>
           )}
