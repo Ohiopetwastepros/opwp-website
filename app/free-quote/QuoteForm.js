@@ -146,7 +146,13 @@ export default function QuoteForm() {
     if (!inArea || frequency === "one_time") return;
     const t = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/quote?zip=${zipClean}&dogs=${dogs}&frequency=${frequency}`);
+        const params = new URLSearchParams({
+          zip: zipClean,
+          dogs: String(dogs),
+          frequency,
+          last_cleaned: lastCleaned,
+        });
+        const r = await fetch(`/api/quote?${params}`);
         const j = await r.json();
         if (!cancelled && j.configured && j.ok && typeof j.monthly === "number") {
           setLivePrice(j.monthly);
@@ -154,7 +160,7 @@ export default function QuoteForm() {
       } catch { /* fallback to local */ }
     }, 350);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [inArea, zipClean, dogs, frequency]);
+  }, [inArea, zipClean, dogs, frequency, lastCleaned]);
 
   const baseMonthly   = livePrice ?? base.monthly;
   const monthly       = baseMonthly != null ? baseMonthly + yardUpcharge : null;
@@ -271,7 +277,7 @@ export default function QuoteForm() {
     "dog_name[]":     [dogName || ""],
     "safe_dog[]":     [safeDog],
     "dog_comment[]":  [dogComment || ""],
-    // Non-API fields (Pipedream reads these to add to account notes / Airtable)
+    // Internal metadata saved in D1 and included in Sweep & Go account notes where supported.
     gate_location:    gateLocation,
     gate_code:        gateCode || undefined,
     has_doggie_door:  doggieDoor,
@@ -299,7 +305,7 @@ export default function QuoteForm() {
       });
       const j = await r.json();
       if (j.configured === false) {
-        // Pipedream not wired yet — show confirmation only
+        // Sweep & Go credentials are not configured yet — store for follow-up.
         setStep("done-manual");
       } else if (j.ok) {
         // Account created in SNG → redirect to payment

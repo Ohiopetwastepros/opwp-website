@@ -1,0 +1,26 @@
+# Copy to .dev.vars for local Cloudflare preview. Never commit .dev.vars.
+# Use one Sweep & Go Open API token with every needed permission/event enabled.
+SNG_API_KEY=""
+SNG_WEBHOOK_SECRET=""
+CF_ACCESS_TEAM_DOMAIN="https://your-team.cloudflareaccess.com"
+CF_ACCESS_AUD=""
+ADMIN_DEV_BYPASS="true"
+
+NEXT_PUBLIC_AIRTABLE_OPS_URL="https://airtable.com/appcAWPBQB8GmOrcT/tblhi8MGUOsWNmd37/viw5yCUbwl2GWnXff?blocks=hide"
+AIRTABLE_BASE_ID="appcAWPBQB8GmOrcT"
+AIRTABLE_OPERATIONS_TABLE_ID="tblhi8MGUOsWNmd37"
+AIRTABLE_API_KEY=""
+
+# QuickBooks Online production OAuth. Store real values with Wrangler secrets.
+QB_CLIENT_ID=""
+QB_CLIENT_SECRET=""
+QB_REDIRECT_URI="https://opwp-website.ohiopetwastepros.workers.dev/api/quickbooks/callback"
+# Generate 32 random bytes and base64 encode them. Never rotate after connecting
+# unless the QuickBooks connection is re-authorized.
+QB_TOKEN_ENCRYPTION_KEY=""
+QB_ENVIRONMENT="sandbox"
+
+# Warren can be connected when its API base URL, authentication scheme, and
+# endpoint documentation are available.
+WARREN_API_URL=""
+WARREN_API_TOKEN=""

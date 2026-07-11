@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 
+const { initOpenNextCloudflareForDev } = require("@opennextjs/cloudflare");
+
+initOpenNextCloudflareForDev();
+
 // --- Old WordPress blog slugs -> new (shortened) blog slugs ---
 const blogRedirects = [
   ["/how-much-does-dog-poop-removal-cost-in-toledo-the-surrounding-area", "/blog/dog-poop-removal-cost-toledo"],

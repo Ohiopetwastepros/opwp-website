@@ -26,6 +26,9 @@ a { color: inherit; }
 
 /* Fixed-header offset: header is position:fixed, push content down. */
 main { display: block; padding-top: 104px; }
+body:has(.opwp-admin-shell) [data-opwp-header],
+body:has(.opwp-admin-shell) > footer { display: none !important; }
+body:has(.opwp-admin-shell) > main { padding-top: 0 !important; }
 @media (max-width: 1000px) { main { padding-top: 96px; } }
 
 /* ---------- Reveal-on-scroll (matches source motion classes) ---------- */

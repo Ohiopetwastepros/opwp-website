@@ -1,32 +1,26 @@
-// Server-side proxy to the Pipedream "create client" workflow.
-// Pipedream calls SNG PUT /api/v1/residential/onboarding, writes property/
-// access notes to Airtable, and sends Craig a notification.
-//
-// Required Vercel env var to go live:
-//   PIPEDREAM_ONBOARD_URL = HTTP trigger URL of your Pipedream onboarding workflow
-//
-// Until that var is set, returns { configured: false } and the form shows
-// a manual-followup confirmation instead of redirecting to SNG payment.
+import { markSubmissionSynced, saveSubmission } from "@/lib/db";
+import { sngRequest, toOnboardingPayload } from "@/lib/sweepandgo";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request) {
-  const body = await request.json().catch(() => ({}));
-
-  const endpoint = process.env.PIPEDREAM_ONBOARD_URL;
-  if (!endpoint) {
-    return Response.json({ configured: false, reason: "no_endpoint" });
+  const body = await request.json().catch(() => null);
+  if (!body || !body.email || !body.zip_code || !body.first_name || !body.last_name) {
+    return Response.json({ ok: false, error: "Required customer fields are missing" }, { status: 400 });
   }
 
-  try {
-    const r = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await r.json().catch(() => ({}));
-    return Response.json({ configured: true, ok: r.ok, status: r.status, data });
-  } catch (err) {
-    return Response.json({ configured: true, ok: false, error: String(err) });
-  }
+  const saved = await saveSubmission({ kind: "onboarding", source: "website", body });
+  const upstream = await sngRequest("/api/v1/residential/onboarding", {
+    method: "PUT",
+    body: toOnboardingPayload(body),
+  });
+
+  await markSubmissionSynced(saved.id, upstream.data, upstream.ok);
+  return Response.json({
+    configured: upstream.configured,
+    stored: saved.configured,
+    ok: upstream.ok,
+    status: upstream.status,
+    data: upstream.data,
+  });
 }

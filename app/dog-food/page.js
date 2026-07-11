@@ -24,6 +24,10 @@ export const metadata = {
   },
 };
 
+const DOG_FOOD_TOOL_URL =
+  process.env.NEXT_PUBLIC_DOG_FOOD_TOOL_URL ||
+  "https://ohiopetwastepros.com/dog-food/";
+
 const itemListJsonLd = {
   "@context": "https://schema.org",
   "@type": "ItemList",
@@ -189,8 +193,8 @@ export default function DogFoodPage() {
             Extreme Dog Fuel is a premium, veterinarian-recommended dog food with no corn, wheat, soy, or glutens — built for every age and activity level. We deliver it locally across Greater Toledo, right alongside your pet waste service.
           </p>
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
-            <Link
-              href="/free-quote/"
+            <a
+              href={DOG_FOOD_TOOL_URL}
               className="hov-cta"
               style={{
                 background: "#4F9E3A",
@@ -204,7 +208,7 @@ export default function DogFoodPage() {
               }}
             >
               Get Your Instant Quote
-            </Link>
+            </a>
             <Link
               href="/contact/"
               className="hov-white-08"
@@ -577,8 +581,8 @@ export default function DogFoodPage() {
             Contact us for current pricing and to add Extreme Dog Fuel to your service. Already a client? We&apos;ll deliver it right along with your scheduled visit.
           </p>
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
-            <Link
-              href="/free-quote/"
+            <a
+              href={DOG_FOOD_TOOL_URL}
               className="hov-cta"
               style={{
                 background: "#4F9E3A",
@@ -592,7 +596,7 @@ export default function DogFoodPage() {
               }}
             >
               Get Your Instant Quote
-            </Link>
+            </a>
             <a
               href="tel:419-262-2371"
               style={{

@@ -1,31 +1,34 @@
-// Server-side proxy to the Pipedream "out-of-area waitlist" workflow.
-// Pipedream writes a lead to SNG's out-of-service lead endpoint and/or Airtable.
-//
-// Required Vercel env var to go live:
-//   PIPEDREAM_WAITLIST_URL = HTTP trigger URL of your Pipedream waitlist workflow
-//
-// Until that var is set, returns { configured: false } — the form still shows
-// the OOA confirmation (lead is not yet stored anywhere).
+import { markSubmissionSynced, saveSubmission } from "@/lib/db";
+import { sngRequest } from "@/lib/sweepandgo";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request) {
-  const body = await request.json().catch(() => ({}));
-
-  const endpoint = process.env.PIPEDREAM_WAITLIST_URL;
-  if (!endpoint) {
-    return Response.json({ configured: false, reason: "no_endpoint" });
+  const body = await request.json().catch(() => null);
+  if (!body || !/^\d{5}$/.test(String(body.zip ?? ""))) {
+    return Response.json({ ok: false, error: "A valid ZIP code is required" }, { status: 400 });
   }
 
-  try {
-    const r = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await r.json().catch(() => ({}));
-    return Response.json({ configured: true, ok: r.ok, data });
-  } catch (err) {
-    return Response.json({ configured: true, ok: false, error: String(err) });
-  }
+  const saved = await saveSubmission({ kind: "waitlist", source: "website", body });
+  const upstream = await sngRequest("/api/v2/client_on_boarding/out_of_service_form", {
+    method: "POST",
+    body: {
+      name: body.name || "Website visitor",
+      address: body.address || "Not provided",
+      email_address: body.email || "",
+      zip_code: body.zip,
+      comment: "Submitted through the Ohio Pet Waste Pros website.",
+      phone: body.phone || "",
+      marketing_allowed: body.consent ? 1 : 0,
+      marketing_allowed_source: "open_api",
+    },
+  });
+
+  await markSubmissionSynced(saved.id, upstream.data, upstream.ok);
+  return Response.json({
+    configured: upstream.configured,
+    stored: saved.configured,
+    ok: upstream.configured ? upstream.ok : true,
+    status: upstream.status,
+  });
 }
