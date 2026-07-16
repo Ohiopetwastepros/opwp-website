@@ -1,5 +1,6 @@
 import { getRuntimeEnv } from "@/lib/cloudflare";
 import { saveSngEvent } from "@/lib/db";
+import { processSngEvent, recoverFailedSngEvents } from "@/lib/sng-event-processor";
 
 export const dynamic = "force-dynamic";
 
@@ -41,8 +42,16 @@ export async function POST(request) {
 
   const eventType = String(inferEventType(body));
   const saved = await saveSngEvent({ eventType, body });
+  const data = body?.data && typeof body.data === "object" ? body.data : body;
+  const externalId = body?.id ?? body?.event_id ?? data?.job_id ?? data?.invoice_id ?? data?.shift_id ?? data?.client_id ?? data?.lead_id ?? data?.id;
+  const processing = saved.configured
+    ? await processSngEvent({ id: saved.id, eventType, externalId, body })
+    : { processed: false, error: "D1 is not configured." };
+  const recovery = saved.configured
+    ? await recoverFailedSngEvents({ limit: 5, excludeId: saved.id })
+    : { attempted: 0, recovered: 0, remaining: 0 };
 
-  return Response.json({ ok: true, stored: saved.configured, id: saved.id });
+  return Response.json({ ok: true, stored: saved.configured, id: saved.id, processing, recovery });
 }
 
 export async function GET() {

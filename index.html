@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OPWP Tool</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 32px;
+    }
+    .subtext {
+      margin-top: 4px;
+      color: #475569;
+      font-size: 14px;
+    }
+    .btn-row, .tab-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      border: 1px solid #cbd5e1;
+      background: white;
+      color: #0f172a;
+      border-radius: 14px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button.primary {
+      background: #0f172a;
+      color: white;
+      border-color: #0f172a;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 24px;
+      margin-top: 18px;
+    }
+    .card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    }
+    .card h2 {
+      margin: 0;
+      font-size: 22px;
+    }
+    .card-head {
+      padding: 18px 18px 0 18px;
+    }
+    .card-body {
+      padding: 18px;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .field.full {
+      grid-column: 1 / -1;
+    }
+    label {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: white;
+    }
+    textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+    .status-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+    }
+    .badge {
+      border: 1px solid #cbd5e1;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 13px;
+      background: #f8fafc;
+      white-space: nowrap;
+    }
+    .info-box {
+      border-radius: 12px;
+      background: #f1f5f9;
+      padding: 12px;
+      font-size: 14px;
+      color: #334155;
+      white-space: pre-wrap;
+    }
+    .message-box {
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      background: white;
+      padding: 16px;
+      white-space: pre-wrap;
+      line-height: 1.55;
+      font-size: 14px;
+    }
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 12px;
+      grid-column: 1 / -1;
+    }
+    .checkbox-row input {
+      width: auto;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script>
+    const { useMemo, useState } = React;
+
+    const zipToCity = {
+      "43402": "Bowling Green", "43403": "Bowling Green", "43412": "Bradner", "43414": "Curtice",
+      "43416": "Elmore", "43460": "Rossford", "43465": "Walbridge", "43504": "Berkey",
+      "43515": "Delta", "43525": "Holland", "43528": "Holland", "43537": "Maumee",
+      "43542": "Monclova", "43547": "Neapolis", "43551": "Perrysburg", "43552": "Perrysburg",
+      "43560": "Sylvania", "43565": "Swanton", "43566": "Whitehouse", "43571": "Weston",
+      "43604": "Toledo", "43605": "Toledo", "43606": "Toledo", "43607": "Toledo",
+      "43608": "Toledo", "43609": "Toledo", "43610": "Toledo", "43611": "Toledo",
+      "43612": "Toledo", "43613": "Toledo", "43614": "Toledo", "43615": "Toledo",
+      "43616": "Oregon", "43617": "Toledo", "43619": "Northwood", "43620": "Toledo",
+      "43623": "Toledo", "44883": "Tiffin", "48144": "Lambertville", "48182": "Temperance",
+      "49267": "Ottawa Lake"
+    };
+
+    const recurringPricing = {
+      weekly: { 1: 90, 2: 100, 3: 115, 4: 130, 5: 140, 6: 150, 7: 160 },
+      biweekly: { 1: 68, 2: 75, 3: 87 },
+      twice_weekly: { 1: 162, 2: 180, 3: 207, 4: 234, 5: 252, 6: 270, 7: 288 }
+    };
+
+    const initialCleanupPricing = {
+      one_week: { 1: "$18.48–$25", 2: "$21.93–$28", 3: "$23.09–$30", 4: "$24.25–$31", 5: "$25.40–$32" },
+      two_weeks: { 1: "$25.40–$32", 2: "$30.02–$37", 3: "$32.33–$39", 4: "$34.64–$41", 5: "$36.95–$43" },
+      three_weeks: { 1: "$35.20–$42", 2: "$42.51–$49", 3: "$46.17–$53", 4: "$49.82–$56", 5: "$53.48–$60" },
+      one_month: { 1: "$45–$55", 2: "$55–$65", 3: "$60–$70", 4: "$65–$75", 5: "$80–$90" },
+      two_months: { 1: "$60–$70", 2: "$70–$80", 3: "$80–$90", 4: "$90–$110", 5: "$120–$140" },
+      three_four_months: { 1: "$79–$89", 2: "$85–$95", 3: "$89–$99", 4: "$99–$119", 5: "$140–$160" }
+    };
+
+    const oneTimePricing = {
+      one_week: { 1: "$27.72–$37.50", 2: "$32.90–$42", 3: "$34.64–$45", 4: "$36.39–$46.50", 5: "$38.10–$48" },
+      two_weeks: { 1: "$38.10–$48", 2: "$45.03–$55.50", 3: "$48.50–$58.50", 4: "$51.96–$61.50", 5: "$55.43–$64.50" },
+      three_weeks: { 1: "$52.80–$63", 2: "$63.77–$73.50", 3: "$69.26–$79.50", 4: "$74.73–$84", 5: "$80.22–$90" },
+      one_month: { 1: "$60–$75", 2: "$75–$100", 3: "$85–$110", 4: "$105–$130", 5: "$125–$150" },
+      two_months: { 1: "$75–$100", 2: "$95–$120", 3: "$105–$130", 4: "$125–$150", 5: "$145–$170" },
+      three_four_months: { 1: "$95–$120", 2: "$115–$140", 3: "$125–$150", 4: "$145–$170", 5: "$165–$190" }
+    };
+
+    const guidance = {
+      initial_full: "Use for new leads when you have city, dogs, and likely service type.",
+      initial_missing_info: "Use when lead details are incomplete and you need to confirm info first.",
+      one_time: "Use when someone only wants a one-time cleanup and you need yard/buildup details.",
+      website_followup: "Use for website leads that have already reached out.",
+      quote_sent_followup: "Use after pricing was sent and you want a soft check-in.",
+      quote_sent_close: "Use after pricing was sent and you want a direct close.",
+      no_response_followup: "Use for general follow-up when a lead went quiet.",
+      schedule_close: "Use when the lead seems interested and you want to move straight to scheduling.",
+      april_followup: "Use as a seasonal month-start nudge.",
+      followup_day1: "Use after 1 day of no response.",
+      followup_day3: "Use after 3 days of no response.",
+      followup_day5: "Use as the final soft nudge.",
+      quote_followup_24h: "Use 24 hours after sending pricing.",
+      quote_followup_3d: "Use 3 days after sending pricing.",
+      quote_followup_final: "Use as the final quote follow-up.",
+      hot_lead_close: "Use same day for fast replies or hot leads ready to close."
+    };
+
+    function normalizeName(name) {
+      if (!name.trim()) return "";
+      return name.trim().split(" ").map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join(" ");
+    }
+    function firstNameOnly(fullName) {
+      return normalizeName(fullName).split(" ")[0] || "";
+    }
+    function normalizeDogs(dogs) {
+      const clean = String(dogs || "").trim().toLowerCase();
+      if (!clean) return "";
+      if (clean.includes("dog")) return clean.replace(/\s+/g, " ");
+      return `${clean} dog${clean === "1" ? "" : "s"}`;
+    }
+    function normalizeFrequency(value) {
+      if (!value) return "";
+      if (value === "not_sure") return "weekly or biweekly";
+      if (value === "weekly") return "weekly";
+      if (value === "biweekly") return "biweekly";
+      if (value === "twice_weekly") return "twice weekly";
+      if (value === "one_time") return "one-time cleanup";
+      return value;
+    }
+    function qualityCheck(email, phone) {
+      const issues = [];
+      if (email && !/^\S+@\S+\.\S+$/.test(email)) issues.push("Email may be incorrect");
+      if (phone && phone.replace(/\D/g, "").length < 10) issues.push("Phone may be incomplete");
+      return issues;
+    }
+    function leadScore(data) {
+      let score = 0;
+      if (data.source) score += 20;
+      if (data.dogs) score += 15;
+      if (data.frequency && data.frequency !== "not_sure") score += 20;
+      if (data.city) score += 5;
+      if (data.email) score += 5;
+      if (data.phone) score += 10;
+      return Math.min(score, 100);
+    }
+    function scoreLabel(score) {
+      if (score >= 75) return "Hot lead";
+      if (score >= 50) return "Warm lead";
+      return "Needs info";
+    }
+    function getRecurringPrice(dogs, frequency) {
+      const d = parseInt(dogs, 10);
+      if (!d) return "";
+      if (frequency === "biweekly" && d > 3) return "Biweekly service is not available for over 3 dogs.";
+      const amount = recurringPricing[frequency] && recurringPricing[frequency][d];
+      return amount ? `$${amount}/month` : "";
+    }
+    function getInitialEstimate(dogs, timeframe) {
+      const d = parseInt(dogs, 10);
+      if (!d || timeframe === "not_entered") return "";
+      if (timeframe === "no_initial") return "No initial needed";
+      if (d >= 6) return "Custom quote";
+      return initialCleanupPricing[timeframe] && initialCleanupPricing[timeframe][d] || "";
+    }
+    function getOneTimePrice(dogs, timeframe) {
+      const d = parseInt(dogs, 10);
+      if (!d || timeframe === "not_entered") return "";
+      if (d >= 6) return "Custom quote";
+      return oneTimePricing[timeframe] && oneTimePricing[timeframe][d] || "";
+    }
+    function getYardAdjustment(yardTier) {
+      switch (yardTier) {
+        case "small": return "";
+        case "medium": return "+$10 yard size adjustment";
+        case "large": return "+$20 yard size adjustment";
+        case "xl": return "+$30 yard size adjustment";
+        case "over_3_4": return "Custom quote required for yard size";
+        default: return "";
+      }
+    }
+    function getServiceDayText(frequency, serviceDay, secondServiceDay) {
+      if (frequency === "twice_weekly") {
+        if (serviceDay && secondServiceDay) return `${serviceDay}s and ${secondServiceDay}s`;
+        if (serviceDay) return `${serviceDay}s`;
+        return "your scheduled service days";
+      }
+      if (serviceDay) return `${serviceDay}s`;
+      return "your scheduled service day";
+    }
+    function formatDateForText(dateValue) {
+      if (!dateValue) return "";
+      const date = new Date(dateValue + "T12:00:00");
+      return date.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+    }
+    function buildLeadMessage(data) {
+      const name = firstNameOnly(data.fullName) || "there";
+      const city = data.city || "your area";
+      const dogs = normalizeDogs(data.dogs);
+      const questionFrequency = data.frequency === "not_sure" ? "weekly or biweekly" : normalizeFrequency(data.frequency);
+      const sender = data.senderName || "Amanda";
+
+      switch (data.template) {
+        case "initial_full":
+          return data.timeOfDay === "morning"
+            ? `Good morning ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Thanks for requesting a quote last night. Just confirming — you're in ${city} with ${dogs}, and you're looking for ${questionFrequency} service?`
+            : `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 I can get you pricing — just confirming you're in ${city} with ${dogs}, and looking for ${questionFrequency} service?`;
+        case "initial_missing_info":
+          if (!data.city && !dogs) return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 I can get you pricing — can you confirm your city and how many dogs you have?`;
+          if (data.city && !dogs) return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 I see you're in ${city} — how many dogs do you have so I can get accurate pricing?`;
+          if (!data.city && dogs) return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 I see you have ${dogs} — what city are you in, and are you thinking weekly or biweekly service?`;
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just confirming you're in ${city} with ${dogs}?`;
+        case "one_time":
+          return `Got it 👍 For one-time cleanups, pricing depends on yard size and how much waste has built up.\n\nIs the area your dog uses about 1/8 acre or larger?\nAnd when was it last fully cleaned?`;
+        case "website_followup":
+          return `Hi! This is ${sender} with Ohio Pet Waste Pros 👋 We received your information from the quote form you filled out on our website.\n\nBased on what you submitted, I can share pricing again. Are you interested in recurring service or a one-time cleanup?`;
+        case "quote_sent_followup":
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just wanted to check — did you have any questions on the pricing, or want me to get you on the schedule?`;
+        case "quote_sent_close":
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 I sent your pricing over — want me to lock in your first cleanup?`;
+        case "no_response_followup":
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just checking back in — still interested in getting pricing or starting service? Happy to help!`;
+        case "schedule_close":
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Want me to get your first cleanup scheduled? We can get you on the route quickly.`;
+        case "april_followup":
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 April is right around the corner — want to get service started so you're all set for spring?`;
+        case "followup_day1":
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just wanted to follow up — did you still want pricing or help getting started?`;
+        case "followup_day3":
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just checking back in 🙂 We’re filling up in your area, so I wanted to see if you wanted to get on the schedule.`;
+        case "followup_day5":
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Last follow-up from me — I don’t want to bug you 😊 If you still want help with dog waste cleanup, just let me know and I’ll get everything set up for you.`;
+        case "quote_followup_24h":
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just wanted to see if you had any questions on the pricing or if you’d like to get scheduled?`;
+        case "quote_followup_3d":
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just checking in 🙂 ${data.startDate ? `We could get you started as soon as ${formatDateForText(data.startDate)} — ` : ""}want me to lock that in for you?`;
+        case "quote_followup_final":
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Wanted to follow up one last time — should I get your first cleanup scheduled or hold off for now?`;
+        case "hot_lead_close":
+          return `Awesome 👍 This is ${sender} with Ohio Pet Waste Pros. Want me to get your first cleanup scheduled?`;
+        default:
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋`;
+      }
+    }
+    function buildWelcomeMessage(data) {
+      const name = firstNameOnly(data.fullName) || "there";
+      const sender = data.senderName || "Amanda";
+      const dogs = normalizeDogs(data.dogs);
+      const serviceText = data.frequency === "one_time" ? "a one-time cleanup" : `${normalizeFrequency(data.frequency)} service`;
+      const addOns = data.notes && data.notes.trim() ? ` + ${data.notes.trim()}` : "";
+      const serviceDay = getServiceDayText(data.frequency, data.serviceDay, data.secondServiceDay);
+      const startText = formatDateForText(data.startDate);
+      return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 🐾\n\nWelcome aboard — we’re excited to have you!\n\nYou’re set up for ${dogs} on ${serviceText}${addOns}.\n\nWe service your yard on ${serviceDay} each visit.\n\nAfter your first cleanup, we’ll charge your initial cleanup + the remainder of the month. After that, billing runs automatically on the 1st each month.\n\nYou’ll receive a text when we’re on the way and another when your cleanup is complete.\n\n${startText ? `Your first cleanup is scheduled for ${startText}.` : `We’ll confirm your first cleanup date with you shortly.`}`;
+    }
+
+    function App() {
+      const [tab, setTab] = useState("lead");
+      const [copied, setCopied] = useState(false);
+      const [form, setForm] = useState({
+        senderName: "Amanda",
+        fullName: "",
+        phone: "",
+        email: "",
+        zip: "",
+        city: "",
+        dogs: "",
+        frequency: "not_sure",
+        source: "",
+        template: "initial_full",
+        timeOfDay: "standard",
+        initialTimeframe: "not_entered",
+        yardTier: "",
+        serviceDay: "",
+        secondServiceDay: "",
+        startDate: "",
+        urgency: false,
+        notes: ""
+      });
+
+      const derivedCity = useMemo(() => form.city.trim() || zipToCity[form.zip.trim()] || "", [form.city, form.zip]);
+      const currentData = { ...form, city: derivedCity };
+      const score = leadScore({ ...currentData, city: derivedCity });
+      const checks = qualityCheck(form.email, form.phone);
+      const recurringPrice = getRecurringPrice(form.dogs, form.frequency);
+      const initialEstimate = getInitialEstimate(form.dogs, form.initialTimeframe);
+      const oneTimeEstimate = getOneTimePrice(form.dogs, form.initialTimeframe);
+      const yardAdjustment = getYardAdjustment(form.yardTier);
+
+      const message = useMemo(() => {
+        if (tab === "welcome") return buildWelcomeMessage(currentData);
+        let base = buildLeadMessage(currentData);
+        const pricingTemplates = new Set(["initial_full", "initial_missing_info", "quote_sent_followup", "quote_sent_close", "quote_followup_24h", "quote_followup_3d", "quote_followup_final", "schedule_close", "hot_lead_close"]);
+        if (pricingTemplates.has(form.template) && form.frequency !== "one_time" && recurringPrice) base += `\n\nYour recurring service would be ${recurringPrice}.`;
+        if (pricingTemplates.has(form.template) && form.frequency !== "one_time" && yardAdjustment) base += yardAdjustment === "Custom quote required for yard size" ? `\nYard size would require a custom quote.` : `\n${yardAdjustment}.`;
+        if (pricingTemplates.has(form.template) && form.frequency !== "one_time" && initialEstimate) {
+          if (initialEstimate === "No initial needed") {
+            base += `
+There will be no initial cleanup charge. The remainder of the current month will be billed after your first cleanup.`;
+          } else if (initialEstimate === "Custom quote") {
+            base += `
+Initial cleanup will be a custom quote based on the property, buildup, and how long it will take the technician to complete the cleanup.`;
+          } else {
+            base += `
+Initial cleanup will fall in the ${initialEstimate} range depending on buildup and how long it takes the technician to complete the cleanup.`;
+          }
+        }
+        if ((form.template === "one_time" || form.frequency === "one_time") && oneTimeEstimate) base += oneTimeEstimate === "Custom quote" ? `\n\nBased on the property and buildup, this would be a custom quote.` : `\n\nBased on buildup, a one-time cleanup will fall in the ${oneTimeEstimate} range.`;
+        if (form.urgency && form.template !== "followup_day3") base += `\n\nWe’re currently filling up your area, so we can get you on the route quickly.`;
+        if (form.startDate && form.template !== "quote_followup_3d") base += `\nWe could start as soon as ${formatDateForText(form.startDate)}.`;
+        return base;
+      }, [tab, currentData, form.template, form.frequency, form.urgency, form.startDate, recurringPrice, initialEstimate, oneTimeEstimate, yardAdjustment]);
+
+      function updateField(key, value) {
+        setForm(prev => ({ ...prev, [key]: value }));
+      }
+      function copyMessage() {
+        navigator.clipboard.writeText(message);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }
+      function loadExample() {
+        if (tab === "welcome") {
+          setForm({
+            senderName: "Craig",
+            fullName: "Danielle",
+            phone: "",
+            email: "",
+            zip: "43560",
+            city: "",
+            dogs: "3",
+            frequency: "biweekly",
+            source: "search_engine",
+            template: "initial_full",
+            timeOfDay: "standard",
+            initialTimeframe: "one_month",
+            yardTier: "medium",
+            serviceDay: "Monday",
+            startDate: "2026-04-07",
+            urgency: false,
+            notes: "monthly sanitization"
+          });
+        } else {
+          setForm({
+            senderName: "Amanda",
+            fullName: "Stan Nally",
+            phone: "(330) 592-3621",
+            email: "stan.nally@gmail.com",
+            zip: "43560",
+            city: "",
+            dogs: "2",
+            frequency: "weekly",
+            source: "search_engine",
+            template: "initial_full",
+            timeOfDay: "standard",
+            initialTimeframe: "one_month",
+            yardTier: "medium",
+            serviceDay: "",
+            startDate: "2026-04-03",
+            urgency: true,
+            notes: ""
+          });
+        }
+      }
+
+      return React.createElement("div", { className: "wrap" },
+        React.createElement("div", { className: "topbar" },
+          React.createElement("div", null,
+            React.createElement("h1", null, "Ohio Pet Waste Pros Lead Response Generator"),
+            React.createElement("div", { className: "subtext" }, "One tool for lead texts, follow-ups, pricing, and welcome texts.")
+          ),
+          React.createElement("div", { className: "btn-row" },
+            React.createElement("button", { onClick: loadExample }, "Load Example"),
+            React.createElement("button", { className: "primary", onClick: copyMessage }, copied ? "Copied" : "Copy Message")
+          )
+        ),
+
+        React.createElement("div", { className: "tab-row" },
+          React.createElement("button", { className: tab === "lead" ? "primary" : "", onClick: () => setTab("lead") }, "Lead & Follow-Up"),
+          React.createElement("button", { className: tab === "welcome" ? "primary" : "", onClick: () => setTab("welcome") }, "Welcome Text")
+        ),
+
+        React.createElement("div", { className: "grid" },
+          React.createElement("div", { className: "card" },
+            React.createElement("div", { className: "card-head" }, React.createElement("h2", null, tab === "welcome" ? "Welcome Text Details" : "Lead Details")),
+            React.createElement("div", { className: "card-body" },
+              React.createElement("div", { className: "form-grid" },
+                field("Sender", input(form.senderName, v => updateField("senderName", v), "Amanda, Craig, Bria...")),
+                field("Full name", input(form.fullName, v => updateField("fullName", v))),
+                field("Phone", input(form.phone, v => updateField("phone", v))),
+                field("Email", input(form.email, v => updateField("email", v))),
+                field("ZIP code", input(form.zip, v => updateField("zip", v))),
+                field("City override", input(form.city, v => updateField("city", v), "Leave blank to auto-fill from ZIP")),
+                field("Yard size", select(form.yardTier, v => updateField("yardTier", v), [
+                  ["", "Select yard size"], ["small", "Standard Yard (≤1/8 acre)"], ["medium", "Medium yard (1/8–1/4)"], ["large", "Large yard (1/4–1/2)"], ["xl", "XL yard (1/2–3/4)"], ["over_3_4", "Over 3/4 acre"]
+                ])),
+                field("Dogs", select(form.dogs, v => updateField("dogs", v), [["", "Select number of dogs"], ["1", "1 dog"], ["2", "2 dogs"], ["3", "3 dogs"], ["4", "4 dogs"], ["5", "5 dogs"], ["6", "6 dogs"], ["7", "7 dogs"]])),
+                field("Frequency", select(form.frequency, v => updateField("frequency", v), [["not_sure", "Not sure yet"], ["weekly", "Weekly"], ["biweekly", "Biweekly"], ["twice_weekly", "Twice weekly"], ["one_time", "One-time cleanup"]])),
+                field("Referral source", select(form.source, v => updateField("source", v), [["", "Select referral source"], ["search_engine", "Search engine"], ["previous_client", "Previous client"], ["family_friend", "Referred by family or friend"], ["social_media", "Social media"], ["vehicle_signage", "Vehicle signage"], ["yard_sign", "Yard sign"], ["other", "Other"]])),
+                tab === "lead" ? field("Response template", select(form.template, v => updateField("template", v), [["initial_full", "Initial lead text"], ["initial_missing_info", "Missing info text"], ["one_time", "One-time cleanup text"], ["website_followup", "Website follow-up"], ["quote_sent_followup", "Quote sent follow-up"], ["quote_sent_close", "Quote sent close"], ["no_response_followup", "No response follow-up"], ["schedule_close", "Ready to schedule text"], ["april_followup", "Month-start follow-up"], ["followup_day1", "Follow-up Day 1"], ["followup_day3", "Follow-up Day 3"], ["followup_day5", "Follow-up Day 5"], ["quote_followup_24h", "Quote follow-up 24h"], ["quote_followup_3d", "Quote follow-up 3 days"], ["quote_followup_final", "Quote final follow-up"], ["hot_lead_close", "Hot lead fast close"]])) : null,
+                tab === "lead" ? field("Time context", select(form.timeOfDay, v => updateField("timeOfDay", v), [["standard", "Standard"], ["morning", "Morning follow-up"]])) : null,
+                field("Last thorough cleanup", select(form.initialTimeframe, v => updateField("initialTimeframe", v), [["not_entered", "Not entered"], ["no_initial", "No initial needed (yard is clean)"], ["one_week", "One week"], ["two_weeks", "Two weeks"], ["three_weeks", "Three weeks"], ["one_month", "One month"], ["two_months", "Two months"], ["three_four_months", "3–4 months"]])),
+                tab === "welcome" ? field("Service day", select(form.serviceDay, v => updateField("serviceDay", v), [["", "Select service day"], ["Monday", "Monday"], ["Tuesday", "Tuesday"], ["Wednesday", "Wednesday"], ["Thursday", "Thursday"], ["Friday", "Friday"]])) : null,
+                tab === "welcome" && form.frequency === "twice_weekly" ? field("Second service day", select(form.secondServiceDay || "", v => updateField("secondServiceDay", v), [["", "Select second service day"], ["Monday", "Monday"], ["Tuesday", "Tuesday"], ["Wednesday", "Wednesday"], ["Thursday", "Thursday"], ["Friday", "Friday"]])) : null,
+                field(tab === "welcome" ? "Start date" : "Start date (optional)", dateInput(form.startDate, v => updateField("startDate", v))),
+                tab === "lead" ? React.createElement("div", { className: "checkbox-row", key: "urgency" },
+                  React.createElement("input", { type: "checkbox", checked: form.urgency, onChange: e => updateField("urgency", e.target.checked) }),
+                  React.createElement("label", null, "Add urgency line about route filling")
+                ) : null,
+                field(tab === "welcome" ? "Add-ons" : "Internal notes", textarea(form.notes, v => updateField("notes", v), tab === "welcome" ? "Examples: monthly sanitization, deodorization" : "Optional notes for your office team"), true)
+              )
+            )
+          ),
+
+          React.createElement("div", null,
+            React.createElement("div", { className: "card" },
+              React.createElement("div", { className: "card-head" }, React.createElement("h2", null, "Status")),
+              React.createElement("div", { className: "card-body status-list" },
+                statusRow("Auto-filled city", derivedCity || "Unknown"),
+                statusRow("Lead score", score + "%"),
+                statusRow("Status", scoreLabel(score)),
+                tab === "lead" ? infoSection("Checks", checks.length ? checks.join("\n") : "Contact info looks usable") : null,
+                tab === "lead" ? infoSection("Pricing preview", [
+                  form.frequency !== "one_time" ? (recurringPrice || "Enter dogs and frequency to see recurring price.") : (oneTimeEstimate || "Enter dogs and last thorough cleanup timeframe to see one-time estimate."),
+                  yardAdjustment || "",
+                  form.frequency !== "one_time" ? (initialEstimate === "No initial needed" ? "No initial cleanup needed." : (initialEstimate || "Enter last thorough cleanup timeframe to see initial cleanup estimate.")) : ""
+                ].filter(Boolean).join("\n")) : null,
+                infoSection("Quick office use", tab === "welcome" ? "Use this tab after a client signs up to send a clean onboarding text." : (guidance[form.template] || "Pick a template, review the message, and copy/send."))
+              )
+            ),
+            React.createElement("div", { className: "card", style: { marginTop: "24px" } },
+              React.createElement("div", { className: "card-head" }, React.createElement("h2", null, "Ready-to-Send Text")),
+              React.createElement("div", { className: "card-body" }, React.createElement("div", { className: "message-box" }, message))
+            )
+          )
+        )
+      );
+    }
+
+    function field(labelText, control, full) {
+      return React.createElement("div", { className: full ? "field full" : "field", key: labelText },
+        React.createElement("label", null, labelText),
+        control
+      );
+    }
+    function input(value, onChange, placeholder) {
+      return React.createElement("input", { value, placeholder: placeholder || "", onChange: e => onChange(e.target.value) });
+    }
+    function dateInput(value, onChange) {
+      return React.createElement("input", { type: "date", value, onChange: e => onChange(e.target.value) });
+    }
+    function textarea(value, onChange, placeholder) {
+      return React.createElement("textarea", { value, placeholder: placeholder || "", onChange: e => onChange(e.target.value) });
+    }
+    function select(value, onChange, options) {
+      return React.createElement("select", { value, onChange: e => onChange(e.target.value) },
+        options.map(([val, label]) => React.createElement("option", { key: val + label, value: val }, label))
+      );
+    }
+    function statusRow(label, value) {
+      return React.createElement("div", { className: "status-row", key: label },
+        React.createElement("span", { style: { color: "#475569" } }, label),
+        React.createElement("span", { className: "badge" }, value)
+      );
+    }
+    function infoSection(title, text) {
+      return React.createElement("div", { key: title },
+        React.createElement("div", { style: { fontSize: "14px", fontWeight: 600, marginBottom: "6px" } }, title),
+        React.createElement("div", { className: "info-box" }, text)
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+  </script>
+</body>
+</html>

@@ -5,6 +5,8 @@ SNG_WEBHOOK_SECRET=""
 CF_ACCESS_TEAM_DOMAIN="https://your-team.cloudflareaccess.com"
 CF_ACCESS_AUD=""
 ADMIN_DEV_BYPASS="true"
+ADMIN_USERNAME="owner"
+ADMIN_PASSWORD="use-a-strong-local-development-password"
 
 NEXT_PUBLIC_AIRTABLE_OPS_URL="https://airtable.com/appcAWPBQB8GmOrcT/tblhi8MGUOsWNmd37/viw5yCUbwl2GWnXff?blocks=hide"
 AIRTABLE_BASE_ID="appcAWPBQB8GmOrcT"

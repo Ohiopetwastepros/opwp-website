@@ -71,7 +71,7 @@ Wrangler is authenticated for `ohiopetwastepros@outlook.com`, and the
 `opwp-website` Worker has been created in Cloudflare:
 
 - Worker ID: `b8bfed82ca9a43cdae6bf8501c33a862`
-- Current deployed version: `d15dc2a5-c649-4d8d-aa7f-df329847f6de`
+- Current deployed version: `cf45ef7c-0a42-4b73-940c-cb1dbaa9af49`
 - Worker URL: `https://opwp-website.ohiopetwastepros.workers.dev`
 
 The workers.dev route is active for testing. The `ohiopetwastepros.com` zone can
@@ -155,3 +155,65 @@ guessing, provide its API documentation, base URL, authentication method, and th
 records/actions that should appear in the admin area. `WARREN_API_URL` and
 `WARREN_API_TOKEN` names are reserved in the example environment file for that
 next adapter.
+
+## Current handoff — July 11, 2026
+
+### Executive backend
+
+- `/admin/` is an executive cockpit for OPWP and Extreme Dog Fuel.
+- `/admin/financials/` is the dedicated QuickBooks financial command center.
+- Public website chrome is suppressed on admin routes.
+- Admin routes currently use Cloudflare Access plus in-app JWT verification.
+- Next requested feature: an application username/password login. Decide whether
+  it replaces the visible Access login (recommended) or becomes a second login.
+
+### Airtable
+
+- OPWP base: `appcAWPBQB8GmOrcT`.
+- Extreme Dog Fuel base: `appc40e3mlfOt2HoA`.
+- Live aggregation covers revenue, MRR, customers, churn, job efficiency,
+  pipeline, dog-food sales, subscriptions, demand, fulfillment, and inventory.
+- KPI targets remain editable in Airtable.
+
+### QuickBooks Online
+
+- The real QBO company is connected in `production` mode.
+- OAuth connect, refresh, controlled `401` recovery, reconnect, revoke, and
+  disconnect were tested with a full sandbox connect/disconnect/reconnect cycle.
+- OAuth tokens are AES-GCM encrypted before D1 storage. Never print or inspect
+  secrets or token values.
+- Worker secrets: `QB_CLIENT_ID`, `QB_CLIENT_SECRET`, `QB_REDIRECT_URI`,
+  `QB_ENVIRONMENT`, and `QB_TOKEN_ENCRYPTION_KEY`.
+- Redirect URI:
+  `https://opwp-website.ohiopetwastepros.workers.dev/api/quickbooks/callback`.
+- Migrations `0003`, `0004`, and `0005` add the QuickBooks connection,
+  lifecycle environment, and sanitized metadata cache.
+- Financials show cash, MTD revenue/net income, monthly trends, margin bridge,
+  working capital, balance-sheet position, accounts, and decision framing.
+- Receivables/payables aging are unavailable and degrade gracefully.
+- QBO currently returns no classified COGS, so gross margin is labeled “Not
+  tracked” rather than showing a misleading 100%.
+- `intuit_tid` is captured in structured error logs.
+
+### Immediate next steps
+
+Current production Worker version: `4af50e4b-2a4f-4219-a004-9537fe4ba235` (2026-07-15 cadence-aware route intelligence plus read-only Tony staffing scenario). Production schedules run subscription truth at `0 11 * * *`, the Airtable cockpit snapshot at `15 * * * *`, and the active route book at `35 * * * *`.
+
+1. Refresh `/admin/financials/` once on version
+   `597aec82-26c0-4b65-aee0-fb62a3a3d54f` to populate the sanitized metadata
+   cache.
+2. Query `quickbooks_metadata_cache` for account/class/location/product names
+   and types only—never tokens or customer transactions.
+3. Map direct costs, overhead, vehicles, advertising, payroll, owner activity,
+   OPWP, and Extreme Dog Fuel.
+4. Add editable assumptions for cash reserve, truck affordability, advertising
+   capacity, acquisition payback, and hiring capacity.
+5. Return to the owner’s 2026 KPI targets after the login decision.
+
+### Working and deployment notes
+
+- Use `npm.cmd` / `npx.cmd` on Windows and `apply_patch` for source edits.
+- OpenNext on Windows/OneDrive may emit `EINVAL readlink` warnings from generated
+  `.next` files. Remove only the verified generated `.next` directory and retry.
+- The worktree contains extensive user-owned uncommitted backend changes.
+  Preserve unrelated edits and do not reset the worktree.
