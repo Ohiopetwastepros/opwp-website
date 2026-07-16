@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { getActiveSubscriptionRouteSummary } from "@/lib/route-intelligence";
 import RouteAnalysisClient from "./RouteAnalysisClient";
 import OnboardingRouteTool from "./OnboardingRouteTool";
+import OfficeAccessManager from "./OfficeAccessManager";
 import styles from "./routes.module.css";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,7 @@ export default async function RoutesPage() {
               </div>
             </section>
             <OnboardingRouteTool />
+            <OfficeAccessManager />
             <RouteAnalysisClient initialSummary={source} />
           </>
         )}
