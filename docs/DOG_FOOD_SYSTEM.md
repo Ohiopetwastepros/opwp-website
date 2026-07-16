@@ -5,7 +5,8 @@
 Last updated: 2026-07-15
 
 - Live tool: `https://opwp-website.ohiopetwastepros.workers.dev/dog-food/`
-- Current production version: `a1903b27-f7ed-4ef5-83f9-793e91161b7e`
+- Current production version: `a211fa0a-ae93-451d-aaab-35e427f117e7`
+- Protected Route Partner workspace: `https://opwp-website.ohiopetwastepros.workers.dev/admin/route-partner/`
 - Protected route dashboard: `https://opwp-website.ohiopetwastepros.workers.dev/admin/routes/`
 - Primary UI files: `app/dog-food/DogFoodOrderTool.js` and `app/dog-food/dog-food.module.css`
 - The customer journey currently has four steps: blends and gated price, dog profiles, recommendations, and order/delivery.
@@ -323,3 +324,8 @@ The first standalone operating slice now exists in the repository:
 This checkpoint intentionally does not message customers, charge cards, change a
 CRM route, or expose the technician field app. Those actions remain disabled until
 their confirmation loops and provider integrations are implemented and tested.
+
+Production release `a211fa0a-ae93-451d-aaab-35e427f117e7` applied migration
+`0020_route_partner_foundation.sql` and deployed the protected management
+workspace on 2026-07-15. The production tables were verified empty after release;
+no Sweep & Go route import or customer-facing action was triggered during deployment.

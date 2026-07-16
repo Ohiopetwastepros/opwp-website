@@ -1,8 +1,8 @@
 # Cloudflare deployment and backend setup
 
 This project now deploys as a Next.js application on Cloudflare Workers through
-OpenNext. The private `/admin/` route uses Cloudflare Access for login and also
-verifies the Access JWT inside the application. Website submissions are stored
+OpenNext. The private `/admin/` and `/api/admin/` routes currently use the
+application's Basic authentication middleware. Website submissions are stored
 in D1, and Sweep & Go data is read or written directly from server routes.
 
 ## 1. D1 database
@@ -34,8 +34,8 @@ npx wrangler secret put CF_ACCESS_AUD
 
 `SNG_API_KEY` has been set in Cloudflare and verified against the live quote
 endpoint.
-`CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` have also been set in Cloudflare.
-The `/admin/` route now redirects to Cloudflare Access for login.
+`CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` have also been set in Cloudflare for
+an optional Zero Trust layer. The current Worker route uses Basic authentication.
 `SNG_WEBHOOK_SECRET` has been set in Cloudflare for the Sweep & Go webhook
 receiver.
 
@@ -46,7 +46,7 @@ as a Cloudflare Workers Builds variable if the tool moves to a new URL.
 `/admin/`. Airtable API integration can be added later with `AIRTABLE_API_KEY`,
 `AIRTABLE_BASE_ID`, and `AIRTABLE_OPERATIONS_TABLE_ID`.
 
-## 3. Protect the admin route
+## 3. Optional Cloudflare Access edge protection
 
 In Cloudflare Zero Trust:
 
@@ -58,8 +58,8 @@ In Cloudflare Zero Trust:
 4. Enable one-time PIN or the preferred identity provider and require MFA.
 5. Copy the app's Audience tag into `CF_ACCESS_AUD`.
 
-Cloudflare will show the login before the request reaches the site. The app then
-validates the signed `Cf-Access-Jwt-Assertion` a second time.
+When this Access application is enabled, Cloudflare will show its login before
+the request reaches the site's existing Basic authentication middleware.
 
 ## 4. Deploy
 
@@ -71,7 +71,7 @@ Wrangler is authenticated for `ohiopetwastepros@outlook.com`, and the
 `opwp-website` Worker has been created in Cloudflare:
 
 - Worker ID: `b8bfed82ca9a43cdae6bf8501c33a862`
-- Current deployed version: `cf45ef7c-0a42-4b73-940c-cb1dbaa9af49`
+- Current deployed version: `a211fa0a-ae93-451d-aaab-35e427f117e7`
 - Worker URL: `https://opwp-website.ohiopetwastepros.workers.dev`
 
 The workers.dev route is active for testing. The `ohiopetwastepros.com` zone can
@@ -163,9 +163,8 @@ next adapter.
 - `/admin/` is an executive cockpit for OPWP and Extreme Dog Fuel.
 - `/admin/financials/` is the dedicated QuickBooks financial command center.
 - Public website chrome is suppressed on admin routes.
-- Admin routes currently use Cloudflare Access plus in-app JWT verification.
-- Next requested feature: an application username/password login. Decide whether
-  it replaces the visible Access login (recommended) or becomes a second login.
+- Admin routes currently use the application username/password through Basic
+  authentication. Cloudflare Access can be enabled later as an additional edge layer.
 
 ### Airtable
 
@@ -197,7 +196,7 @@ next adapter.
 
 ### Immediate next steps
 
-Current production Worker version: `4af50e4b-2a4f-4219-a004-9537fe4ba235` (2026-07-15 cadence-aware route intelligence plus read-only Tony staffing scenario). Production schedules run subscription truth at `0 11 * * *`, the Airtable cockpit snapshot at `15 * * * *`, and the active route book at `35 * * * *`.
+Current production Worker version: `a211fa0a-ae93-451d-aaab-35e427f117e7` (2026-07-15 Route Partner foundation, cadence-aware route intelligence, and the read-only Craig-office/Tony-full-time geographic scenario). D1 migration `0020_route_partner_foundation.sql` is applied remotely. Production schedules run subscription truth at `0 11 * * *`, the Airtable cockpit snapshot at `15 * * * *`, and the active route book at `35 * * * *`.
 
 1. Refresh `/admin/financials/` once on version
    `597aec82-26c0-4b65-aee0-fb62a3a3d54f` to populate the sanitized metadata

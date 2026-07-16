@@ -116,7 +116,7 @@ Decision: Can management trust today's numbers, and what failed before it affect
 - Route revenue/hour uses recurring revenue per scheduled visit divided by modeled service plus drive time, with $100/hour as the operating target.
 - Current-week output uses the latest completed Airtable service date to anchor A/B and monthly cadence. Coverage is 86/87 cadence accounts; Melissa Furrie is included but disclosed as unanchored until a completed job supplies the cohort.
 - Flexible-day candidates are advisory, exclude locked two-day accounts, stay within established service regions, and never write changes back automatically.
-- The Tony full-time scenario is presentation-only. It models current Tony routes plus Bria's current Wednesday and Friday route books, excludes ambiguous shared-owner records, and exposes remaining capacity rather than treating 40 hours of recurring scooping as a target.
+- The Craig-office/Tony-full-time scenario is presentation-only. Craig retains one geographically defined Monday route and is office-focused Tuesday-Friday; Tony owns Wednesday/Friday and one geographic cluster on Monday/Tuesday/Thursday; Bria owns the complementary clusters. The calculation includes shared-owner records, keeps every service day fixed, and exposes remaining capacity rather than treating 40 hours of recurring scooping as a target.
 
 Every promoted KPI must have:
 

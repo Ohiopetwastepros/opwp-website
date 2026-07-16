@@ -1,6 +1,6 @@
 # OPWP Operating System — Project Memory
 
-Last updated: 2026-07-14
+Last updated: 2026-07-15
 
 This file is the durable handoff for future work. Update it after meaningful data-model, KPI, integration, or deployment changes. Never place passwords, API keys, tokens, or other secrets here.
 
@@ -9,7 +9,8 @@ This file is the durable handoff for future work. Update it after meaningful dat
 - Executive dashboard: `https://opwp-website.ohiopetwastepros.workers.dev/admin/`
 - D1 event ledger: `https://opwp-website.ohiopetwastepros.workers.dev/admin/events/`
 - Cloudflare Worker: `opwp-website`
-- Current production version: `cf45ef7c-0a42-4b73-940c-cb1dbaa9af49` (deployed 2026-07-14)
+- Current production version: `a211fa0a-ae93-451d-aaab-35e427f117e7` (deployed 2026-07-15)
+- Route Partner management: `https://opwp-website.ohiopetwastepros.workers.dev/admin/route-partner/`
 - D1 database: `opwp-backend`
 - Airtable base: `OPWP Operating System`
 - Sweep & Go is the operational source for clients, subscriptions, jobs, shifts, and invoices.
@@ -114,8 +115,9 @@ Pipedream is not required for this flow. Keep old Pipedream workflows paused unt
 - Twice-weekly/two-day assignments are locked, established territory areas are preserved, and all flexible-day suggestions require owner approval. No route recommendation writes back to SNG or Airtable automatically.
 - Route economics now compare recurring revenue per scheduled visit with modeled service plus road time against the $100/hour target. Multi-technician ownership, depot travel, and alternating cohorts remain explicit limitations rather than hidden assumptions.
 - Found one routing-source exception: Casey Lucio is marked `Weekly` but has Tuesday and Thursday service days. Both days remain locked and the Route Intelligence page flags this for source confirmation.
-- Added a read-only Tony full-time runway scenario to Route Intelligence. It retains Tony's current Monday/Tuesday/Thursday books and models Bria's Wednesday/Friday books under Tony without changing any source assignment or customer day. The current-week projection is about 29.4 recurring field hours, 105 stops, $2,858 route revenue, $97/hour before depot/break time, and 10.6 hours of capacity to a 40-hour week.
-- The scenario identifies Friday as the strongest full-day addition, Wednesday as an efficient shorter fifth day, and Tony's 69.9-mile Monday route as the primary density problem. Same-day geographic consolidation must be modeled before adding Monday volume.
+- Replaced the initial Tony-only runway with a road-calculated future-state scenario: Craig retains one dense Monday field route and transitions to office leadership Tuesday-Friday; Tony becomes the five-day field anchor; Bria owns complementary Monday/Tuesday/Thursday books. All service days stay unchanged and nothing writes back.
+- The current-week model regroups 49 customers by same-day geography, reduces modeled open-route mileage from 385.5 to 372.3 miles, and yields 51.7 team field hours at $93.50/hour before depot/break time. Monday still needs three technicians: Bria 30 stops/41.2 miles/$95.60 per hour, Craig 10/27.2/$95.10, and Tony 16/59.0/$65.00.
+- Tony's modeled five-day book is approximately 31.6 recurring field hours. Tuesday ($84.10/hour) and especially Monday ($65.00/hour) remain below target, proving that same-day technician reassignment alone cannot reach $100/hour without selective service-day density changes or additional nearby revenue.
 
 ## Known exceptions
 
@@ -138,12 +140,13 @@ Pipedream is not required for this flow. Keep old Pipedream workflows paused unt
 
 ## Where to resume
 
-1. Confirm Melissa Furrie's cadence cohort from her next completed SNG job and confirm Casey Lucio's Weekly versus Tuesday/Thursday source conflict. Then add depot/start-end travel and isolated-stop cost before treating route revenue/hour as the final paid-hour KPI.
-2. Confirm the next real pause webhook creates an Airtable pause row and the next unpause closes its D1 duration. Add a dashboard overdue-return alert once at least one real pause cycle has been observed.
-3. Resolve the 13 `Needs Validation` historical cancellations by confirming whether a paid invoice existed before cancellation; keep them excluded unless payment evidence establishes a real customer relationship. Then complete any remaining required churn comments.
-4. Observe at least five normal Bria workdays, confirm the 30-minute cutoff matches actual office transitions, and then decide whether to include her in a combined team rate.
-5. Capture one real one-time job and its `client:invoice_finalized` event end to end; verify job ID, client, service date, invoice ID, amount, and payment status can be tied together without double counting.
-6. Correct the invalid mileage row and negative dog-food inventory before using those totals for decisions.
+1. Sign in to `/admin/route-partner/`, select a known dispatched date, and run the first management-controlled read-only import. Confirm technician ownership, SNG stop order, combined-address cards, and the empty/native food behavior before finalizing any route. Do not enable customer messages, payments, or technician release yet.
+2. Confirm Melissa Furrie's cadence cohort from her next completed SNG job and confirm Casey Lucio's Weekly versus Tuesday/Thursday source conflict. Then add depot/start-end travel and isolated-stop cost before treating route revenue/hour as the final paid-hour KPI.
+3. Confirm the next real pause webhook creates an Airtable pause row and the next unpause closes its D1 duration. Add a dashboard overdue-return alert once at least one real pause cycle has been observed.
+4. Resolve the 13 `Needs Validation` historical cancellations by confirming whether a paid invoice existed before cancellation; keep them excluded unless payment evidence establishes a real customer relationship. Then complete any remaining required churn comments.
+5. Observe at least five normal Bria workdays, confirm the 30-minute cutoff matches actual office transitions, and then decide whether to include her in a combined team rate.
+6. Capture one real one-time job and its `client:invoice_finalized` event end to end; verify job ID, client, service date, invoice ID, amount, and payment status can be tied together without double counting.
+7. Correct the invalid mileage row and negative dog-food inventory before using those totals for decisions.
 
 ## Start-of-session checklist
 

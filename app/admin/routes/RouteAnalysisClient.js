@@ -20,6 +20,7 @@ export default function RouteAnalysisClient({ initialSummary }) {
   }), { miles: 0, drive: 0, service: 0 }), [plan]);
 
   const transition = plan?.officeTransitionScenario;
+  const density = plan?.selectiveDayScenario;
   const transitionTechnicians = useMemo(() => {
     const technicians = new Map();
     for (const route of transition?.routes ?? []) {
@@ -104,6 +105,19 @@ export default function RouteAnalysisClient({ initialSummary }) {
       </div>
       <div className={styles.tableWrap}><table className={styles.routeTable}><thead><tr><th>Day</th><th>Modeled owner</th><th>Stops</th><th>Miles</th><th>Field time</th><th>Revenue</th><th>Revenue / hour</th></tr></thead><tbody>{(transition.routes ?? []).map((route) => <tr key={`transition-${route.technicianName}-${route.routeId}`}><td><strong>{route.routeId}</strong></td><td>{route.technicianName}</td><td>{number(route.stopCount)}</td><td>{number(route.distanceMiles, 1)}</td><td>{hours(route.plannedMinutes)}</td><td>{money(route.routeRevenue)}</td><td><span className={Number(route.revenuePerPlannedHour) >= 100 ? styles.gain : styles.warningRate}>{money(route.revenuePerPlannedHour)}</span></td></tr>)}</tbody></table></div>
       <div className={styles.disclosure}><strong>Scenario boundary:</strong> This compares open customer-to-customer routes. Depot travel, breaks, vehicle loading, one-time jobs, and paid non-route time remain excluded. “Customers moved” means modeled technician ownership only; no customer day changes and no SNG/Airtable updates occur.</div>
+    </section> : null}
+
+    {density ? <section className={styles.candidates}>
+      <div className={styles.candidateHead}><div><div className={styles.eyebrow}>Read-only service-day test</div><h2>Selective density improvement</h2></div><p>Only flexible single-day accounts are tested. Twice-weekly commitments remain locked, and candidates are rejected when the destination day is economically weaker.</p></div>
+      <div className={styles.summaryGrid}>
+        <div><span>Moves tested</span><strong>{number(density.moves?.length)}</strong></div>
+        <div><span>Baseline miles</span><strong>{number(density.baselineTotals?.miles, 1)}</strong></div>
+        <div><span>Modeled miles</span><strong>{number(density.modeledTotals?.miles, 1)}</strong></div>
+        <div><span>Miles improved</span><strong>{number(Number(density.baselineTotals?.miles || 0) - Number(density.modeledTotals?.miles || 0), 1)}</strong></div>
+        <div><span>Modeled team rate</span><strong className={Number(density.modeledTotals?.revenuePerPlannedHour) >= 100 ? "" : styles.belowTarget}>{money(density.modeledTotals?.revenuePerPlannedHour)}</strong></div>
+      </div>
+      {density.moves?.length ? <div className={styles.tableWrap}><table className={styles.routeTable}><thead><tr><th>Customer</th><th>Area</th><th>Current day</th><th>Modeled day</th><th>Source day rate</th><th>Destination rate</th><th>Neighbor gain</th></tr></thead><tbody>{density.moves.map((move) => <tr key={`density-${move.customerId}`}><td><strong>{move.customer}</strong></td><td>{move.region}</td><td>{move.currentDay}</td><td><b>{move.suggestedDay}</b></td><td>{money(move.sourceDayRate)}</td><td>{money(move.destinationDayRate)}</td><td><span className={styles.gain}>{number(move.proximityMilesSaved, 2)} mi</span></td></tr>)}</tbody></table></div> : <div className={styles.disclosure}><strong>Result:</strong> No flexible customer passed all current-week safeguards. That is a valid result; no weaker move is promoted merely to create a recommendation.</div>}
+      <div className={styles.disclosure}><strong>Scenario boundary:</strong> These are modeled service-day changes for management review only. Customer preferences, route promises, and SNG records remain unchanged unless you later approve a specific move.</div>
     </section> : null}
 
     {plan?.recommendations?.length ? <section className={styles.candidates}>
