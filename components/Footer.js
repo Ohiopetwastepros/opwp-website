@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function Footer() {
   return (
-    <div style={{ fontFamily: "var(--font-hanken), sans-serif", background: "#14304A", color: "#aebecd" }}>
+    <div data-opwp-footer style={{ fontFamily: "var(--font-hanken), sans-serif", background: "#14304A", color: "#aebecd" }}>
       <div
         className="opwp-gfoot"
         style={{ maxWidth: 1200, margin: "0 auto", padding: "60px 28px 30px", display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1.2fr", gap: 40 }}

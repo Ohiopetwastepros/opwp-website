@@ -117,6 +117,8 @@ Decision: Can management trust today's numbers, and what failed before it affect
 - Current-week output uses the latest completed Airtable service date to anchor A/B and monthly cadence. Coverage is 86/87 cadence accounts; Melissa Furrie is included but disclosed as unanchored until a completed job supplies the cohort.
 - Flexible-day candidates are advisory, exclude locked two-day accounts, stay within established service regions, and never write changes back automatically.
 - The Craig-office/Tony-full-time scenario is presentation-only. Craig retains one geographically defined Monday route and is office-focused Tuesday-Friday; Tony owns Wednesday/Friday and one geographic cluster on Monday/Tuesday/Thursday; Bria owns the complementary clusters. The calculation includes shared-owner records, keeps every service day fixed, and exposes remaining capacity rather than treating 40 hours of recurring scooping as a target.
+- Selective service-day packages are also presentation-only and must improve both full road-route miles and total planned minutes before the dashboard labels them candidates. Model version 6 rejected the initial three-customer package: 372.3 to 383.6 miles, 3,102.4 to 3,123.2 minutes, and $93.50 to $92.90 per team route hour.
+- Model version 7 adds independent Monday road tests. Dana Mocek Monday-to-Friday passes (-1.9 miles and -15.2 minutes); Tim Mitchell Monday-to-Friday fails (+16.1 miles and +45.4 minutes). Opposite-cohort biweekly candidates such as Denise Knicely are explicitly labeled unvalidated rather than inferred from an off-week route.
 
 Every promoted KPI must have:
 

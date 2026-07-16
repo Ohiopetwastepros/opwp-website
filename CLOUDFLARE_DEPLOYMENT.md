@@ -196,7 +196,7 @@ next adapter.
 
 ### Immediate next steps
 
-Current production Worker version: `a211fa0a-ae93-451d-aaab-35e427f117e7` (2026-07-15 Route Partner foundation, cadence-aware route intelligence, and the read-only Craig-office/Tony-full-time geographic scenario). D1 migration `0020_route_partner_foundation.sql` is applied remotely. Production schedules run subscription truth at `0 11 * * *`, the Airtable cockpit snapshot at `15 * * * *`, and the active route book at `35 * * * *`.
+Current production Worker version: `44cef2b5-f9dd-4671-8e29-012e4e401deb` (2026-07-15 premium management sign-in/session flow, Route Partner experience pass, cadence-aware route intelligence, and model-version-7 independent Monday road tests). D1 migrations `0020_route_partner_foundation.sql` and `0021_admin_login_security.sql` are applied remotely. Production schedules run subscription truth at `0 11 * * *`, the Airtable cockpit snapshot at `15 * * * *`, and the active route book at `35 * * * *`.
 
 1. Refresh `/admin/financials/` once on version
    `597aec82-26c0-4b65-aee0-fb62a3a3d54f` to populate the sanitized metadata

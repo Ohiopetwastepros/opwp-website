@@ -118,6 +118,8 @@ Pipedream is not required for this flow. Keep old Pipedream workflows paused unt
 - Replaced the initial Tony-only runway with a road-calculated future-state scenario: Craig retains one dense Monday field route and transitions to office leadership Tuesday-Friday; Tony becomes the five-day field anchor; Bria owns complementary Monday/Tuesday/Thursday books. All service days stay unchanged and nothing writes back.
 - The current-week model regroups 49 customers by same-day geography, reduces modeled open-route mileage from 385.5 to 372.3 miles, and yields 51.7 team field hours at $93.50/hour before depot/break time. Monday still needs three technicians: Bria 30 stops/41.2 miles/$95.60 per hour, Craig 10/27.2/$95.10, and Tony 16/59.0/$65.00.
 - Tony's modeled five-day book is approximately 31.6 recurring field hours. Tuesday ($84.10/hour) and especially Monday ($65.00/hour) remain below target, proving that same-day technician reassignment alone cannot reach $100/hour without selective service-day density changes or additional nearby revenue.
+- Added a read-only selective service-day test that excludes every twice-weekly/two-day account and performs a full road-time recalculation before promoting a move. The first package tested Greg Gladieux Thursday-to-Wednesday plus Dana Mocek and Tim Mitchell Monday-to-Friday; it was rejected because mileage rose from 372.3 to 383.6, planned time rose from 3,102.4 to 3,123.2 minutes, and team rate fell from $93.50 to $92.90/hour. No source records changed.
+- Model version 7 now tests Monday candidates independently against the complete affected Monday/destination routes. Dana Mocek Monday-to-Friday is the only currently validated candidate: -1.9 miles, -15.2 planned minutes, and +$0.50/team-hour. Tim Mitchell Monday-to-Friday is rejected: +16.1 miles, +45.4 minutes, and -$1.40/team-hour. Denise Knicely Monday-to-Thursday remains unvalidated because her biweekly cohort is not due in the modeled week. The dashboard displays these verdicts and never writes a day change automatically.
 
 ## Known exceptions
 
@@ -132,6 +134,16 @@ Pipedream is not required for this flow. Keep old Pipedream workflows paused unt
 
 ## Deployment notes
 
+### 2026-07-15 premium management-access checkpoint
+
+- Replaced the browser-native Basic Authentication prompt with a branded OPWP management sign-in at `/admin/login/`.
+- Admin credentials now create a signed, HttpOnly, SameSite=Lax session that expires after 12 hours; the existing `ADMIN_USERNAME` and `ADMIN_PASSWORD` Worker secrets remain the credential source.
+- Added D1 migration `0021_admin_login_security.sql` and a hashed-IP login-attempt ledger. Five failed attempts within 15 minutes temporarily block further attempts without storing raw IP addresses.
+- Protected page requests redirect to sign-in, protected API requests return structured `SESSION_REQUIRED` JSON, expired client sessions return to sign-in automatically, and management has an explicit sign-out control.
+- Rebuilt Route Partner as a focused import -> review -> release workspace with larger typography/touch targets, clear zero-data state, responsive desktop/mobile layouts, status messaging, and a confirmation dialog before final release.
+- Admin pages now suppress both the public site header and public footer so the management workspace feels like a standalone application.
+- Production Worker `44cef2b5-f9dd-4671-8e29-012e4e401deb` is deployed at 100%. Verified: login `200` without `WWW-Authenticate`, session status `200`, unauthenticated Route Partner redirect `307`, protected API `401`, and public dog-food page `200`.
+
 - The project currently lives inside OneDrive, which has locked and duplicated generated build artifacts.
 - Recommended permanent location: `C:\Projects\opwp-website-next` (outside OneDrive).
 - Preserve the current OneDrive folder as a backup until the moved copy builds and deploys successfully.
@@ -140,8 +152,8 @@ Pipedream is not required for this flow. Keep old Pipedream workflows paused unt
 
 ## Where to resume
 
-1. Sign in to `/admin/route-partner/`, select a known dispatched date, and run the first management-controlled read-only import. Confirm technician ownership, SNG stop order, combined-address cards, and the empty/native food behavior before finalizing any route. Do not enable customer messages, payments, or technician release yet.
-2. Confirm Melissa Furrie's cadence cohort from her next completed SNG job and confirm Casey Lucio's Weekly versus Tuesday/Thursday source conflict. Then add depot/start-end travel and isolated-stop cost before treating route revenue/hour as the final paid-hour KPI.
+1. Sign in at `/admin/login/`, continue to `/admin/route-partner/`, select a known dispatched date, and run the first management-controlled read-only import. Confirm technician ownership, SNG stop order, combined-address cards, and the empty/native food behavior before finalizing any route. Do not enable customer messages, payments, or technician release yet.
+2. Confirm Melissa Furrie's cadence cohort from her next completed SNG job and confirm Casey Lucio's Weekly versus Tuesday/Thursday source conflict. Then add depot/start-end travel, paid shift hours, and isolated-stop cost before treating route revenue/hour as the final paid-hour KPI. The first selective service-day package was road-tested and rejected, so focus next on Monday territory compression/additional nearby revenue rather than implementing those three day moves.
 3. Confirm the next real pause webhook creates an Airtable pause row and the next unpause closes its D1 duration. Add a dashboard overdue-return alert once at least one real pause cycle has been observed.
 4. Resolve the 13 `Needs Validation` historical cancellations by confirming whether a paid invoice existed before cancellation; keep them excluded unless payment evidence establishes a real customer relationship. Then complete any remaining required churn comments.
 5. Observe at least five normal Bria workdays, confirm the 30-minute cutoff matches actual office transitions, and then decide whether to include her in a combined team rate.
