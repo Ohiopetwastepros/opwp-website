@@ -110,7 +110,7 @@ Decision: Can management trust today's numbers, and what failed before it affect
 
 ### Route Intelligence implementation checkpoint — 2026-07-15
 
-- Authoritative active-book source: protected hourly Airtable cockpit snapshot in D1.
+- Authoritative active-book source: protected Airtable cockpit snapshot in D1. The normal schedule refreshes hourly; route assignment also refreshes it on demand when it is more than 15 minutes old.
 - Current coverage: 213/213 street addresses geocoded, 224 service-day memberships, 179.75 weekly-equivalent visits, 11 locked two-day records, and 18 technician/day route sectors.
 - Road-time sequences use Geoapify matrices; large technician/day books are geographically sectorized at 30 stops to remain within matrix limits.
 - Route revenue/hour uses recurring revenue per scheduled visit divided by modeled service plus drive time, with $100/hour as the operating target.
@@ -119,6 +119,7 @@ Decision: Can management trust today's numbers, and what failed before it affect
 - The Craig-office/Tony-full-time scenario is presentation-only. Craig retains one geographically defined Monday route and is office-focused Tuesday-Friday; Tony owns Wednesday/Friday and one geographic cluster on Monday/Tuesday/Thursday; Bria owns the complementary clusters. The calculation includes shared-owner records, keeps every service day fixed, and exposes remaining capacity rather than treating 40 hours of recurring scooping as a target.
 - Selective service-day packages are also presentation-only and must improve both full road-route miles and total planned minutes before the dashboard labels them candidates. Model version 6 rejected the initial three-customer package: 372.3 to 383.6 miles, 3,102.4 to 3,123.2 minutes, and $93.50 to $92.90 per team route hour.
 - Model version 7 adds independent Monday road tests. Dana Mocek Monday-to-Friday passes (-1.9 miles and -15.2 minutes); Tim Mitchell Monday-to-Friday fails (+16.1 miles and +45.4 minutes). Opposite-cohort biweekly candidates such as Denise Knicely are explicitly labeled unvalidated rather than inferred from an off-week route.
+- The Route Intelligence view now contains the live successor to OPWP Route Assignment Tool V12. The office can paste one full service address and choose frequency; city and ZIP are resolved from the street match. New recurring customers are ranked by actual road-time insertion into the nearest current route sector, eight-hour route capacity, projected route revenue/hour, established region/day density, and current future-state technician ownership. Automatic recommendations are stored and surfaced for office review; they are not treated as applied until SNG contains the confirmed schedule.
 
 Every promoted KPI must have:
 

@@ -120,6 +120,11 @@ Pipedream is not required for this flow. Keep old Pipedream workflows paused unt
 - Tony's modeled five-day book is approximately 31.6 recurring field hours. Tuesday ($84.10/hour) and especially Monday ($65.00/hour) remain below target, proving that same-day technician reassignment alone cannot reach $100/hour without selective service-day density changes or additional nearby revenue.
 - Added a read-only selective service-day test that excludes every twice-weekly/two-day account and performs a full road-time recalculation before promoting a move. The first package tested Greg Gladieux Thursday-to-Wednesday plus Dana Mocek and Tim Mitchell Monday-to-Friday; it was rejected because mileage rose from 372.3 to 383.6, planned time rose from 3,102.4 to 3,123.2 minutes, and team rate fell from $93.50 to $92.90/hour. No source records changed.
 - Model version 7 now tests Monday candidates independently against the complete affected Monday/destination routes. Dana Mocek Monday-to-Friday is the only currently validated candidate: -1.9 miles, -15.2 planned minutes, and +$0.50/team-hour. Tim Mitchell Monday-to-Friday is rejected: +16.1 miles, +45.4 minutes, and -$1.40/team-hour. Denise Knicely Monday-to-Thursday remains unvalidated because her biweekly cohort is not due in the modeled week. The dashboard displays these verdicts and never writes a day change automatically.
+- Rebuilt `OPWP_Route_Assignment_Tool_V12.xlsx` as a live protected onboarding workflow. V12 remains an unchanged reference; its static formula (`ZIP density × 6 + city density × 3 + cohort match × 2 − day load × 1.5 − tech load`) and manual import queues are replaced by the current Airtable/D1 active book, cached street coordinates, Geoapify road-time insertion, route capacity, projected route revenue/hour, current territory density, and the Craig-office/Tony-full-time staffing model.
+- Every recurring website onboarding now receives an automatic route recommendation before the SNG onboarding request. The result is retained in D1 `onboarding_route_assignments`, appended to the internal SNG account note, and shown in the Route Intelligence automatic-onboarding queue. One-time jobs are excluded. Existing twice-weekly commitments remain locked; new twice-weekly onboardings are evaluated as allowed day pairs, with Sylvania fixed to Tuesday/Thursday.
+- Simplified the protected route checker to one full-address field plus frequency; service minutes and core monthly revenue are optional planning inputs. The address is street-matched and its city/ZIP are resolved automatically. Before every manual check or recurring website onboarding, the system refreshes Airtable when the protected cockpit snapshot is more than 15 minutes old. Newly visible active customers are folded into the closest current route sector even if the scheduled route-plan job has not run yet. A refresh failure is logged to system health and visibly falls back to the last valid snapshot instead of blocking the customer workflow.
+- The backend also includes a protected manual simulator for street address, frequency, estimated service minutes, and core monthly revenue. It ranks all five days with added road minutes/miles, modeled technician, projected route hours, projected revenue/hour, regional density, and the three nearest active customers. Simulations do not create customers or persist queue rows.
+- The Sweep & Go onboarding integration has no proven service-day write field. Recommendations therefore require office confirmation in SNG; the system does not invent or send an unsupported schedule parameter.
 
 ## Known exceptions
 
@@ -143,6 +148,16 @@ Pipedream is not required for this flow. Keep old Pipedream workflows paused unt
 - Rebuilt Route Partner as a focused import -> review -> release workspace with larger typography/touch targets, clear zero-data state, responsive desktop/mobile layouts, status messaging, and a confirmation dialog before final release.
 - Admin pages now suppress both the public site header and public footer so the management workspace feels like a standalone application.
 - Production Worker `44cef2b5-f9dd-4671-8e29-012e4e401deb` is deployed at 100%. Verified: login `200` without `WWW-Authenticate`, session status `200`, unauthenticated Route Partner redirect `307`, protected API `401`, and public dog-food page `200`.
+
+### 2026-07-15 technician field-app checkpoint
+
+- Built the complete initial mobile technician workflow at `/field/` and individual field access at `/field/login/`; account and assignment control lives at `/admin/route-partner/team/`.
+- Route release now creates a shift, required truck load, food-payment gate, and inventory requirements. The field workflow records mileage, breaks, arrivals, task state, food proof/placement, inventory disposition, and route closeout.
+- Scoop tasks require a second validation against Sweep & Go completion. Management route control now exposes CRM validation and field exception approval/denial.
+- The repeatable local two-stop field simulation passes all authenticated operations, including private photo upload/readback and inventory closeout.
+- Cloudflare R2 is not enabled on the account, so the initial release uses compressed D1 proof storage capped at 1.25 MB. Connect R2 before broad rollout.
+- Customer texts are recorded in the notification outbox but are not sent until a messaging provider is connected.
+- Full workflow and test handoff: `docs/TECHNICIAN_FIELD_APP.md`.
 
 - The project currently lives inside OneDrive, which has locked and duplicated generated build artifacts.
 - Recommended permanent location: `C:\Projects\opwp-website-next` (outside OneDrive).

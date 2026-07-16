@@ -18,6 +18,8 @@ export default function RoutePartnerClient({ initialDate, initialDay }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [confirmPlan, setConfirmPlan] = useState(null);
+  const [reviewException, setReviewException] = useState(null);
+  const [denialReason, setDenialReason] = useState("");
   const hasPlans = Boolean(day?.plans?.length);
   const allFinalized = useMemo(() => hasPlans && day.plans.every((plan) => plan.status === "finalized"), [day, hasPlans]);
 
@@ -62,12 +64,35 @@ export default function RoutePartnerClient({ initialDate, initialDay }) {
     finally { setLoading(""); }
   }
 
+  async function validateCrm() {
+    if (loading) return;
+    setLoading("validate"); setError(""); setNotice("");
+    try {
+      const data = await request({ action: "validate_crm", date });
+      setDay(data.day);
+      setNotice(`${number(data.validation?.validated)} CRM completion${data.validation?.validated === 1 ? "" : "s"} validated; ${number(data.validation?.pending)} still pending.`);
+    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "CRM completions could not be validated."); }
+    finally { setLoading(""); }
+  }
+
+  async function decideException(decision) {
+    if (!reviewException || loading) return;
+    setLoading(`exception-${reviewException.id}`); setError(""); setNotice("");
+    try {
+      const data = await request({ action: "review_exception", date, requestId: reviewException.id, decision, denialReason });
+      setDay(data.day); setReviewException(null); setDenialReason("");
+      setNotice(`The field change request was ${decision}.`);
+    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "The field change request could not be reviewed."); }
+    finally { setLoading(""); }
+  }
+
   return <>
     <section className={styles.control} aria-labelledby="route-control-title">
       <div><span className={styles.sectionLabel}>Today’s control point</span><h2 id="route-control-title">{longDate(date)}</h2><p>{hasPlans ? "Review the route cards below, then release each approved route." : "Choose a service date and import its dispatched work."}</p></div>
       <div className={styles.controls}>
         <label><span>Service date</span><input type="date" value={date} onChange={(event) => loadDate(event.target.value)} disabled={Boolean(loading)} /></label>
         <button className={styles.primaryButton} type="button" onClick={importDay} disabled={Boolean(loading)}>{loading === "import" ? <><i />Importing…</> : hasPlans ? "Refresh route" : "Import route"}</button>
+        {hasPlans ? <button className={styles.controlSecondary} type="button" onClick={validateCrm} disabled={Boolean(loading)}>{loading === "validate" ? "Checking…" : "Validate CRM"}</button> : null}
       </div>
     </section>
 
@@ -87,12 +112,15 @@ export default function RoutePartnerClient({ initialDate, initialDay }) {
       <button className={styles.primaryButton} type="button" onClick={importDay} disabled={Boolean(loading)}>Import {longDate(date)}</button>
     </section> : <div className={styles.routeList}>{day.plans.map((plan) => <article className={styles.route} key={plan.id}>
       <header><div><div className={styles.routeMeta}><Status value={plan.status} /><span>Version {plan.version}</span></div><h2>{plan.technicianName || "Unassigned route"}</h2><p>{plan.routeId || "Default route"} · {number(plan.locationCount)} physical stops</p></div><button className={styles.releaseButton} type="button" onClick={() => setConfirmPlan(plan)} disabled={Boolean(loading) || plan.status !== "draft"}>{loading === plan.id ? <><i />Finalizing…</> : plan.status === "finalized" ? "✓ Route released" : plan.status === "draft" ? "Review & release" : "Unavailable"}</button></header>
-      <div className={styles.routeSummary}><span><b>{number(plan.sourceJobCount)}</b> scoop jobs</span><span><b>{number(plan.foodTaskCount)}</b> food deliveries</span><span><b>{minutes(plan.locations.reduce((sum, location) => sum + location.estimatedMinutes, 0))}</b> estimated service</span><span>Imported <b>{plan.importedAt ? new Date(plan.importedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "—"}</b></span></div>
+      <div className={styles.routeSummary}><span><b>{number(plan.sourceJobCount)}</b> scoop jobs</span><span><b>{number(plan.foodTaskCount)}</b> food deliveries</span><span><b>{minutes(plan.locations.reduce((sum, location) => sum + location.estimatedMinutes, 0))}</b> estimated service</span><span>Field status <b>{plan.field?.status ? String(plan.field.status).replaceAll("_", " ") : "Not assigned"}</b></span></div>
+      {plan.field ? <div className={styles.fieldStrip}><div><span>Technician app</span><strong>{String(plan.field.status).replaceAll("_", " ")}</strong></div><div><span>Truck load</span><strong>{String(plan.field.loadStatus).replaceAll("_", " ")}</strong></div><div><span>Payment check</span><strong>{String(plan.field.paymentStatus).replaceAll("_", " ")}</strong></div><div><span>Mileage</span><strong>{plan.field.startingMileage ?? "—"}{plan.field.endingMileage != null ? ` → ${plan.field.endingMileage}` : ""}</strong></div></div> : null}
+      {plan.exceptions?.length ? <section className={styles.exceptions}><header><div><span className={styles.sectionLabel}>Field exceptions</span><h3>{plan.exceptions.filter((item) => item.status === "pending").length} awaiting management</h3></div></header>{plan.exceptions.map((item) => <div className={styles.exceptionRow} key={item.id}><div><strong>{String(item.type).replaceAll("_", " ")}</strong><p>{String(item.reason).replaceAll("_", " ")}{item.inventoryDisposition ? ` · Inventory: ${String(item.inventoryDisposition).replaceAll("_", " ")}` : ""}</p></div><Status value={item.status} />{item.status === "pending" ? <button type="button" onClick={() => { setReviewException(item); setDenialReason(""); }}>Review</button> : null}</div>)}</section> : null}
       <ol className={styles.locations}>{plan.locations.map((location) => <li key={location.id}><span className={styles.sequence}>{location.sequence}</span><div className={styles.locationBody}><div className={styles.locationHead}><div><strong>{location.customerName || "Service location"}</strong><p>{location.address}</p></div><small>{minutes(location.estimatedMinutes)}</small></div><div className={styles.tasks}>{location.tasks.map((task) => <div className={`${styles.task} ${task.type === "dog_food" ? styles.foodTask : styles.scoopTask}`} key={task.id}><span>{task.type === "dog_food" ? "Food" : "Scoop"}</span><div><strong>{task.type === "dog_food" ? task.productSummary || "Dog food delivery" : task.customerName || "Scooping service"}</strong><small>{task.type === "dog_food" ? task.placementNote || "Placement confirmation required" : `CRM completion: ${task.crmCompletionStatus}`}</small></div><Status value={task.status} /></div>)}</div></div></li>)}</ol>
     </article>)}</div>}
 
     <section className={styles.boundary}><span aria-hidden="true">i</span><div><strong>Safe initial release</strong><p>Route Partner reads the CRM, combines service work, and records management approval. It will not change CRM routing, charge a card, or message a customer in this release.</p></div></section>
 
     {confirmPlan ? <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmPlan(null); }}><section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="release-title"><span className={styles.modalIcon} aria-hidden="true">✓</span><h2 id="release-title">Release this route?</h2><p>You’re approving <strong>{confirmPlan.technicianName || "this technician"}</strong> with {number(confirmPlan.locationCount)} stops for {longDate(date)}.</p><div><button type="button" className={styles.secondaryButton} onClick={() => setConfirmPlan(null)}>Keep reviewing</button><button type="button" className={styles.primaryButton} onClick={finalize}>Release route</button></div></section></div> : null}
+    {reviewException ? <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setReviewException(null); }}><section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="exception-title"><span className={`${styles.modalIcon} ${styles.warningIcon}`} aria-hidden="true">!</span><h2 id="exception-title">Review field exception</h2><p><strong>{String(reviewException.type).replaceAll("_", " ")}</strong><br />Reason: {String(reviewException.reason).replaceAll("_", " ")}</p><label className={styles.denialField}><span>Reason if denied</span><textarea value={denialReason} onChange={(event) => setDenialReason(event.target.value)} maxLength={500} placeholder="Tell the technician and customer why the request cannot be approved." /></label><div className={styles.exceptionActions}><button type="button" className={styles.secondaryButton} onClick={() => decideException("denied")} disabled={!denialReason.trim() || Boolean(loading)}>Deny request</button><button type="button" className={styles.primaryButton} onClick={() => decideException("approved")} disabled={Boolean(loading)}>Approve request</button></div></section></div> : null}
   </>;
 }

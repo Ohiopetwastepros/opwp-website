@@ -290,6 +290,7 @@ export default function QuoteForm() {
     yard_size_tier:          yardSize,
     yard_upcharge_monthly:   yardUpcharge,
     quoted_monthly_total:    monthlyTotal,
+    route_monthly_revenue:   monthly,
     selected_addons:         Object.keys(selected).filter((k) => selected[k]),
   });
 

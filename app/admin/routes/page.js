@@ -4,6 +4,7 @@ import { verifyAdminRequest } from "@/lib/admin-auth";
 import { getDb } from "@/lib/db";
 import { getActiveSubscriptionRouteSummary } from "@/lib/route-intelligence";
 import RouteAnalysisClient from "./RouteAnalysisClient";
+import OnboardingRouteTool from "./OnboardingRouteTool";
 import styles from "./routes.module.css";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +47,7 @@ export default async function RoutesPage() {
                 <div><span>04</span><strong>Owner approval is required</strong><p>No service day or technician assignment is ever pushed back automatically.</p></div>
               </div>
             </section>
+            <OnboardingRouteTool />
             <RouteAnalysisClient initialSummary={source} />
           </>
         )}

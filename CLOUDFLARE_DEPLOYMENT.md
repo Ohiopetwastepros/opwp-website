@@ -71,7 +71,7 @@ Wrangler is authenticated for `ohiopetwastepros@outlook.com`, and the
 `opwp-website` Worker has been created in Cloudflare:
 
 - Worker ID: `b8bfed82ca9a43cdae6bf8501c33a862`
-- Current deployed version: `a211fa0a-ae93-451d-aaab-35e427f117e7`
+- Current deployed version: `57bad319-7ffa-48ce-b7ee-a5aa9633d1b8`
 - Worker URL: `https://opwp-website.ohiopetwastepros.workers.dev`
 
 The workers.dev route is active for testing. The `ohiopetwastepros.com` zone can
@@ -196,7 +196,7 @@ next adapter.
 
 ### Immediate next steps
 
-Current production Worker version: `44cef2b5-f9dd-4671-8e29-012e4e401deb` (2026-07-15 premium management sign-in/session flow, Route Partner experience pass, cadence-aware route intelligence, and model-version-7 independent Monday road tests). D1 migrations `0020_route_partner_foundation.sql` and `0021_admin_login_security.sql` are applied remotely. Production schedules run subscription truth at `0 11 * * *`, the Airtable cockpit snapshot at `15 * * * *`, and the active route book at `35 * * * *`.
+Current production Worker version: `57bad319-7ffa-48ce-b7ee-a5aa9633d1b8` (2026-07-15 address-first live Airtable route checker, on-demand 15-minute freshness guard, immediate inclusion of newly visible active customers, automatic address city/ZIP resolution, premium management sessions, Route Partner and technician field-app foundations, and cadence-aware route intelligence). D1 migrations through `0023_field_proof_fallback.sql` are applied remotely, including `onboarding_route_assignments`, the technician field-app schema, and proof-storage fallback. Production schedules run subscription truth at `0 11 * * *`, the Airtable cockpit snapshot at `15 * * * *`, and the active route book at `35 * * * *`.
 
 1. Refresh `/admin/financials/` once on version
    `597aec82-26c0-4b65-aee0-fb62a3a3d54f` to populate the sanitized metadata
