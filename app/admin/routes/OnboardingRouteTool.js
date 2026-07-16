@@ -6,7 +6,7 @@ import styles from "./routes.module.css";
 const number = (value, digits = 0) => new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(Number(value) || 0);
 const money = (value) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value) || 0);
 
-export default function OnboardingRouteTool() {
+export default function OnboardingRouteTool({ endpoint = "/api/admin/route-assignment/", officeMode = false }) {
   const [form, setForm] = useState({ address: "", frequency: "once_a_week", estimated_service_minutes: "", monthly_revenue: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -15,11 +15,11 @@ export default function OnboardingRouteTool() {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/admin/route-assignment/", { cache: "no-store" }).then((response) => response.json()).then((data) => {
+    fetch(endpoint, { cache: "no-store" }).then((response) => response.json()).then((data) => {
       if (active && data.ok) setAssignments(data.assignments ?? []);
     }).catch(() => {});
     return () => { active = false; };
-  }, []);
+  }, [endpoint]);
 
   const update = (name) => (event) => setForm((current) => ({ ...current, [name]: event.target.value }));
   async function analyze(event) {
@@ -28,7 +28,7 @@ export default function OnboardingRouteTool() {
     setError("");
     setResult(null);
     try {
-      const response = await fetch("/api/admin/route-assignment/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form), cache: "no-store" });
+      const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form), cache: "no-store" });
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.error || "The address could not be analyzed.");
       setResult(data.recommendation);
@@ -37,7 +37,7 @@ export default function OnboardingRouteTool() {
   }
 
   return <section className={styles.assignmentTool}>
-    <div className={styles.assignmentHead}><div><div className={styles.eyebrow}>OPWP Route Assignment Tool · live Airtable edition</div><h2>Type an address. Confirm the best service day.</h2><p>The engine refreshes the active Airtable customer book when needed, then tests real road-time insertion into every weekday route. Excel is no longer part of the operating flow.</p></div><span>Live customers + road time</span></div>
+    <div className={styles.assignmentHead}><div><div className={styles.eyebrow}>OPWP Route Assignment Tool · live Airtable edition</div><h2>Type an address. Confirm the best service day.</h2><p>The engine refreshes the active Airtable customer book when needed, then tests real road-time insertion into every weekday route.{officeMode ? " Use this recommendation when confirming the customer's service day." : " Excel is no longer part of the operating flow."}</p></div><span>Live customers + road time</span></div>
     <form className={styles.assignmentForm} onSubmit={analyze}>
       <label className={styles.addressField}><span>Full service address</span><input required value={form.address} onChange={update("address")} placeholder="123 Main St, Toledo, OH 43615" autoComplete="street-address" /></label>
       <label><span>Frequency</span><select value={form.frequency} onChange={update("frequency")}><option value="once_a_week">Weekly</option><option value="every_other_week">Biweekly</option><option value="twice_a_week">Twice weekly</option><option value="once_a_month">Monthly</option></select></label>
