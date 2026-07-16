@@ -199,10 +199,11 @@ export default async function AdminPage({ searchParams }) {
           <a href="/admin/financials/"><span>02</span>Financial performance</a>
           <a className={view === "operations" ? styles.active : ""} href="/admin/?view=operations"><span>03</span>Route operations</a>
           <a href="/admin/routes/"><span>04</span>Route intelligence</a>
-          <a className={view === "customers" ? styles.active : ""} href="/admin/?view=customers"><span>05</span>Growth &amp; retention</a>
-          <a className={view === "food" ? styles.active : ""} href="/admin/?view=food"><span>06</span>Extreme Dog Fuel</a>
-          <a className={view === "scorecard" ? styles.active : ""} href="/admin/?view=scorecard"><span>07</span>Management scorecard</a>
-          <a className={view === "systems" ? styles.active : ""} href="/admin/?view=systems"><span>08</span>Systems &amp; controls</a>
+          <a href="/admin/route-partner/"><span>05</span>Route Partner</a>
+          <a className={view === "customers" ? styles.active : ""} href="/admin/?view=customers"><span>06</span>Growth &amp; retention</a>
+          <a className={view === "food" ? styles.active : ""} href="/admin/?view=food"><span>07</span>Extreme Dog Fuel</a>
+          <a className={view === "scorecard" ? styles.active : ""} href="/admin/?view=scorecard"><span>08</span>Management scorecard</a>
+          <a className={view === "systems" ? styles.active : ""} href="/admin/?view=systems"><span>09</span>Systems &amp; controls</a>
         </nav>
         <div className={styles.railFoot}><span className={styles.live} /><div><strong>Systems online</strong><small>Protected executive access</small></div></div>
       </aside>

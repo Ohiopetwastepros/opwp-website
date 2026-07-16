@@ -19,29 +19,19 @@ export default function RouteAnalysisClient({ initialSummary }) {
     service: result.service + Number(route.serviceMinutes || 0),
   }), { miles: 0, drive: 0, service: 0 }), [plan]);
 
-  const tonyScenario = useMemo(() => {
-    const routes = plan?.routes ?? [];
-    const core = routes.filter((route) => route.technicianName === "Tony Bridgman");
-    const additions = routes.filter((route) => route.technicianName === "Bria Mahaney" && ["Wednesday", "Friday"].includes(String(route.routeId).split(" - ")[0]));
-    const aggregate = (rows) => rows.reduce((result, route) => ({
-      stops: result.stops + Number(route.stopCount || 0),
-      miles: result.miles + Number(route.distanceMiles || 0),
-      minutes: result.minutes + Number(route.plannedMinutes || 0),
-      revenue: result.revenue + Number(route.routeRevenue || 0),
-    }), { stops: 0, miles: 0, minutes: 0, revenue: 0 });
-    const current = aggregate(core);
-    const projectedRoutes = [...core, ...additions];
-    const projected = aggregate(projectedRoutes);
-    return {
-      core,
-      additions,
-      current,
-      projected,
-      projectedRate: projected.minutes ? projected.revenue / (projected.minutes / 60) : 0,
-      openHours: Math.max(0, 40 - projected.minutes / 60),
-      priorityRoutes: routes.filter((route) => Number(route.stopCount) >= 5).sort((left, right) => Number(left.revenuePerPlannedHour) - Number(right.revenuePerPlannedHour)).slice(0, 4),
-    };
-  }, [plan]);
+  const transition = plan?.officeTransitionScenario;
+  const transitionTechnicians = useMemo(() => {
+    const technicians = new Map();
+    for (const route of transition?.routes ?? []) {
+      const row = technicians.get(route.technicianName) || { technician: route.technicianName, stops: 0, miles: 0, minutes: 0, revenue: 0 };
+      row.stops += Number(route.stopCount || 0);
+      row.miles += Number(route.distanceMiles || 0);
+      row.minutes += Number(route.plannedMinutes || 0);
+      row.revenue += Number(route.routeRevenue || 0);
+      technicians.set(route.technicianName, row);
+    }
+    return [...technicians.values()].map((row) => ({ ...row, revenuePerHour: row.minutes ? row.revenue / (row.minutes / 60) : 0, capacityHours: Math.max(0, 40 - row.minutes / 60) }));
+  }, [transition]);
 
   async function refreshPlan() {
     if (loading) return;
@@ -100,22 +90,20 @@ export default function RouteAnalysisClient({ initialSummary }) {
       <div className={styles.disclosure}><strong>Interpretation:</strong> Road-time sequencing optimizes this week's cadence-eligible customers already assigned to that day and technician. Revenue/hour uses recurring revenue per scheduled visit against service plus road time, with a $100/hour target. {number(plan.cadenceAnchoredCustomers)}/{number(plan.cadenceCustomerCount)} biweekly/monthly accounts are date-anchored; {number(plan.unanchoredCadenceCustomers?.length)} are included pending a completed-date anchor. This does not change SNG.</div>
     </section> : <section className={styles.loading}><div className={styles.loadingMark}>→</div><div><strong>The route plan is being assembled automatically</strong><p>{number(summary?.activeCustomers - summary?.geocodedCustomers)} addresses remain to be street-matched. The hourly recovery job will continue until the road-time model is complete.</p></div></section>}
 
-    {plan ? <section className={styles.candidates}>
-      <div className={styles.candidateHead}><div><div className={styles.eyebrow}>Read-only staffing scenario</div><h2>Tony full-time route runway</h2></div><p>This models Tony retaining his current Monday, Tuesday, and Thursday routes and covering Bria's current Wednesday and Friday routes. It changes no service day, customer, or source assignment.</p></div>
+    {transition ? <section className={styles.candidates}>
+      <div className={styles.candidateHead}><div><div className={styles.eyebrow}>Read-only future-state scenario</div><h2>Craig office transition + Tony full-time</h2></div><p>Customer service days stay fixed. Craig retains one dense Monday route during the transition; Tony and Bria own the remaining route books, with Tony carrying Wednesday and Friday. Nothing is written back.</p></div>
       <div className={styles.summaryGrid}>
-        <div><span>Current core field time</span><strong>{hours(tonyScenario.current.minutes)}</strong></div>
-        <div><span>Modeled five-day time</span><strong>{hours(tonyScenario.projected.minutes)}</strong></div>
-        <div><span>Modeled stops</span><strong>{number(tonyScenario.projected.stops)}</strong></div>
-        <div><span>Modeled revenue / hr</span><strong className={tonyScenario.projectedRate >= 100 ? "" : styles.belowTarget}>{money(tonyScenario.projectedRate)}</strong></div>
-        <div><span>Capacity to 40 hours</span><strong>{hours(tonyScenario.openHours * 60)}</strong></div>
+        <div><span>Modeled customers moved</span><strong>{number(transition.changedCustomers)}</strong></div>
+        <div><span>Current fragmented miles</span><strong>{number(transition.currentTotals?.miles, 1)}</strong></div>
+        <div><span>Modeled route miles</span><strong>{number(transition.modeledTotals?.miles, 1)}</strong></div>
+        <div><span>Modeled field time</span><strong>{hours(transition.modeledTotals?.plannedMinutes)}</strong></div>
+        <div><span>Team revenue / hr</span><strong className={Number(transition.modeledTotals?.revenuePerPlannedHour) >= 100 ? "" : styles.belowTarget}>{money(transition.modeledTotals?.revenuePerPlannedHour)}</strong></div>
       </div>
       <div className={styles.scenarioGrid}>
-        <article className={styles.scenarioCard}><span>Expansion order 01</span><h3>Friday route</h3><strong>{hours(tonyScenario.additions.find((route) => String(route.routeId).startsWith("Friday"))?.plannedMinutes)}</strong><p>{number(tonyScenario.additions.find((route) => String(route.routeId).startsWith("Friday"))?.stopCount)} stops at {money(tonyScenario.additions.find((route) => String(route.routeId).startsWith("Friday"))?.revenuePerPlannedHour)}/hour. This is the strongest full-day addition using the current setup.</p></article>
-        <article className={styles.scenarioCard}><span>Expansion order 02</span><h3>Wednesday route</h3><strong>{hours(tonyScenario.additions.find((route) => String(route.routeId).startsWith("Wednesday"))?.plannedMinutes)}</strong><p>{number(tonyScenario.additions.find((route) => String(route.routeId).startsWith("Wednesday"))?.stopCount)} stops at {money(tonyScenario.additions.find((route) => String(route.routeId).startsWith("Wednesday"))?.revenuePerPlannedHour)}/hour. It creates a fifth field day with room for one-time work.</p></article>
-        <article className={styles.scenarioCard}><span>Primary constraint</span><h3>Tony's Monday route</h3><strong>{money(tonyScenario.core.find((route) => String(route.routeId).startsWith("Monday"))?.revenuePerPlannedHour)}/hr</strong><p>{number(tonyScenario.core.find((route) => String(route.routeId).startsWith("Monday"))?.distanceMiles, 1)} road miles for {number(tonyScenario.core.find((route) => String(route.routeId).startsWith("Monday"))?.stopCount)} stops. Geographic consolidation on Monday matters more than adding volume.</p></article>
+        {transitionTechnicians.map((row) => <article className={styles.scenarioCard} key={row.technician}><span>Future field book</span><h3>{row.technician}</h3><strong>{hours(row.minutes)}</strong><p>{number(row.stops)} stops · {number(row.miles, 1)} road miles · {money(row.revenuePerHour)}/hour · {number(row.capacityHours, 1)} hours open to 40.</p></article>)}
       </div>
-      <div className={styles.tableWrap}><table className={styles.routeTable}><thead><tr><th>Efficiency priority</th><th>Current owner</th><th>Stops</th><th>Miles</th><th>Field time</th><th>Revenue / hour</th><th>Read-only action</th></tr></thead><tbody>{tonyScenario.priorityRoutes.map((route) => <tr key={`priority-${route.technicianName}-${route.routeId}`}><td><strong>{route.routeId}</strong></td><td>{route.technicianName}</td><td>{number(route.stopCount)}</td><td>{number(route.distanceMiles, 1)}</td><td>{hours(route.plannedMinutes)}</td><td><span className={Number(route.revenuePerPlannedHour) >= 100 ? styles.gain : styles.warningRate}>{money(route.revenuePerPlannedHour)}</span></td><td>{String(route.routeId).startsWith("Monday") ? "Consolidate same-day geographic pockets" : "Review isolated street clusters"}</td></tr>)}</tbody></table></div>
-      <div className={styles.disclosure}><strong>Scenario boundary:</strong> The modeled five-day total excludes Bria/Tony or Craig/Tony shared records, depot travel, breaks, vehicle loading, office time, and one-time work. The open hours are operating capacity—not a recommendation to fill all 40 hours with recurring scooping.</div>
+      <div className={styles.tableWrap}><table className={styles.routeTable}><thead><tr><th>Day</th><th>Modeled owner</th><th>Stops</th><th>Miles</th><th>Field time</th><th>Revenue</th><th>Revenue / hour</th></tr></thead><tbody>{(transition.routes ?? []).map((route) => <tr key={`transition-${route.technicianName}-${route.routeId}`}><td><strong>{route.routeId}</strong></td><td>{route.technicianName}</td><td>{number(route.stopCount)}</td><td>{number(route.distanceMiles, 1)}</td><td>{hours(route.plannedMinutes)}</td><td>{money(route.routeRevenue)}</td><td><span className={Number(route.revenuePerPlannedHour) >= 100 ? styles.gain : styles.warningRate}>{money(route.revenuePerPlannedHour)}</span></td></tr>)}</tbody></table></div>
+      <div className={styles.disclosure}><strong>Scenario boundary:</strong> This compares open customer-to-customer routes. Depot travel, breaks, vehicle loading, one-time jobs, and paid non-route time remain excluded. “Customers moved” means modeled technician ownership only; no customer day changes and no SNG/Airtable updates occur.</div>
     </section> : null}
 
     {plan?.recommendations?.length ? <section className={styles.candidates}>

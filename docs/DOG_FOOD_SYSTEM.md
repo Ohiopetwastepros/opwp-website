@@ -298,3 +298,28 @@ The management layer should report revenue, gross margin, bags sold by SKU,
 subscription demand, churn, failed payments, inventory on hand, inventory value,
 weeks of supply, suggested reorder quantity, purchase-order status, route delivery
 volume, delivery cost, and on-time delivery rate.
+
+## Route Partner foundation checkpoint — 2026-07-15
+
+The first standalone operating slice now exists in the repository:
+
+- D1 uses `route_partner_organizations` as the tenant boundary. OPWP is the first
+  organization; CRM connections, members, route versions, tasks, vehicles, load
+  checks, events, and change requests are all organization-scoped.
+- `/admin/route-partner/` imports a selected Sweep & Go dispatch day without
+  creating dog-food customers, jobs, or subscriptions in Sweep & Go.
+- Each import creates an immutable draft version only when the underlying scoop
+  jobs or native dog-food work changed. Identical imports do not create duplicates.
+- Scoop jobs retain their dispatched order. Scheduled native food deliveries are
+  merged onto the same physical location card when the address matches; food-only
+  stops remain native Route Partner locations.
+- Management can review and finalize each technician route. Finalization is
+  recorded in an append-only route event ledger and does not write back to the CRM.
+- The schema includes the next operating controls: individual members/roles,
+  vehicle inventory links, predeparture load/payment checks, CRM completion
+  validation, task GPS/photo evidence, and management change requests with an
+  explicit inventory-disposition checkpoint.
+
+This checkpoint intentionally does not message customers, charge cards, change a
+CRM route, or expose the technician field app. Those actions remain disabled until
+their confirmation loops and provider integrations are implemented and tested.

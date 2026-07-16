@@ -69,6 +69,14 @@ Pipedream is not required for this flow. Keep old Pipedream workflows paused unt
 
 ## Repairs and validations completed
 
+- Added the first multi-tenant Route Partner operating foundation. The protected
+  `/admin/route-partner/` workspace imports dispatched Sweep & Go jobs, preserves
+  their order, merges native dog-food tasks by physical address, versions every
+  changed route, and records management finalization without writing food records
+  back to the CRM. D1 migration `0020_route_partner_foundation.sql` also establishes
+  member roles, CRM adapters, combined location/task cards, vehicle load checks,
+  completion validation, audit events, and change-request inventory checkpoints.
+
 - Removed 756 duplicate Airtable job rows covering January–July 2026.
 - Backfilled 890 SNG completed jobs for the latest 30-day period.
 - Removed 616 synthetic `LIVE-` duplicates after numeric SNG jobs were present.
