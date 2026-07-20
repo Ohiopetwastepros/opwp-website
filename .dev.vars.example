@@ -8,6 +8,10 @@ ADMIN_DEV_BYPASS="true"
 ADMIN_USERNAME="owner"
 ADMIN_PASSWORD="use-a-strong-local-development-password"
 
+# Stripe test keys first. Store live values with Wrangler secrets, never here.
+STRIPE_SECRET_KEY=""
+STRIPE_WEBHOOK_SECRET=""
+
 NEXT_PUBLIC_AIRTABLE_OPS_URL="https://airtable.com/appcAWPBQB8GmOrcT/tblhi8MGUOsWNmd37/viw5yCUbwl2GWnXff?blocks=hide"
 AIRTABLE_BASE_ID="appcAWPBQB8GmOrcT"
 AIRTABLE_OPERATIONS_TABLE_ID="tblhi8MGUOsWNmd37"

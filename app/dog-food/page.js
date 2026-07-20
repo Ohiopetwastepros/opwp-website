@@ -1,5 +1,8 @@
 import DogFoodOrderTool from "./DogFoodOrderTool";
 import styles from "./dog-food.module.css";
+import { stripeConfigured } from "@/lib/stripe";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Extreme Dog Fuel Delivered in Northwest Ohio",
@@ -118,7 +121,7 @@ export default function DogFoodPage() {
           <h2>Build your delivery in a few simple steps.</h2>
           <p>One household, up to ten dogs, and one easy recurring order.</p>
         </div>
-        <DogFoodOrderTool />
+        <DogFoodOrderTool paymentConfigured={stripeConfigured()} />
       </section>
     </div>
   );

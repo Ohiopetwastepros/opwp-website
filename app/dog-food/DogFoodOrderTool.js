@@ -119,12 +119,13 @@ function dogProfileCompletion(dogs) {
   });
 }
 
-export default function DogFoodOrderTool() {
+export default function DogFoodOrderTool({ paymentConfigured = false }) {
   const [step, setStep] = useState(1);
   const [customer, setCustomer] = useState(initialCustomer);
   const [dogs, setDogs] = useState([newDog(1, true)]);
   const [plan, setPlan] = useState("subscription");
   const [delivery, setDelivery] = useState("route_day");
+  const [billingConsent, setBillingConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
@@ -271,15 +272,23 @@ export default function DogFoodOrderTool() {
       setError("Please complete the delivery address before ordering.");
       return;
     }
+    if (plan === "subscription" && !billingConsent) {
+      setError("Please authorize monthly billing before continuing to secure payment.");
+      return;
+    }
     setSubmitting(true);
     try {
       const response = await fetch("/api/dog-food/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customer, dogs, recommendations, orderLines, plan, delivery, totals, partialSubmissionId }),
+        body: JSON.stringify({ customer, dogs, recommendations, orderLines, plan, delivery, totals, partialSubmissionId, billingConsent }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "We could not submit your order.");
+      if (data.checkoutUrl) {
+        window.location.assign(data.checkoutUrl);
+        return;
+      }
       toolRef.current?.scrollIntoView({ behavior: "auto", block: "start" });
       setResult(data);
     } catch (submissionError) {
@@ -325,7 +334,7 @@ export default function DogFoodOrderTool() {
         <div className={styles.successIcon}>✓</div>
         <span>Order request {result.orderNumber}</span>
         <h3>Thanks, {customer.firstName}. Your order is in.</h3>
-        <p>No card has been charged yet. An OPWP team member will confirm your delivery day and securely finish payment while online checkout is being connected.</p>
+        <p>Your request is saved, but secure checkout is not available yet. An OPWP team member will confirm your delivery day and finish payment with you.</p>
         <div className={styles.successSummary}>
           <span>{dogs.length} {dogs.length === 1 ? "dog" : "dogs"}</span>
           <span>{orderLines.reduce((sum, line) => sum + line.quantity, 0)} {orderLines.length === 1 ? "bag" : "bags"}</span>
@@ -616,14 +625,18 @@ export default function DogFoodOrderTool() {
                 <Field label="Where should we leave the food?"><select value={customer.placement} onChange={(event) => updateCustomer("placement", event.target.value)}><option>Front porch</option><option>Garage door</option><option>Side door</option><option>Back porch</option><option>Inside gate</option><option>Other</option></select></Field>
                 {customer.placement === "Other" && <Field label="Other placement"><input value={customer.placementOther} onChange={(event) => updateCustomer("placementOther", event.target.value)} placeholder="Tell the route professional where to leave it" /></Field>}
               </div>
-              <div className={styles.paymentNotice}><strong>Secure online payment is being connected.</strong><span>Submitting this request does not charge a card. OPWP will confirm your order and payment before delivery.</span></div>
+              {plan === "subscription" && <label className={styles.billingConsent}>
+                <input type="checkbox" checked={billingConsent} onChange={(event) => setBillingConsent(event.target.checked)} />
+                <span><strong>Authorize monthly delivery and billing</strong>I authorize OPWP to securely save my payment method with Stripe and charge the current order total now. Future dog-food orders will be charged approximately 48 hours before each confirmed monthly delivery. I can update, pause, or cancel before the next charge.</span>
+              </label>}
+              <div className={styles.paymentNotice}><strong>{paymentConfigured ? "Secure payment powered by Stripe" : "Secure payment setup is coming next"}</strong><span>{paymentConfigured ? "Your order is created using the prices shown here, then you will continue to Stripe to pay. OPWP never receives or stores your full card number." : "Your request will be saved without charging a card. OPWP will confirm the first route date and complete payment with you while Stripe activation is finalized."}</span></div>
             </section>
           )}
 
           {error && <div className={styles.errorMessage} role="alert">{error}</div>}
           <div className={styles.formActions}>
             {step > 1 && <button type="button" className={styles.backButton} onClick={goBack}>Back</button>}
-            {step < 4 ? <button type="button" className={styles.nextButton} onClick={goNext}>Continue <span>→</span></button> : <button type="button" className={styles.orderButton} onClick={submitOrder} disabled={submitting}>{submitting ? "Submitting…" : "Order Now"} <span>→</span></button>}
+            {step < 4 ? <button type="button" className={styles.nextButton} onClick={goNext}>Continue <span>→</span></button> : <button type="button" className={styles.orderButton} onClick={submitOrder} disabled={submitting}>{submitting ? (paymentConfigured ? "Opening secure checkout…" : "Saving order…") : (paymentConfigured ? "Order & Pay Securely" : "Submit Order Request")} <span>→</span></button>}
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 import { verifyAdminRequest } from "@/lib/admin-auth";
 import { getDb } from "@/lib/db";
-import { recordDogFoodPayment } from "@/lib/dog-food-payments";
+import { activateDogFoodSubscriptionFromOrder, recordDogFoodPayment } from "@/lib/dog-food-payments";
+import { createDogFoodPaymentSetup } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +66,11 @@ async function scheduleOrder(db, body) {
      ON CONFLICT(order_id) DO UPDATE SET scheduled_date=excluded.scheduled_date,delivery_type=excluded.delivery_type,
        placement_note=excluded.placement_note,status='scheduled',updated_at=CURRENT_TIMESTAMP`
   ).bind(crypto.randomUUID(), order.id, order.customer_id, order.address_id, scheduledDate, deliveryType, placement).run();
-  return { orderId: order.id, scheduledDate };
+  await db.prepare(
+    "UPDATE dog_food_orders SET status=CASE WHEN status='paid' THEN 'scheduled' ELSE status END,updated_at=CURRENT_TIMESTAMP WHERE id=?"
+  ).bind(order.id).run();
+  const subscription = await activateDogFoodSubscriptionFromOrder({ db, orderId: order.id });
+  return { orderId: order.id, scheduledDate, subscription };
 }
 
 async function updateOrder(db, body, actor) {
@@ -164,6 +169,13 @@ async function createOrder(db, body, actor) {
   return { orderId, orderNumber, totalCents: totals.total };
 }
 
+async function createStripeSetup(db, body, request) {
+  const customerId = clean(body.customerId, 100);
+  const orderId = clean(body.orderId, 100) || null;
+  if (!customerId) throw new Error("Choose a customer for secure payment setup.");
+  return createDogFoodPaymentSetup({ db, customerId, orderId, origin: new URL(request.url).origin });
+}
+
 export async function POST(request) {
   const current = await context(request);
   if (current.response) return current.response;
@@ -178,6 +190,8 @@ export async function POST(request) {
           ? await updateOrder(current.db, body, current.auth.email)
         : action === "schedule_order"
           ? await scheduleOrder(current.db, body)
+        : action === "create_stripe_setup"
+          ? await createStripeSetup(current.db, body, request)
         : null;
     if (!result) return Response.json({ ok: false, error: "The requested action is not supported." }, { status: 400 });
     console.log(JSON.stringify({ event: `dog_food_${action}`, actor: current.auth.email, ...result }));

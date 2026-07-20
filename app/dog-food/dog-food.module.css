@@ -294,6 +294,10 @@
 .recommendationInfo p { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .disclaimer { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: #f4f5f2; color: #6e7a82; font-size: 11px; line-height: 1.45; }
 .paymentNotice { display: flex; flex-direction: column; gap: 2px; margin-top: 24px; padding: 14px 16px; border-left: 4px solid #d3aa22; border-radius: 8px; background: #fff8dc; color: #655619; font-size: 12px; }
+.billingConsent { display: flex; align-items: flex-start; gap: 12px; margin-top: 22px; padding: 16px; border: 1px solid #cfe0ca; border-radius: 12px; background: #f5faf3; color: #53635a; font-size: 11px; line-height: 1.5; cursor: pointer; }
+.billingConsent input { flex: none; width: 18px; height: 18px; margin-top: 2px; accent-color: var(--green); }
+.billingConsent span { display: flex; flex-direction: column; gap: 2px; }
+.billingConsent strong { color: var(--navy); font-size: 13px; }
 .formActions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 30px; padding-top: 22px; border-top: 1px solid #eeece6; }
 .backButton, .nextButton, .orderButton { min-height: 52px; padding: 0 25px; border-radius: 13px; font: 800 14px var(--font-hanken); cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, filter .18s ease; }
 .backButton { border: 1px solid #ccd2d5; background: #fff; color: #52616a; }

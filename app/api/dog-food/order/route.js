@@ -1,4 +1,5 @@
 import { cancelDogFoodFollowUp, getDb, saveSubmission } from "@/lib/db";
+import { createDogFoodCheckout, stripeConfigured } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
@@ -113,6 +114,9 @@ export async function POST(request) {
     if (body.plan === "subscription" && body.delivery !== "route_day") {
       return Response.json({ error: "Monthly delivery must use the free recurring route day." }, { status: 400 });
     }
+    if (body.plan === "subscription" && body.billingConsent !== true) {
+      return Response.json({ error: "Please authorize monthly billing before continuing to secure checkout." }, { status: 400 });
+    }
     if (body.delivery === "same_day" && !sameDayOrderingOpen()) {
       return Response.json({ error: "Same-day ordering closes at 12:00 PM Eastern. Choose next-day or a free route day." }, { status: 400 });
     }
@@ -156,10 +160,21 @@ export async function POST(request) {
       await cancelDogFoodFollowUp(body.partialSubmissionId);
     }
 
+    let checkout = null;
+    if (commerceOrder && stripeConfigured()) {
+      try {
+        checkout = await createDogFoodCheckout({ db: getDb(), orderId: commerceOrder.orderId, origin: new URL(request.url).origin });
+      } catch (error) {
+        console.error(JSON.stringify({ event: "dog_food_checkout_creation_failed", orderId: commerceOrder.orderId, message: error instanceof Error ? error.message : "failed" }));
+      }
+    }
+
     return Response.json({
       ok: true,
       orderNumber: commerceOrder?.orderNumber || `EDF-${stored.id.slice(0, 8).toUpperCase()}`,
       stored: stored.configured,
+      checkoutUrl: checkout?.checkoutUrl || null,
+      paymentConfigured: stripeConfigured(),
     });
   } catch {
     return Response.json({ error: "We could not submit the order. Please try again." }, { status: 500 });
