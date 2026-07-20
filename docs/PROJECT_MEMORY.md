@@ -9,7 +9,7 @@ This file is the durable handoff for future work. Update it after meaningful dat
 - Executive dashboard: `https://opwp-website.ohiopetwastepros.workers.dev/admin/`
 - D1 event ledger: `https://opwp-website.ohiopetwastepros.workers.dev/admin/events/`
 - Cloudflare Worker: `opwp-website`
-- Current production version: `3d075ca2-22c3-4784-9172-1d05d50ae78f` (deployed 2026-07-20)
+- Current production version: `feaf19d4-1532-4a4a-8be2-5a5b9d69ebf8` (deployed 2026-07-20)
 - Route Partner management: `https://opwp-website.ohiopetwastepros.workers.dev/admin/route-partner/`
 - D1 database: `opwp-backend`
 - Airtable base: `OPWP Operating System`
