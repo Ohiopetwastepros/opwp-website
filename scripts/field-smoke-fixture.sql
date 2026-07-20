@@ -11,6 +11,12 @@ DELETE FROM route_partner_tasks WHERE route_plan_id='qa-field-plan';
 DELETE FROM route_partner_locations WHERE route_plan_id='qa-field-plan';
 DELETE FROM route_partner_route_plans WHERE id='qa-field-plan';
 DELETE FROM dog_food_deliveries WHERE id='qa-food-delivery';
+DELETE FROM dog_food_subscription_items WHERE subscription_id IN (SELECT id FROM dog_food_subscriptions WHERE customer_id='qa-food-customer');
+DELETE FROM dog_food_subscriptions WHERE customer_id='qa-food-customer';
+DELETE FROM dog_food_payments WHERE order_id IN (SELECT id FROM dog_food_orders WHERE customer_id='qa-food-customer' AND source='admin_manual');
+DELETE FROM dog_food_deliveries WHERE order_id IN (SELECT id FROM dog_food_orders WHERE customer_id='qa-food-customer' AND source='admin_manual');
+DELETE FROM dog_food_order_items WHERE order_id IN (SELECT id FROM dog_food_orders WHERE customer_id='qa-food-customer' AND source='admin_manual');
+DELETE FROM dog_food_orders WHERE customer_id='qa-food-customer' AND source='admin_manual';
 -- The smoke Worker must run with FIELD_AUTH_SECRET=field-smoke-local-secret.
 INSERT INTO route_partner_members (id,organization_id,email,display_name,role,external_employee_id,status)
 VALUES ('qa-field-member','org-opwp','field.qa@opwp.local','Field QA','technician','qa-tech','active')

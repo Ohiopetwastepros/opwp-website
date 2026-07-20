@@ -195,3 +195,12 @@ Pipedream is not required for this flow. Keep old Pipedream workflows paused unt
 - Added global focus, reduced-motion, touch, dialog, and security-header improvements.
 - Added `scripts/dog-food-smoke.mjs` and expanded `scripts/field-smoke.mjs` guardrail coverage.
 - Full findings and remaining external integration boundaries are in `docs/PRODUCT_AUDIT_2026-07-20.md`.
+
+# July 20, 2026 — standalone dog-food commerce checkpoint
+
+- Established D1 and the OPWP application as the source of truth for every dog-food subscription. Do not create food subscriptions in Sweep & Go, including for existing scooping customers.
+- Added the protected `/admin/dog-food/` operations workspace for customers, orders, payment status, recurring subscriptions, delivery dates, and inventory visibility.
+- Added guarded internal order entry and auditable manual payment confirmation. The temporary flow requires management to charge the card in Sweep & Go/CardPointe first and then record the unique external transaction reference; the OPWP action never claims to charge the card.
+- Website checkout now creates a normalized unpaid commerce order in addition to its retained submission record. New monthly requests cannot be marked paid or activated until management confirms the first route delivery date.
+- The first successful payment activates one native four-week subscription per customer/address and merges multiple formula lines into it. Duplicate payment references and duplicate captured payments are rejected.
+- Jim Hansen order `EDF-JH-20260720-01` remains delivered and payment due for one Red 30-20 and one Blue 26-14 bag ($129.30 including Lucas County tax). Do not mark it paid until the real SNG/CardPointe charge is completed.

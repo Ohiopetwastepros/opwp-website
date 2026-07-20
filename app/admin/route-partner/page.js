@@ -31,7 +31,7 @@ export default async function RoutePartnerPage() {
           <a href="/admin/routes/">Route intelligence</a>
           <a className={styles.active} href="/admin/route-partner/">Route Partner</a>
           <a href="/admin/route-partner/team/">Field team</a>
-          <a href="/admin/?view=food">Extreme Dog Fuel</a>
+          <a href="/admin/dog-food/">Extreme Dog Fuel</a>
           <a href="/admin/?view=systems">Systems &amp; controls</a>
         </nav>
         <div className={styles.railFoot}><span />Systems connected</div>

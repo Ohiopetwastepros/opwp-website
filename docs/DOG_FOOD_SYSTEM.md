@@ -2,12 +2,13 @@
 
 ## Current build checkpoint
 
-Last updated: 2026-07-15
+Last updated: 2026-07-20
 
 - Live tool: `https://opwp-website.ohiopetwastepros.workers.dev/dog-food/`
 - Current production version: `a211fa0a-ae93-451d-aaab-35e427f117e7`
 - Protected Route Partner workspace: `https://opwp-website.ohiopetwastepros.workers.dev/admin/route-partner/`
 - Protected route dashboard: `https://opwp-website.ohiopetwastepros.workers.dev/admin/routes/`
+- Protected dog-food operations workspace: `https://opwp-website.ohiopetwastepros.workers.dev/admin/dog-food/`
 - Primary UI files: `app/dog-food/DogFoodOrderTool.js` and `app/dog-food/dog-food.module.css`
 - The customer journey currently has four steps: blends and gated price, dog profiles, recommendations, and order/delivery.
 - Price is revealed only after first name, last name, email, mobile phone, and SMS consent are complete.
@@ -23,7 +24,11 @@ Last updated: 2026-07-15
 - The onboarding flow was streamlined on 2026-07-14. Continue and Back now move focus and scroll directly to the top of the active tool before the next interaction, mobile controls use direct touch handling and shorter transitions, steps 1–3 use the full application width without a duplicate sidebar, the order summary appears only at checkout, and the repeated product-lineup and route-marketing sections below the form were removed.
 - Checkout terminology was clarified on 2026-07-14. Customer types are now Current scooping customer, New route partner customer, and One-time delivery only; order types are Monthly delivery and One-time order. Selecting a one-time customer sets a one-time order, while selecting a new route partner sets monthly route delivery.
 - The four Extreme Dog Fuel bag PNGs have transparent corners and preserve the original packaging artwork.
-- Production checkout does not charge a card yet; it creates an order request while the final payment integration is decided.
+- Production checkout does not charge a card yet. It now creates both the retained form submission and a normalized unpaid commerce order so the request appears in dog-food operations.
+- Dog-food subscriptions are owned exclusively by the standalone system, including subscriptions for existing scooping customers. Sweep & Go must not contain parallel dog-food subscriptions.
+- During the payment transition, management charges an existing card manually in Sweep & Go or CardPointe and records the unique transaction/invoice reference in dog-food operations. No card data is copied into D1.
+- A website monthly request must receive a confirmed first delivery date before its first payment can be recorded. Confirming that first payment activates one four-week standalone subscription and schedules the next charge 48 hours before the next delivery.
+- The protected dog-food workspace centralizes customers, orders, payment state, monthly subscriptions, product availability, and inventory visibility. It deliberately keeps payment confirmation separate from delivery completion.
 - The first route-intelligence backend was deployed on 2026-07-14. `GEOAPIFY_API_KEY` is present as a write-only Cloudflare secret, and the integration keeps the key server-side.
 - D1 migration `0016_route_intelligence.sql` adds a reusable address geocode cache, analysis-run ledger, and aggregate route-day metrics. Customer addresses are never returned in the route-analysis response or written to Worker logs.
 - The protected `/api/admin/route-intelligence` endpoint imports one chosen Sweep & Go dispatch date, normalizes technician/route/sequence/address/service-time fields, geocodes only uncached addresses with a configurable hard cap, and calculates ordered drive miles, drive minutes, service minutes, planned minutes, and remaining time against the initial eight-hour target.

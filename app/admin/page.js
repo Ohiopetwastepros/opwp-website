@@ -115,6 +115,7 @@ function attentionItems(opwp, dogFood, cockpitOk, recurringSngCount, events = []
   if (subscriptionStatusReviews?.openCount > 0) items.push({ title: `${subscriptionStatusReviews.openCount} subscription status review${subscriptionStatusReviews.openCount === 1 ? "" : "s"} open`, detail: `${money(subscriptionStatusReviews.coreMrrAtRisk)} of scooping MRR is preserved pending confirmation; these records are not counted as churn.`, tone: "warn", href: "#subscription-status-reviews" });
   if (opwp.churnReasonReviewCount > 0) items.push({ title: `${opwp.churnReasonReviewCount} churn detail record${opwp.churnReasonReviewCount === 1 ? " needs" : "s need"} review`, detail: "The confirmed cancellation is missing either its standardized reason or required comment. Complete the Airtable Churn Log.", tone: "warn", href: "#churn-reason-review" });
   if (opwp.churnEligibilityReviewCount > 0) items.push({ title: `${opwp.churnEligibilityReviewCount} cancellation${opwp.churnEligibilityReviewCount === 1 ? " needs" : "s need"} eligibility validation`, detail: "These records have no completed-service or paid-invoice evidence and are excluded from churn until the office confirms a paid customer relationship.", tone: "warn", href: "#churn-eligibility-review" });
+  if (opwp.googleReviewRecentOneTimeCount > 0) items.push({ title: `${opwp.googleReviewRecentOneTimeCount} recent one-time client${opwp.googleReviewRecentOneTimeCount === 1 ? "" : "s"} has not reviewed`, detail: "A completed one-time job from the last 30 days is highlighted for manual review-request follow-up.", tone: "warn", href: "#google-reviews" });
   if (eventFailures.length > 0) items.push({ title: `${eventFailures.length} backend event${eventFailures.length === 1 ? "" : "s"} need attention`, detail: "Automatic recovery is active and will retry these records when the next SNG event arrives.", tone: "bad", href: "/admin/events/" });
   if (!cockpitOk) items.push({ title: "Airtable metrics unavailable", detail: "The cockpit could not refresh its operating data.", tone: "bad", href: "#systems" });
   else if (opwp.airtableSnapshot?.status === "failed") items.push({ title: "Airtable refresh needs attention", detail: `The dashboard is safely using the last valid D1 snapshot. ${opwp.airtableSnapshot.error || "The hourly refresh will retry automatically."}`, tone: "bad", href: "#systems" });
@@ -201,7 +202,7 @@ export default async function AdminPage({ searchParams }) {
           <a href="/admin/routes/"><span>04</span>Route intelligence</a>
           <a href="/admin/route-partner/"><span>05</span>Route Partner</a>
           <a className={view === "customers" ? styles.active : ""} href="/admin/?view=customers"><span>06</span>Growth &amp; retention</a>
-          <a className={view === "food" ? styles.active : ""} href="/admin/?view=food"><span>07</span>Extreme Dog Fuel</a>
+          <a href="/admin/dog-food/"><span>07</span>Extreme Dog Fuel</a>
           <a className={view === "scorecard" ? styles.active : ""} href="/admin/?view=scorecard"><span>08</span>Management scorecard</a>
           <a className={view === "systems" ? styles.active : ""} href="/admin/?view=systems"><span>09</span>Systems &amp; controls</a>
         </nav>

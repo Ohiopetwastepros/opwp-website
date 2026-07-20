@@ -27,7 +27,7 @@ export default async function RoutesPage() {
           <a href="/admin/?view=operations">Route operations</a>
           <a className={styles.active} href="/admin/routes/">Route intelligence</a>
           <a href="/admin/route-partner/">Route Partner</a>
-          <a href="/admin/?view=food">Extreme Dog Fuel</a>
+          <a href="/admin/dog-food/">Extreme Dog Fuel</a>
           <a href="/admin/?view=systems">Systems &amp; controls</a>
         </nav>
         <div className={styles.railFoot}><span />Protected executive access</div>
