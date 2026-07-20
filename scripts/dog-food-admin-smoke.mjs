@@ -22,10 +22,21 @@ const created = await post({
   placement: "QA placement",
   items: [{ productId: "edf-22-12-pink-40", quantity: 1 }, { productId: "edf-26-14-blue-40", quantity: 1 }],
 });
-if (!created.orderId || created.totalCents !== 12930) throw new Error(`Unexpected order: ${JSON.stringify(created)}`);
+if (!created.orderId || created.totalCents !== 12714) throw new Error(`Unexpected order: ${JSON.stringify(created)}`);
+const edited = await post({
+  action: "update_order", orderId: created.orderId, plan: "subscription", delivery: "route_day", scheduledDate: "2026-07-20", placement: "QA revised placement",
+  items: [{ productId: "edf-22-12-pink-40", quantity: 1 }, { productId: "edf-26-14-blue-40", quantity: 2 }],
+});
+if (edited.totalCents !== 19071) throw new Error(`Unexpected edited order: ${JSON.stringify(edited)}`);
+const restored = await post({
+  action: "update_order", orderId: created.orderId, plan: "subscription", delivery: "route_day", scheduledDate: "2026-07-20", placement: "QA placement",
+  items: [{ productId: "edf-22-12-pink-40", quantity: 1 }, { productId: "edf-26-14-blue-40", quantity: 1 }],
+});
+if (restored.totalCents !== 12714) throw new Error(`Unexpected restored order: ${JSON.stringify(restored)}`);
 const paymentReference = `QA-${crypto.randomUUID()}`;
 const paid = await post({ action: "mark_paid", orderId: created.orderId, provider: "sng_manual", reference: paymentReference });
 if (paid.status !== "scheduled") throw new Error(`Unexpected payment result: ${JSON.stringify(paid)}`);
+await rejected({ action: "update_order", orderId: created.orderId, plan: "subscription", delivery: "route_day", scheduledDate: "2026-07-20", items: [{ productId: "edf-22-12-pink-40", quantity: 2 }] });
 await rejected({ action: "mark_paid", orderId: created.orderId, provider: "sng_manual", reference: `QA-${crypto.randomUUID()}` });
 const addedFormula = await post({
   action: "create_order", customerId: "qa-food-customer", plan: "subscription", delivery: "route_day", scheduledDate: "2026-08-17", placement: "QA placement",
@@ -37,4 +48,4 @@ const duplicateTarget = await post({
   items: [{ productId: "edf-30-20-red-40", quantity: 1 }],
 });
 await rejected({ action: "mark_paid", orderId: duplicateTarget.orderId, provider: "sng_manual", reference: paymentReference });
-console.log(JSON.stringify({ ok: true, orderNumber: created.orderNumber, totalCents: created.totalCents, paymentStatus: paid.status, subscriptionMerge: "requested", duplicatePaymentReference: "rejected", duplicateOrderCapture: "rejected" }));
+console.log(JSON.stringify({ ok: true, orderNumber: created.orderNumber, totalCents: restored.totalCents, editableOrder: "verified", paidOrderEdit: "rejected", paymentStatus: paid.status, subscriptionMerge: "requested", duplicatePaymentReference: "rejected", duplicateOrderCapture: "rejected" }));

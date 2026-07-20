@@ -276,7 +276,7 @@ subscription demand, and safety stock are known.
 
 ## Product availability
 
-- The four 40 lb Elite products are customer-visible at $60.
+- The four 40 lb Elite products are customer-visible at $59 before tax. Lucas County tax is calculated per taxable line, matching the current SNG invoice behavior ($63.57 for one bag; $127.14 for two bags).
 - The four 20 lb Elite products exist as inactive placeholders until their price,
   cost, and opening counts are supplied.
 - Camo and Sand can remain in Airtable for historical/distribution reporting but

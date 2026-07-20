@@ -173,14 +173,15 @@ export default function DogFoodOrderTool() {
       grouped.set(recommendation.formula.code, current);
     }
     return [...grouped.values()].map((line) => ({
-      ...line, bagWeight: 40, quantity: Math.max(1, Math.ceil(line.pounds / 40)), unitPrice: 60,
+      ...line, bagWeight: 40, quantity: Math.max(1, Math.ceil(line.pounds / 40)), unitPrice: 59,
     }));
   }, [recommendations]);
 
   const totals = useMemo(() => {
     const subtotal = orderLines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
     const fee = DELIVERY[delivery].fee;
-    const tax = (subtotal + fee) * 0.0775;
+    const foodTax = orderLines.reduce((sum, line) => sum + Math.round(line.unitPrice * 0.0775 * 100) / 100 * line.quantity, 0);
+    const tax = foodTax + Math.round(fee * 0.0775 * 100) / 100;
     return { subtotal, fee, tax, total: subtotal + fee + tax };
   }, [orderLines, delivery]);
 
@@ -308,7 +309,7 @@ export default function DogFoodOrderTool() {
     fetch("/api/dog-food/quote", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ customer, quote: { bagPrice: 60, tax: 4.65, total: 64.65 } }),
+      body: JSON.stringify({ customer, quote: { bagPrice: 59, tax: 4.57, total: 63.57 } }),
     })
       .then(async (response) => {
         const data = await response.json();
@@ -418,9 +419,9 @@ export default function DogFoodOrderTool() {
               </div>
               {quoteReady ? (
                 <div className={styles.perBagPrice} role="status">
-                  <div><span>One 40 lb bag</span><strong>{money(60)}</strong></div><b>+</b>
-                  <div><span>Lucas County tax (7.75%)</span><strong>{money(4.65)}</strong></div><b>=</b>
-                  <div className={styles.perBagTotal}><span>Total per bag</span><strong>{money(64.65)}</strong></div>
+                  <div><span>One 40 lb bag</span><strong>{money(59)}</strong></div><b>+</b>
+                  <div><span>Lucas County tax (7.75%)</span><strong>{money(4.57)}</strong></div><b>=</b>
+                  <div className={styles.perBagTotal}><span>Total per bag</span><strong>{money(63.57)}</strong></div>
                 </div>
               ) : (
                 <div className={styles.priceGate}>
@@ -435,8 +436,8 @@ export default function DogFoodOrderTool() {
               {quoteReady && (
                 <div className={styles.quoteReveal} role="status">
                   <span>Your quote is saved</span>
-                  <strong>{money(64.65)} <small>per 40 lb bag</small></strong>
-                  <small>{money(60)} food + {money(4.65)} Lucas County tax • free recurring route-day delivery</small>
+                  <strong>{money(63.57)} <small>per 40 lb bag</small></strong>
+                  <small>{money(59)} food + {money(4.57)} Lucas County tax • free recurring route-day delivery</small>
                   <p>If you stop here, your saved quote may receive one helpful follow-up text. Finishing the order automatically cancels that reminder.</p>
                 </div>
               )}
@@ -643,7 +644,7 @@ export default function DogFoodOrderTool() {
           {step !== 2 && <h3>{step === 1 ? (quoteReady ? "Price per bag" : "Unlock your price") : "Your order"}</h3>}
           {step === 1 ? (
             quoteReady ?
-              <div className={styles.emptyOrder}><span>Every 40 lb blend</span><strong>{money(64.65)}</strong><p>{money(60)} per bag + {money(4.65)} Lucas County tax. Recurring route-day delivery is free.</p></div> :
+              <div className={styles.emptyOrder}><span>Every 40 lb blend</span><strong>{money(63.57)}</strong><p>{money(59)} per bag + {money(4.57)} Lucas County tax. Recurring route-day delivery is free.</p></div> :
               <div className={styles.emptyOrder}><span>Contact information and consent</span><strong>Price locked</strong><p>Complete your name, email, mobile phone, and text consent to reveal the exact price with tax.</p></div>
           ) : step === 2 ? null : (
             <>

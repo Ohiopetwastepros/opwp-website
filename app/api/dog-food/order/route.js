@@ -44,7 +44,8 @@ async function createCommerceOrder(body, submissionId) {
 
   const subtotal = (products.results || []).reduce((sum, product) => sum + Number(product.retail_price_cents) * quantities.get(product.id), 0);
   const deliveryFee = body.delivery === "same_day" ? 1000 : body.delivery === "next_day" ? 500 : 0;
-  const tax = Math.round((subtotal + deliveryFee) * 0.0775);
+  const foodTax = (products.results || []).reduce((sum, product) => sum + Math.round(Number(product.retail_price_cents) * 0.0775) * quantities.get(product.id), 0);
+  const tax = foodTax + Math.round(deliveryFee * 0.0775);
   const customerRecord = await db.prepare("SELECT id FROM dog_food_customers WHERE lower(email)=? LIMIT 1").bind(email).first();
   const customerId = customerRecord?.id || crypto.randomUUID();
   const addressRecord = customerRecord

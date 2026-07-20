@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Dog Food Operations | OPWP", robots: { index: false, follow: false, nocache: true } };
 
 async function dashboard(db) {
-  const [summary, orders, subscriptions, products, customers] = await Promise.all([
+  const [summary, orders, subscriptions, products, customers, orderItems] = await Promise.all([
     db.prepare(`SELECT
       (SELECT COUNT(*) FROM dog_food_customers WHERE status='active') AS active_customers,
       (SELECT COUNT(*) FROM dog_food_orders WHERE status IN ('pending_payment','payment_failed')) AS unpaid_orders,
@@ -18,7 +18,7 @@ async function dashboard(db) {
       (SELECT COUNT(*) FROM dog_food_subscriptions WHERE status='active') AS active_subscriptions,
       (SELECT COUNT(*) FROM dog_food_deliveries WHERE scheduled_date=date('now') AND status IN ('scheduled','assigned','out_for_delivery')) AS due_today,
       (SELECT COALESCE(SUM(total_cents),0) FROM dog_food_orders WHERE status IN ('paid','scheduled','fulfilled') AND created_at>=datetime('now','-30 days')) AS revenue_30_cents`).first(),
-    db.prepare(`SELECT o.id,o.order_number,o.order_type,o.status,o.subtotal_cents,o.delivery_fee_cents,o.tax_cents,o.total_cents,o.created_at,
+    db.prepare(`SELECT o.id,o.order_number,o.order_type,o.status,o.subtotal_cents,o.delivery_fee_cents,o.tax_cents,o.total_cents,o.requested_delivery_speed,o.created_at,
       c.first_name,c.last_name,c.customer_type,c.sng_client_id,d.id AS delivery_id,d.scheduled_date,d.status AS delivery_status,d.delivered_at,d.placement_note,
       GROUP_CONCAT(CAST(oi.quantity AS TEXT)||'× '||p.formula_code||' '||p.color||' '||CAST(p.bag_weight_lb AS TEXT)||' lb',', ') AS items
       FROM dog_food_orders o JOIN dog_food_customers c ON c.id=o.customer_id
@@ -36,8 +36,21 @@ async function dashboard(db) {
     db.prepare(`SELECT c.id,c.first_name,c.last_name,c.email,c.phone,c.customer_type,c.sng_client_id,a.city,a.postal_code,a.route_day
       FROM dog_food_customers c LEFT JOIN dog_food_addresses a ON a.customer_id=c.id AND a.is_primary=1
       WHERE c.status='active' ORDER BY c.last_name,c.first_name LIMIT 250`).all(),
+    db.prepare(`SELECT oi.order_id,oi.product_id,oi.quantity FROM dog_food_order_items oi
+      JOIN (SELECT id FROM dog_food_orders ORDER BY created_at DESC LIMIT 75) recent ON recent.id=oi.order_id
+      ORDER BY oi.created_at`).all(),
   ]);
-  return { summary: summary || {}, orders: orders.results || [], subscriptions: subscriptions.results || [], products: products.results || [], customers: customers.results || [] };
+  const itemsByOrder = new Map();
+  for (const item of orderItems.results || []) {
+    const current = itemsByOrder.get(item.order_id) || [];
+    current.push({ productId: item.product_id, quantity: Number(item.quantity) || 0 });
+    itemsByOrder.set(item.order_id, current);
+  }
+  return {
+    summary: summary || {},
+    orders: (orders.results || []).map((order) => ({ ...order, lineItems: itemsByOrder.get(order.id) || [] })),
+    subscriptions: subscriptions.results || [], products: products.results || [], customers: customers.results || [],
+  };
 }
 
 export default async function DogFoodOperationsPage() {

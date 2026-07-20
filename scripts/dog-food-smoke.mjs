@@ -34,11 +34,11 @@ const payload = {
     skinCoat: "no",
     priority: "balanced",
   }],
-  recommendations: [],
-  orderLines: [],
+  recommendations: [{ dog: 1, dogId: 1, formula: { code: "26-14", color: "Blue" }, monthlyPounds: 22 }],
+  orderLines: [{ formula: { code: "26-14", color: "Blue" }, quantity: 1, bagWeight: 40, unitPrice: 59, pounds: 22, dogs: [1] }],
   plan: "subscription",
   delivery: "route_day",
-  totals: { subtotal: 60, fee: 0, tax: 4.65, total: 64.65 },
+  totals: { subtotal: 59, fee: 0, tax: 4.57, total: 63.57 },
 };
 
 async function submit(body) {

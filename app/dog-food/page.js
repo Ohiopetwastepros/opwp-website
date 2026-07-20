@@ -62,7 +62,7 @@ const productJsonLd = {
     offers: {
       "@type": "Offer",
       priceCurrency: "USD",
-      price: "60.00",
+      price: "59.00",
       availability: "https://schema.org/InStock",
     },
   })),

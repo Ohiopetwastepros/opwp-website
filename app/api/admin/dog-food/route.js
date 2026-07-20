@@ -6,6 +6,29 @@ export const dynamic = "force-dynamic";
 const validDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
 const clean = (value, max = 200) => String(value || "").trim().slice(0, max);
 
+async function pricedItems(db, requestedItems) {
+  const quantities = new Map((Array.isArray(requestedItems) ? requestedItems : []).map((item) => [
+    clean(item.productId, 100), Math.max(0, Math.min(10, Number(item.quantity) || 0)),
+  ]));
+  const productIds = [...quantities.entries()].filter(([, quantity]) => quantity > 0).map(([id]) => id);
+  if (!productIds.length || productIds.length > 8) throw new Error("Add at least one active dog-food product.");
+  const placeholders = productIds.map(() => "?").join(",");
+  const products = await db.prepare(
+    `SELECT id,retail_price_cents FROM dog_food_products
+     WHERE id IN (${placeholders}) AND is_active=1 AND retail_price_cents IS NOT NULL`
+  ).bind(...productIds).all();
+  if ((products.results || []).length !== productIds.length) throw new Error("One or more selected products are unavailable.");
+  return { quantities, products: products.results || [] };
+}
+
+function orderTotals(products, quantities, delivery) {
+  const deliveryFee = delivery === "same_day" ? 1000 : delivery === "next_day" ? 500 : 0;
+  const subtotal = products.reduce((sum, product) => sum + Number(product.retail_price_cents) * quantities.get(product.id), 0);
+  const foodTax = products.reduce((sum, product) => sum + Math.round(Number(product.retail_price_cents) * 0.0775) * quantities.get(product.id), 0);
+  const tax = foodTax + Math.round(deliveryFee * 0.0775);
+  return { subtotal, deliveryFee, tax, total: subtotal + deliveryFee + tax };
+}
+
 async function context(request) {
   const auth = await verifyAdminRequest(request.headers);
   if (!auth.authorized) return { response: Response.json({ ok: false, error: "Unauthorized" }, { status: 401 }) };
@@ -103,6 +126,60 @@ async function scheduleOrder(db, body) {
   return { orderId: order.id, scheduledDate };
 }
 
+async function updateOrder(db, body, actor) {
+  const orderId = clean(body.orderId, 100);
+  const plan = body.plan === "subscription" ? "subscription" : "on_demand";
+  const delivery = ["route_day", "next_day", "same_day"].includes(body.delivery) ? body.delivery : "route_day";
+  const scheduledDate = clean(body.scheduledDate, 10);
+  if (!orderId) throw new Error("Choose an order to edit.");
+  if (plan === "subscription" && delivery !== "route_day") throw new Error("Monthly delivery must use the free route day.");
+  if (scheduledDate && !validDate(scheduledDate)) throw new Error("Enter a valid delivery date.");
+  const order = await db.prepare(
+    `SELECT o.id,o.order_number,o.customer_id,o.address_id,o.status,c.customer_type,d.id AS delivery_id,d.status AS delivery_status
+     FROM dog_food_orders o JOIN dog_food_customers c ON c.id=o.customer_id
+     LEFT JOIN dog_food_deliveries d ON d.order_id=o.id WHERE o.id=? LIMIT 1`
+  ).bind(orderId).first();
+  if (!order) throw new Error("The order was not found.");
+  if (!["draft", "pending_payment", "payment_failed"].includes(order.status)) throw new Error("Product and price edits are locked after payment is recorded.");
+  const captured = await db.prepare("SELECT id FROM dog_food_payments WHERE order_id=? AND status='captured' LIMIT 1").bind(orderId).first();
+  if (captured) throw new Error("This order already has a captured payment and cannot be repriced.");
+  const { quantities, products } = await pricedItems(db, body.items);
+  const totals = orderTotals(products, quantities, delivery);
+  const placement = clean(body.placement, 200) || "Confirm placement before delivery";
+  const deliveryType = order.customer_type === "scoop" && delivery === "route_day" ? "scoop_route"
+    : order.customer_type === "route_partner" && delivery === "route_day" ? "route_partner" : "on_demand";
+  const statements = [
+    db.prepare("DELETE FROM dog_food_order_items WHERE order_id=?").bind(orderId),
+    db.prepare(
+      `UPDATE dog_food_orders SET order_type=?,subtotal_cents=?,delivery_fee_cents=?,tax_cents=?,total_cents=?,requested_delivery_speed=?,
+       notes=COALESCE(notes,'')||?,updated_at=CURRENT_TIMESTAMP WHERE id=?`
+    ).bind(plan, totals.subtotal, totals.deliveryFee, totals.tax, totals.total, delivery, `\nEdited by ${actor}.`, orderId),
+  ];
+  for (const product of products) {
+    const quantity = quantities.get(product.id);
+    statements.push(db.prepare(
+      `INSERT INTO dog_food_order_items (id,order_id,product_id,quantity,unit_price_cents,line_total_cents,substitution_policy)
+       VALUES (?,?,?,?,?,?,'same_formula_weight')`
+    ).bind(crypto.randomUUID(), orderId, product.id, quantity, product.retail_price_cents, Number(product.retail_price_cents) * quantity));
+  }
+  if (order.delivery_id && order.delivery_status !== "delivered" && scheduledDate) {
+    statements.push(db.prepare(
+      `UPDATE dog_food_deliveries SET scheduled_date=?,delivery_type=?,placement_note=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`
+    ).bind(scheduledDate, deliveryType, placement, order.delivery_id));
+  } else if (!order.delivery_id && scheduledDate) {
+    statements.push(db.prepare(
+      `INSERT INTO dog_food_deliveries (id,order_id,customer_id,address_id,scheduled_date,delivery_type,status,placement_note)
+       VALUES (?,?,?,?,?,?,'scheduled',?)`
+    ).bind(crypto.randomUUID(), order.id, order.customer_id, order.address_id, scheduledDate, deliveryType, placement));
+  }
+  statements.push(db.prepare(
+    `INSERT INTO route_partner_plan_events (id,organization_id,event_type,actor_email,details)
+     VALUES (?,'org-opwp','dog_food_order_edited',?,?)`
+  ).bind(crypto.randomUUID(), actor, JSON.stringify({ orderId, orderNumber: order.order_number, ...totals })));
+  await db.batch(statements);
+  return { orderId, orderNumber: order.order_number, totalCents: totals.total };
+}
+
 async function createOrder(db, body, actor) {
   const customerId = clean(body.customerId, 100);
   const plan = body.plan === "subscription" ? "subscription" : "on_demand";
@@ -115,17 +192,8 @@ async function createOrder(db, body, actor) {
   const address = await db.prepare("SELECT id,placement_preference,placement_other FROM dog_food_addresses WHERE customer_id=? ORDER BY is_primary DESC,created_at DESC LIMIT 1").bind(customerId).first();
   if (!customer || !address) throw new Error("The selected customer needs an active profile and delivery address.");
 
-  const requestedItems = Array.isArray(body.items) ? body.items : [];
-  const quantities = new Map(requestedItems.map((item) => [clean(item.productId, 100), Math.max(0, Math.min(10, Number(item.quantity) || 0))]));
-  const productIds = [...quantities.entries()].filter(([, quantity]) => quantity > 0).map(([id]) => id);
-  if (!productIds.length || productIds.length > 8) throw new Error("Add at least one active dog-food product.");
-  const placeholders = productIds.map(() => "?").join(",");
-  const products = await db.prepare(`SELECT id,retail_price_cents FROM dog_food_products WHERE id IN (${placeholders}) AND is_active=1 AND retail_price_cents IS NOT NULL`).bind(...productIds).all();
-  if ((products.results || []).length !== productIds.length) throw new Error("One or more selected products are unavailable.");
-
-  const subtotal = (products.results || []).reduce((sum, product) => sum + Number(product.retail_price_cents) * quantities.get(product.id), 0);
-  const deliveryFee = delivery === "same_day" ? 1000 : delivery === "next_day" ? 500 : 0;
-  const tax = Math.round((subtotal + deliveryFee) * 0.0775);
+  const { quantities, products } = await pricedItems(db, body.items);
+  const totals = orderTotals(products, quantities, delivery);
   const orderId = crypto.randomUUID();
   const orderNumber = `EDF-${orderId.slice(0, 8).toUpperCase()}`;
   const placement = clean(body.placement, 200) || clean(address.placement_other || address.placement_preference, 200) || "Confirm placement before delivery";
@@ -136,14 +204,14 @@ async function createOrder(db, body, actor) {
       `INSERT INTO dog_food_orders
         (id,order_number,customer_id,address_id,order_type,status,subtotal_cents,delivery_fee_cents,tax_rate_basis_points,tax_cents,total_cents,requested_delivery_speed,source,notes,placed_at)
        VALUES (?,?,?,? ,?,'pending_payment',?,?,775,?,?,?,'admin_manual',?,CURRENT_TIMESTAMP)`
-    ).bind(orderId, orderNumber, customer.id, address.id, plan, subtotal, deliveryFee, tax, subtotal + deliveryFee + tax, delivery, `Created by ${actor}. Charge must be confirmed before route release.`),
+    ).bind(orderId, orderNumber, customer.id, address.id, plan, totals.subtotal, totals.deliveryFee, totals.tax, totals.total, delivery, `Created by ${actor}. Charge must be confirmed before route release.`),
     db.prepare(
       `INSERT INTO dog_food_deliveries
         (id,order_id,customer_id,address_id,scheduled_date,delivery_type,status,placement_note)
        VALUES (?,?,?,?,?,?,'scheduled',?)`
     ).bind(deliveryId, orderId, customer.id, address.id, scheduledDate, deliveryType, placement),
   ];
-  for (const product of products.results || []) {
+  for (const product of products) {
     const quantity = quantities.get(product.id);
     statements.push(db.prepare(
       `INSERT INTO dog_food_order_items (id,order_id,product_id,quantity,unit_price_cents,line_total_cents,substitution_policy)
@@ -151,7 +219,7 @@ async function createOrder(db, body, actor) {
     ).bind(crypto.randomUUID(), orderId, product.id, quantity, product.retail_price_cents, Number(product.retail_price_cents) * quantity));
   }
   await db.batch(statements);
-  return { orderId, orderNumber, totalCents: subtotal + deliveryFee + tax };
+  return { orderId, orderNumber, totalCents: totals.total };
 }
 
 export async function POST(request) {
@@ -164,6 +232,8 @@ export async function POST(request) {
       ? await markPaid(current.db, body, current.auth.email)
       : action === "create_order"
         ? await createOrder(current.db, body, current.auth.email)
+        : action === "update_order"
+          ? await updateOrder(current.db, body, current.auth.email)
         : action === "schedule_order"
           ? await scheduleOrder(current.db, body)
         : null;
