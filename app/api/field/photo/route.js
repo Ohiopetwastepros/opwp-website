@@ -21,9 +21,10 @@ export async function PUT(request) {
   if (!bucket && length > D1_MAX_BYTES) return Response.json({ ok: false, error: "The compressed delivery photo must be smaller than 1.25 MB." }, { status: 413 });
   const task = await db.prepare(
     `SELECT t.id,t.route_plan_id FROM route_partner_tasks t JOIN route_partner_field_shifts s ON s.route_plan_id=t.route_plan_id
-     WHERE t.id=? AND t.task_type='dog_food' AND s.technician_member_id=? LIMIT 1`
+     WHERE t.id=? AND t.task_type='dog_food' AND t.status='in_progress'
+       AND s.technician_member_id=? AND s.status='in_progress' LIMIT 1`
   ).bind(taskId, auth.member.id).first();
-  if (!task) return Response.json({ ok: false, error: "This delivery is not assigned to your route." }, { status: 403 });
+  if (!task) return Response.json({ ok: false, error: "Start this assigned delivery before adding its proof photo." }, { status: 403 });
   const extension = contentType === "image/png" ? "png" : contentType === "image/webp" ? "webp" : contentType === "image/heic" ? "heic" : "jpg";
   const proofId = crypto.randomUUID();
   const objectKey = `${auth.member.organizationId}/${task.route_plan_id}/${taskId}/${proofId}.${extension}`;

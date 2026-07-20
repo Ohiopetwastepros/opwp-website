@@ -3,18 +3,18 @@
 import { useRef, useEffect, useState } from "react";
 
 const PHOTOS = [
-  ["/assets/photos/we-scoop-banner.jpg", "Ohio Pet Waste Pros 'We Scoop Dog Poop' branded service vehicle"],
-  ["/assets/photos/cody-scooping-vest.jpg", "Ohio Pet Waste Pros technician in a safety vest scooping a yard"],
-  ["/assets/photos/dixie-red-scoop.jpg", "Ohio Pet Waste Pros scoop and bag beside rescue dog Dixie"],
-  ["/assets/photos/craig-deodorizing.jpg", "Owner applying eco-friendly yard deodorizing treatment"],
-  ["/assets/photos/craig-sanitizing-spray.jpg", "Owner applying pet-safe sanitizing spray to a backyard"],
-  ["/assets/photos/dixie-craig-posed-1.jpg", "Ohio Pet Waste Pros owner with rescue dog Dixie in a clean yard"],
-  ["/assets/photos/scooping-bell.jpg", "Technician scooping and double-bagging dog waste in a Toledo-area yard"],
-  ["/assets/photos/wysiwash-application.jpg", "Applying Wysiwash pet-safe sanitizing system to a yard"],
-  ["/assets/photos/dixie-frisbee.jpg", "Happy dog playing frisbee in a clean, waste-free backyard"],
-  ["/assets/photos/team-craig.jpg", "Craig Bridgman, co-owner of Ohio Pet Waste Pros"],
-  ["/assets/photos/team-tony.jpg", "Tony, an Ohio Pet Waste Pros service technician"],
-  ["/assets/photos/dixie-photo.jpg", "Dixie, the rescue dog who inspired Ohio Pet Waste Pros"],
+  ["/assets/photos/we-scoop-banner.webp", "Ohio Pet Waste Pros 'We Scoop Dog Poop' branded service vehicle"],
+  ["/assets/photos/cody-scooping-vest.webp", "Ohio Pet Waste Pros technician in a safety vest scooping a yard"],
+  ["/assets/photos/dixie-red-scoop.webp", "Ohio Pet Waste Pros scoop and bag beside rescue dog Dixie"],
+  ["/assets/photos/craig-deodorizing.webp", "Owner applying eco-friendly yard deodorizing treatment"],
+  ["/assets/photos/craig-sanitizing-spray.webp", "Owner applying pet-safe sanitizing spray to a backyard"],
+  ["/assets/photos/dixie-craig-posed-1.webp", "Ohio Pet Waste Pros owner with rescue dog Dixie in a clean yard"],
+  ["/assets/photos/scooping-bell.webp", "Technician scooping and double-bagging dog waste in a Toledo-area yard"],
+  ["/assets/photos/wysiwash-application.webp", "Applying Wysiwash pet-safe sanitizing system to a yard"],
+  ["/assets/photos/dixie-frisbee.webp", "Happy dog playing frisbee in a clean, waste-free backyard"],
+  ["/assets/photos/team-craig.webp", "Craig Bridgman, co-owner of Ohio Pet Waste Pros"],
+  ["/assets/photos/team-tony.webp", "Tony, an Ohio Pet Waste Pros service technician"],
+  ["/assets/photos/dixie-photo.webp", "Dixie, the rescue dog who inspired Ohio Pet Waste Pros"],
 ];
 
 export default function GalleryCarousel() {

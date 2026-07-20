@@ -190,7 +190,7 @@ export default function AboutPage() {
             }}
           >
             <img
-              src="/assets/photos/team-new-sign.png"
+              src="/assets/photos/team-new-sign.webp"
               alt="The Bridgman family with the new Ohio Pet Waste Pros sign"
               style={{
                 width: "100%",
@@ -201,7 +201,7 @@ export default function AboutPage() {
               }}
             />
             <img
-              src="/assets/photos/team-maumee-river.jpg"
+              src="/assets/photos/team-maumee-river.webp"
               alt="The Ohio Pet Waste Pros family along the Maumee River"
               style={{
                 width: "100%",
@@ -231,7 +231,7 @@ export default function AboutPage() {
         >
           <div>
             <img
-              src="/assets/photos/dixie-craig-posed-1.jpg"
+              src="/assets/photos/dixie-craig-posed-1.webp"
               alt="Craig Bridgman, co-owner of Ohio Pet Waste Pros, with rescue dog Dixie"
               style={{
                 width: "100%",
@@ -387,7 +387,7 @@ export default function AboutPage() {
           </div>
           <div>
             <img
-              src="/assets/photos/dixie-frisbee.jpg"
+              src="/assets/photos/dixie-frisbee.webp"
               alt="Dixie, the rescue dog who inspired Ohio Pet Waste Pros"
               style={{
                 width: "100%",
@@ -464,7 +464,7 @@ export default function AboutPage() {
               }}
             >
               <img
-                src="/assets/photos/team-craig.jpg"
+                src="/assets/photos/team-craig.webp"
                 alt="Craig Bridgman, co-owner"
                 style={{
                   width: "100%",
@@ -519,7 +519,7 @@ export default function AboutPage() {
               }}
             >
               <img
-                src="/assets/photos/team-amanda.jpg"
+                src="/assets/photos/team-amanda.webp"
                 alt="Amanda Bridgman, co-owner of Ohio Pet Waste Pros"
                 style={{
                   width: "100%",
@@ -575,7 +575,7 @@ export default function AboutPage() {
               }}
             >
               <img
-                src="/assets/photos/team-tony.jpg"
+                src="/assets/photos/team-tony.webp"
                 alt="Tony B, Ohio Pet Waste Pros technician"
                 style={{
                   width: "100%",
@@ -631,7 +631,7 @@ export default function AboutPage() {
               }}
             >
               <img
-                src="/assets/photos/team-bria.jpg"
+                src="/assets/photos/team-bria.webp"
                 alt="Bria, Ohio Pet Waste Pros technician"
                 style={{
                   width: "100%",
@@ -729,7 +729,7 @@ export default function AboutPage() {
               }}
             >
               <img
-                src="/assets/photos/scooping-bell.jpg"
+                src="/assets/photos/scooping-bell.webp"
                 alt="Ohio Pet Waste Pros owner with scooping equipment and a customer's dog in Toledo"
                 style={{
                   width: "100%",
@@ -772,7 +772,7 @@ export default function AboutPage() {
               }}
             >
               <img
-                src="/assets/photos/cody-scooping-vest.jpg"
+                src="/assets/photos/cody-scooping-vest.webp"
                 alt="Ohio Pet Waste Pros technician in uniform scooping a yard in Sylvania"
                 style={{
                   width: "100%",
@@ -816,7 +816,7 @@ export default function AboutPage() {
               }}
             >
               <img
-                src="/assets/photos/dixie-red-scoop.jpg"
+                src="/assets/photos/dixie-red-scoop.webp"
                 alt="Happy dog next to an Ohio Pet Waste Pros sign in a clean yard"
                 style={{
                   width: "100%",

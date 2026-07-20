@@ -17,7 +17,7 @@ export default function CityPage({ city, state }) {
               <a href="tel:419-262-2371" style={{ background: "rgba(255,255,255,.1)", border: "1.5px solid rgba(255,255,255,.3)", color: "#fff", textDecoration: "none", padding: "16px 28px", borderRadius: 11, fontWeight: 700, fontSize: 16.5 }}>Call 419-262-2371</a>
             </div>
           </div>
-          <div><img src="/assets/photos/scooping-bell.jpg" alt={`Dog poop removal service in ${city}, ${state}`} style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 20, boxShadow: "0 30px 60px -26px rgba(0,0,0,.6)" }} /></div>
+          <div><img src="/assets/photos/scooping-bell.webp" alt={`Dog poop removal service in ${city}, ${state}`} width="1400" height="1050" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 20, boxShadow: "0 30px 60px -26px rgba(0,0,0,.6)" }} /></div>
         </div>
       </section>
 

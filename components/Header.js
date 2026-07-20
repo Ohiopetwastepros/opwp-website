@@ -86,7 +86,7 @@ export default function Header({ active }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", minWidth: 0 }}>
             <img
-              src="/assets/opwp-logo.png"
+              src="/assets/opwp-logo.webp"
               alt="Ohio Pet Waste Pros logo"
               style={{ width: 52, height: 52, flex: "none", display: "block", background: "#fff", borderRadius: "50%" }}
             />

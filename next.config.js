@@ -57,6 +57,18 @@ const nextConfig = {
   // Preserve the exact WordPress URL structure (trailing slashes) so rankings transfer.
   trailingSlash: true,
   poweredByHeader: false,
+  async headers() {
+    return [{
+      source: "/:path*",
+      headers: [
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "X-Frame-Options", value: "SAMEORIGIN" },
+        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        { key: "Permissions-Policy", value: "camera=(self), geolocation=(self), microphone=()" },
+        { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+      ],
+    }];
+  },
   async redirects() {
     return [
       // --- Short convenience slugs -> new canonical routes ---

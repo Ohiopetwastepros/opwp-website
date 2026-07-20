@@ -208,7 +208,7 @@ export default function CommercialServicesPage() {
           </div>
           <div>
             <img
-              src="/assets/photos/we-scoop-banner.jpg"
+              src="/assets/photos/we-scoop-banner.webp"
               alt="Ohio Pet Waste Pros commercial pet waste removal service"
               style={{
                 width: "100%",
@@ -575,7 +575,7 @@ export default function CommercialServicesPage() {
           </div>
           <div>
             <img
-              src="/assets/photos/team-maumee-river.jpg"
+              src="/assets/photos/team-maumee-river.webp"
               alt="The Ohio Pet Waste Pros team"
               style={{
                 width: "100%",

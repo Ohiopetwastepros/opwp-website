@@ -102,7 +102,7 @@ export default function BiWeeklyPage() {
               <a href="tel:419-262-2371" style={{ background: "rgba(255,255,255,.1)", border: "1.5px solid rgba(255,255,255,.3)", color: "#fff", textDecoration: "none", padding: "16px 28px", borderRadius: 11, fontWeight: 700, fontSize: 16.5 }}>Call 419-262-2371</a>
             </div>
           </div>
-          <div><img src="/assets/photos/craig-standing-horizontal.jpg" alt="Ohio Pet Waste Pros technician on a bi-weekly dog poop removal visit near Perrysburg" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 20, boxShadow: "0 30px 60px -26px rgba(0,0,0,.6)" }} /></div>
+          <div><img src="/assets/photos/craig-standing-horizontal.webp" alt="Ohio Pet Waste Pros technician on a bi-weekly dog poop removal visit near Perrysburg" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 20, boxShadow: "0 30px 60px -26px rgba(0,0,0,.6)" }} /></div>
         </div>
       </section>
 
@@ -144,7 +144,7 @@ export default function BiWeeklyPage() {
               <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}><span style={{ color: "#E7A734", fontSize: 20, fontWeight: 800 }}>!</span><p style={{ margin: 0, fontSize: 16, lineHeight: 1.5, color: "#36424b" }}>If buildup gets ahead of you, <Link href="/weekly-dog-poop-removal/" style={{ color: "#4F9E3A", fontWeight: 700, textDecoration: "none" }}>weekly</Link> is the better long-term choice.</p></div>
             </div>
           </div>
-          <div><img src="/assets/photos/cody-scooping-vest.jpg" alt="Ohio Pet Waste Pros technician double-bagging waste during a bi-weekly visit" style={{ width: "100%", aspectRatio: "4/5", objectFit: "cover", borderRadius: 20, boxShadow: "0 24px 48px -24px rgba(20,48,74,.4)" }} /></div>
+          <div><img src="/assets/photos/cody-scooping-vest.webp" alt="Ohio Pet Waste Pros technician double-bagging waste during a bi-weekly visit" style={{ width: "100%", aspectRatio: "4/5", objectFit: "cover", borderRadius: 20, boxShadow: "0 24px 48px -24px rgba(20,48,74,.4)" }} /></div>
         </div>
       </section>
 

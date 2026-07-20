@@ -193,7 +193,7 @@ export default function WeeklyPage() {
           </div>
           <div>
             <img
-              src="/assets/photos/scooping-bell.jpg"
+              src="/assets/photos/scooping-bell.webp"
               alt="Ohio Pet Waste Pros technician on a weekly dog poop removal visit in Toledo"
               style={{
                 width: "100%",
@@ -412,7 +412,7 @@ export default function WeeklyPage() {
         >
           <div>
             <img
-              src="/assets/photos/we-scoop-banner.jpg"
+              src="/assets/photos/we-scoop-banner.webp"
               alt="Clean NW Ohio backyard maintained with weekly dog waste removal"
               style={{
                 width: "100%",

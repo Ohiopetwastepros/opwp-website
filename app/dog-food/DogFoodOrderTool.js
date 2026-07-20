@@ -131,6 +131,7 @@ export default function DogFoodOrderTool() {
   const [partialSubmissionId, setPartialSubmissionId] = useState(null);
   const [expandedFormula, setExpandedFormula] = useState(null);
   const [formulaDetailTab, setFormulaDetailTab] = useState("overview");
+  const [sameDayAvailable, setSameDayAvailable] = useState(false);
   const leadSentRef = useRef(false);
   const toolRef = useRef(null);
   const activePanelRef = useRef(null);
@@ -241,7 +242,8 @@ export default function DogFoodOrderTool() {
   }
 
   function deliveryIsValid() {
-    return Boolean(customer.address.trim() && customer.city.trim() && /^\d{5}$/.test(customer.zip));
+    return Boolean(customer.address.trim() && customer.city.trim() && /^\d{5}$/.test(customer.zip) &&
+      (customer.placement !== "Other" || customer.placementOther.trim()));
   }
 
   function goNext() {
@@ -296,6 +298,11 @@ export default function DogFoodOrderTool() {
   }, [step]);
 
   useEffect(() => {
+    const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "2-digit", hourCycle: "h23" }).formatToParts(new Date()).find((part) => part.type === "hour")?.value || 24);
+    setSameDayAvailable(hour < 12);
+  }, []);
+
+  useEffect(() => {
     if (!quoteReady || leadSentRef.current) return;
     leadSentRef.current = true;
     fetch("/api/dog-food/quote", {
@@ -329,10 +336,10 @@ export default function DogFoodOrderTool() {
 
   return (
     <div className={styles.toolShell} ref={toolRef}>
-      <div className={styles.stepper} aria-label="Order progress">
+      <div className={styles.stepper} aria-label="Order progress" role="list">
         {["Blends & price", "About your dogs", "Recommendations", "Order"].map((label, index) => {
           const number = index + 1;
-          return <div key={label} className={`${styles.step} ${step === number ? styles.stepActive : ""} ${step > number ? styles.stepDone : ""}`}><span>{step > number ? "✓" : number}</span><b>{label}</b></div>;
+          return <div key={label} role="listitem" aria-current={step === number ? "step" : undefined} className={`${styles.step} ${step === number ? styles.stepActive : ""} ${step > number ? styles.stepDone : ""}`}><span>{step > number ? "✓" : number}</span><b>{label}</b></div>;
         })}
       </div>
 
@@ -404,10 +411,10 @@ export default function DogFoodOrderTool() {
               })()}
               <div className={styles.contactIntro}><strong>Enter your information and provide text consent to unlock the price.</strong><span>No payment on this step.</span></div>
               <div className={styles.inputGrid}>
-                <Field label="First name" required><input autoComplete="given-name" value={customer.firstName} onChange={(event) => updateCustomer("firstName", event.target.value)} /></Field>
-                <Field label="Last name" required><input autoComplete="family-name" value={customer.lastName} onChange={(event) => updateCustomer("lastName", event.target.value)} /></Field>
-                <Field label="Email" required><input type="email" autoComplete="email" value={customer.email} onChange={(event) => updateCustomer("email", event.target.value)} /></Field>
-                <Field label="Mobile phone" required><input type="tel" autoComplete="tel" value={customer.phone} onChange={(event) => updateCustomer("phone", event.target.value)} /></Field>
+                <Field label="First name" required><input required autoComplete="given-name" value={customer.firstName} onChange={(event) => updateCustomer("firstName", event.target.value)} /></Field>
+                <Field label="Last name" required><input required autoComplete="family-name" value={customer.lastName} onChange={(event) => updateCustomer("lastName", event.target.value)} /></Field>
+                <Field label="Email" required><input required type="email" autoComplete="email" value={customer.email} onChange={(event) => updateCustomer("email", event.target.value)} /></Field>
+                <Field label="Mobile phone" required><input required type="tel" autoComplete="tel" value={customer.phone} onChange={(event) => updateCustomer("phone", event.target.value)} /></Field>
               </div>
               {quoteReady ? (
                 <div className={styles.perBagPrice} role="status">
@@ -578,10 +585,10 @@ export default function DogFoodOrderTool() {
                 <p>Recurring route delivery is the simplest option and has no delivery fee.</p>
               </div>
               <div className={styles.inputGrid}>
-                <Field label="Street address" required wide><input autoComplete="street-address" value={customer.address} onChange={(event) => updateCustomer("address", event.target.value)} /></Field>
-                <Field label="City" required><input autoComplete="address-level2" value={customer.city} onChange={(event) => updateCustomer("city", event.target.value)} /></Field>
+                <Field label="Street address" required wide><input required autoComplete="street-address" value={customer.address} onChange={(event) => updateCustomer("address", event.target.value)} /></Field>
+                <Field label="City" required><input required autoComplete="address-level2" value={customer.city} onChange={(event) => updateCustomer("city", event.target.value)} /></Field>
                 <Field label="State"><input value={customer.state} disabled /></Field>
-                <Field label="ZIP code" required><input inputMode="numeric" maxLength={5} autoComplete="postal-code" value={customer.zip} onChange={(event) => updateCustomer("zip", event.target.value.replace(/\D/g, ""))} /></Field>
+                <Field label="ZIP code" required><input required inputMode="numeric" pattern="[0-9]{5}" maxLength={5} autoComplete="postal-code" value={customer.zip} onChange={(event) => updateCustomer("zip", event.target.value.replace(/\D/g, ""))} /></Field>
               </div>
               <fieldset className={styles.choiceFieldset}>
                 <legend>Which best describes you?</legend>
@@ -601,7 +608,7 @@ export default function DogFoodOrderTool() {
               <fieldset className={styles.choiceFieldset}>
                 <legend>Delivery timing</legend>
                 <div className={styles.deliveryChoices}>
-                  {Object.entries(DELIVERY).map(([key, option]) => <Choice key={key} selected={delivery === key} onClick={() => setDelivery(key)} title={option.name} copy={option.detail} disabled={plan === "subscription" && key !== "route_day"} />)}
+                  {Object.entries(DELIVERY).map(([key, option]) => <Choice key={key} selected={delivery === key} onClick={() => setDelivery(key)} title={option.name} copy={key === "same_day" && !sameDayAvailable ? "Unavailable after 12:00 PM Eastern" : option.detail} disabled={(plan === "subscription" && key !== "route_day") || (key === "same_day" && !sameDayAvailable)} />)}
                 </div>
               </fieldset>
               <div className={styles.inputGrid}>

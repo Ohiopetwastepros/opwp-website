@@ -46,7 +46,7 @@ export default function FreeQuotePage() {
         <div style={{ maxWidth: "1180px", margin: "0 auto", padding: "0 28px" }}>
           <div style={{ textAlign: "center", marginBottom: "34px" }}>
             <img
-              src="/assets/opwp-logo.png"
+              src="/assets/opwp-logo.webp"
               alt="Ohio Pet Waste Pros"
               style={{
                 width: "78px",

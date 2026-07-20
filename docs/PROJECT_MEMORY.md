@@ -1,6 +1,6 @@
 # OPWP Operating System — Project Memory
 
-Last updated: 2026-07-15
+Last updated: 2026-07-20
 
 This file is the durable handoff for future work. Update it after meaningful data-model, KPI, integration, or deployment changes. Never place passwords, API keys, tokens, or other secrets here.
 
@@ -185,3 +185,13 @@ Pipedream is not required for this flow. Keep old Pipedream workflows paused unt
 - Compare today’s SNG jobs, completed webhook events, Airtable job upserts, and shifts.
 - Verify failures are either automatically recovered or explicitly shown in the owner-attention queue.
 - Build, test, deploy, and verify both `/admin/` and `/admin/events/` after production changes.
+# July 20, 2026 — full product audit checkpoint
+
+- Completed the cross-product production audit covering the public website, dog-food funnel, office access, Route Partner management, and technician field app.
+- Optimized referenced photos and branding to WebP (88% reduction across 18 referenced photographs).
+- Fixed the weight-free dog-food questionnaire/order mismatch and hardened same-day, consent, placement, contact, plan, and customer-type validation.
+- Hardened the field workflow state machine and completion/inventory/mileage rules.
+- Added protected management review of technician delivery-proof photos.
+- Added global focus, reduced-motion, touch, dialog, and security-header improvements.
+- Added `scripts/dog-food-smoke.mjs` and expanded `scripts/field-smoke.mjs` guardrail coverage.
+- Full findings and remaining external integration boundaries are in `docs/PRODUCT_AUDIT_2026-07-20.md`.

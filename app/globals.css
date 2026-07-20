@@ -42,10 +42,19 @@ body:has(.opwp-field-shell) > main { padding-top: 0 !important; }
 }
 @media (prefers-reduced-motion: reduce) {
   .opwp-reveal, .opwp-reveal.opwp-in { opacity: 1 !important; transform: none !important; transition: none !important; }
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
 /* ---------- :hover support (replaces source style-hover attribute) ---------- */
 a, button { transition: background-color .22s ease, color .22s ease, box-shadow .28s ease, border-color .22s ease; }
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid rgba(47, 113, 143, .48);
+  outline-offset: 3px;
+}
+
+:where(button, [role="button"]):not(:disabled) { touch-action: manipulation; }
 
 .hov-cta:hover { background: #46902F !important; }
 .hov-soft:hover { background: #F1F3EE !important; }

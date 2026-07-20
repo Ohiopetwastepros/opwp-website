@@ -81,7 +81,7 @@ export default function DogFoodPage() {
         <div className={styles.heroInner}>
           <div className={styles.brandLockup}>
             <div className={styles.brandCardOpwp}>
-              <img src="/assets/opwp-logo.png" alt="Ohio Pet Waste Pros" />
+              <img src="/assets/opwp-logo.webp" alt="Ohio Pet Waste Pros" width="320" height="320" />
               <span>Local delivery by<br /><strong>Ohio Pet Waste Pros</strong></span>
             </div>
             <span className={styles.brandPlus}>+</span>

@@ -122,7 +122,7 @@ export default function HomePage() {
             </div>
           </div>
           <div style={{ position: "relative" }}>
-            <img src="/assets/photos/hero-craig-driveway.jpg" alt="Ohio Pet Waste Pros technician with scooping equipment in a Toledo-area driveway" style={{ width: "100%", aspectRatio: "4/5", objectFit: "cover", borderRadius: 22, boxShadow: "0 30px 60px -26px rgba(0,0,0,.6)" }} />
+            <img src="/assets/photos/hero-craig-driveway.webp" alt="Ohio Pet Waste Pros technician with scooping equipment in a Toledo-area driveway" style={{ width: "100%", aspectRatio: "4/5", objectFit: "cover", borderRadius: 22, boxShadow: "0 30px 60px -26px rgba(0,0,0,.6)" }} />
           </div>
         </div>
       </section>
@@ -173,7 +173,7 @@ export default function HomePage() {
       <section style={{ background: "#fff", padding: "84px 0" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px", display: "grid", gridTemplateColumns: "0.95fr 1.05fr", gap: 56, alignItems: "center" }} className="opwp-gsplit">
           <div style={{ position: "relative" }}>
-            <img src="/assets/photos/team-new-sign.png" alt="The family team behind Ohio Pet Waste Pros with their We Scoop Dog Poop sign" style={{ width: "100%", aspectRatio: "5/6", objectFit: "cover", borderRadius: 22, boxShadow: "0 24px 48px -24px rgba(20,48,74,.4)" }} />
+            <img src="/assets/photos/team-new-sign.webp" alt="The family team behind Ohio Pet Waste Pros with their We Scoop Dog Poop sign" style={{ width: "100%", aspectRatio: "5/6", objectFit: "cover", borderRadius: 22, boxShadow: "0 24px 48px -24px rgba(20,48,74,.4)" }} />
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#658461", marginBottom: 12 }}>Family-run &amp; dog-loving</div>
@@ -232,7 +232,7 @@ export default function HomePage() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 22, marginBottom: 22 }} className="opwp-g3">
             <Link href="/weekly-dog-poop-removal/" style={{ textDecoration: "none", color: "inherit", border: "1px solid #ece9df", borderRadius: 18, overflow: "hidden", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.04)", display: "block" }}>
-              <img src="/assets/photos/scooping-bell.jpg" alt="Weekly dog poop removal in a Toledo-area residential yard" style={{ width: "100%", height: 180, objectFit: "cover" }} />
+              <img src="/assets/photos/scooping-bell.webp" alt="Weekly dog poop removal in a Toledo-area residential yard" style={{ width: "100%", height: 180, objectFit: "cover" }} />
               <div style={{ padding: 24 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#658461", marginBottom: 8 }}>Most popular</div>
                 <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 21, margin: "0 0 9px" }}>Weekly cleanups</h3>
@@ -240,7 +240,7 @@ export default function HomePage() {
               </div>
             </Link>
             <Link href="/bi-weekly-dog-poop-removal/" style={{ textDecoration: "none", color: "inherit", border: "1px solid #ece9df", borderRadius: 18, overflow: "hidden", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.04)", display: "block" }}>
-              <img src="/assets/photos/craig-standing-horizontal.jpg" alt="Bi-weekly dog waste removal service" style={{ width: "100%", height: 180, objectFit: "cover" }} />
+              <img src="/assets/photos/craig-standing-horizontal.webp" alt="Bi-weekly dog waste removal service" style={{ width: "100%", height: 180, objectFit: "cover" }} />
               <div style={{ padding: 24 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#658461", marginBottom: 8 }}>Lighter-use yards</div>
                 <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 21, margin: "0 0 9px" }}>Bi-weekly cleanups</h3>
@@ -248,7 +248,7 @@ export default function HomePage() {
               </div>
             </Link>
             <Link href="/one-time-yard-cleanup/" style={{ textDecoration: "none", color: "inherit", border: "1px solid #ece9df", borderRadius: 18, overflow: "hidden", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.04)", display: "block" }}>
-              <img src="/assets/photos/cody-scooping-vest.jpg" alt="One-time and spring cleanup dog waste removal" style={{ width: "100%", height: 180, objectFit: "cover" }} />
+              <img src="/assets/photos/cody-scooping-vest.webp" alt="One-time and spring cleanup dog waste removal" style={{ width: "100%", height: 180, objectFit: "cover" }} />
               <div style={{ padding: 24 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#658461", marginBottom: 8 }}>Fresh start</div>
                 <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 21, margin: "0 0 9px" }}>One-time &amp; spring cleanup</h3>

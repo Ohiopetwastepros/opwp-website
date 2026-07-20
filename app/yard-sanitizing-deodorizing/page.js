@@ -193,7 +193,7 @@ export default function SanitizingPage() {
           </div>
           <div>
             <img
-              src="/assets/photos/craig-deodorizing.jpg"
+              src="/assets/photos/craig-deodorizing.webp"
               alt="Ohio Pet Waste Pros owner applying pet-safe yard deodorizing treatment in a NW Ohio yard"
               style={{
                 width: "100%",
@@ -465,7 +465,7 @@ export default function SanitizingPage() {
           </div>
           <div>
             <img
-              src="/assets/photos/craig-sanitizing-spray.jpg"
+              src="/assets/photos/craig-sanitizing-spray.webp"
               alt="Ohio Pet Waste Pros owner applying pet-safe yard sanitizing treatment with a sprayer"
               style={{
                 width: "100%",

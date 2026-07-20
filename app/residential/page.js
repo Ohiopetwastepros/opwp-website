@@ -66,7 +66,7 @@ export default function ResidentialPage() {
               <a href="tel:419-262-2371" style={{ background: "rgba(255,255,255,.1)", border: "1.5px solid rgba(255,255,255,.3)", color: "#fff", textDecoration: "none", padding: "16px 28px", borderRadius: 11, fontWeight: 700, fontSize: 16.5 }}>Call 419-262-2371</a>
             </div>
           </div>
-          <div><img src="/assets/photos/craig-standing-horizontal.jpg" alt="Ohio Pet Waste Pros technician ready for a residential dog waste cleanup in Toledo" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 20, boxShadow: "0 30px 60px -26px rgba(0,0,0,.6)" }} /></div>
+          <div><img src="/assets/photos/craig-standing-horizontal.webp" alt="Ohio Pet Waste Pros technician ready for a residential dog waste cleanup in Toledo" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 20, boxShadow: "0 30px 60px -26px rgba(0,0,0,.6)" }} /></div>
         </div>
       </section>
 
@@ -79,7 +79,7 @@ export default function ResidentialPage() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 22 }} className="opwp-g3">
             <Link href="/weekly-dog-poop-removal/" style={{ textDecoration: "none", color: "inherit", border: "2px solid #4F9E3A", borderRadius: 18, overflow: "hidden", boxShadow: "0 18px 36px -22px rgba(79,158,58,.45)", display: "block" }}>
-              <img src="/assets/photos/scooping-bell.jpg" alt="Weekly dog poop removal" style={{ width: "100%", height: 180, objectFit: "cover" }} />
+              <img src="/assets/photos/scooping-bell.webp" alt="Weekly dog poop removal" style={{ width: "100%", height: 180, objectFit: "cover" }} />
               <div style={{ padding: 26 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#4F9E3A", marginBottom: 8 }}>Most popular</div>
                 <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 22, margin: "0 0 10px" }}>Weekly Cleanups</h3>
@@ -87,7 +87,7 @@ export default function ResidentialPage() {
               </div>
             </Link>
             <Link href="/bi-weekly-dog-poop-removal/" style={{ textDecoration: "none", color: "inherit", border: "1px solid #ece9df", borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,.04)", display: "block" }}>
-              <img src="/assets/photos/craig-standing-horizontal.jpg" alt="Bi-weekly dog waste removal" style={{ width: "100%", height: 180, objectFit: "cover" }} />
+              <img src="/assets/photos/craig-standing-horizontal.webp" alt="Bi-weekly dog waste removal" style={{ width: "100%", height: 180, objectFit: "cover" }} />
               <div style={{ padding: 26 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#658461", marginBottom: 8 }}>Lighter-use yards</div>
                 <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 22, margin: "0 0 10px" }}>Bi-Weekly Cleanups</h3>
@@ -95,7 +95,7 @@ export default function ResidentialPage() {
               </div>
             </Link>
             <Link href="/one-time-yard-cleanup/" style={{ textDecoration: "none", color: "inherit", border: "1px solid #ece9df", borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,.04)", display: "block" }}>
-              <img src="/assets/photos/cody-scooping-vest.jpg" alt="One-time and spring dog waste cleanup" style={{ width: "100%", height: 180, objectFit: "cover" }} />
+              <img src="/assets/photos/cody-scooping-vest.webp" alt="One-time and spring dog waste cleanup" style={{ width: "100%", height: 180, objectFit: "cover" }} />
               <div style={{ padding: 26 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#658461", marginBottom: 8 }}>Fresh start</div>
                 <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 22, margin: "0 0 10px" }}>One-Time &amp; Spring Cleanup</h3>
@@ -126,7 +126,7 @@ export default function ResidentialPage() {
       {/* ADD-ONS */}
       <section style={{ background: "#fff", padding: "82px 0" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px", display: "grid", gridTemplateColumns: "0.9fr 1.1fr", gap: 50, alignItems: "center" }} className="opwp-gsplit">
-          <div><img src="/assets/photos/wysiwash-application.jpg" alt="Eco-friendly yard sanitizing and deodorizing treatment" style={{ width: "100%", aspectRatio: "4/5", objectFit: "cover", borderRadius: 20, boxShadow: "0 24px 48px -24px rgba(20,48,74,.4)" }} /></div>
+          <div><img src="/assets/photos/wysiwash-application.webp" alt="Eco-friendly yard sanitizing and deodorizing treatment" style={{ width: "100%", aspectRatio: "4/5", objectFit: "cover", borderRadius: 20, boxShadow: "0 24px 48px -24px rgba(20,48,74,.4)" }} /></div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#658461", marginBottom: 12 }}>Add-on services</div>
             <h2 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 34, lineHeight: 1.05, letterSpacing: "-0.02em", margin: "0 0 18px" }}>Go beyond a clean yard</h2>

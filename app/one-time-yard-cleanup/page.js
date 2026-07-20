@@ -114,7 +114,7 @@ export default function OneTimePage() {
               <a href="tel:419-262-2371" style={{ background: "rgba(255,255,255,.1)", border: "1.5px solid rgba(255,255,255,.3)", color: "#fff", textDecoration: "none", padding: "16px 28px", borderRadius: 11, fontWeight: 700, fontSize: 16.5 }}>Call 419-262-2371</a>
             </div>
           </div>
-          <div><img src="/assets/photos/cody-scooping-vest.jpg" alt="Ohio Pet Waste Pros technician performing a one-time spring yard cleanup in Toledo" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 20, boxShadow: "0 30px 60px -26px rgba(0,0,0,.6)" }} /></div>
+          <div><img src="/assets/photos/cody-scooping-vest.webp" alt="Ohio Pet Waste Pros technician performing a one-time spring yard cleanup in Toledo" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 20, boxShadow: "0 30px 60px -26px rgba(0,0,0,.6)" }} /></div>
         </div>
       </section>
 
@@ -146,7 +146,7 @@ export default function OneTimePage() {
       {/* HOW IT WORKS */}
       <section style={{ background: "#fff", padding: "82px 0" }}>
         <div className="opwp-gsplit" style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px", display: "grid", gridTemplateColumns: "0.9fr 1.1fr", gap: 50, alignItems: "center" }}>
-          <div><img src="/assets/photos/we-scoop-banner.jpg" alt="A reset, clean NW Ohio backyard after a one-time dog waste cleanup" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 20, boxShadow: "0 24px 48px -24px rgba(20,48,74,.4)" }} /></div>
+          <div><img src="/assets/photos/we-scoop-banner.webp" alt="A reset, clean NW Ohio backyard after a one-time dog waste cleanup" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 20, boxShadow: "0 24px 48px -24px rgba(20,48,74,.4)" }} /></div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#658461", marginBottom: 12 }}>How it works</div>
             <h2 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 34, lineHeight: 1.05, letterSpacing: "-0.02em", margin: "0 0 22px" }}>From request to clean yard</h2>

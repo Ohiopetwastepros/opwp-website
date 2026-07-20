@@ -34,17 +34,28 @@ async function action(payload) {
   return result.body.day;
 }
 
+async function rejectedAction(payload, expectedText) {
+  const current = await day();
+  const result = await json("/api/field/action/", { method: "POST", headers, body: JSON.stringify({ ...payload, shiftId: current.shift.id, date }) });
+  check(result.response.status === 400 && !result.body.ok, `${payload.action} should have been rejected: ${JSON.stringify(result.body)}`);
+  if (expectedText) check(String(result.body.error || "").toLowerCase().includes(expectedText.toLowerCase()), `${payload.action} returned the wrong guardrail: ${JSON.stringify(result.body)}`);
+}
+
 let current = await day();
 check(current.shift.status === "pending_load", "Expected a pending load check.");
+await rejectedAction({ action: "start_route" }, "departure");
 current = await action({ action: "confirm_load", startingMileage: 1000, items: current.route.load.items.map((item) => ({ productId: item.product_id, quantity: item.required_quantity })) });
 check(current.shift.status === "ready", "Load confirmation did not ready the shift.");
 current = await action({ action: "start_route" });
 check(current.shift.status === "in_progress", "Route did not start.");
+await rejectedAction({ action: "start_task", taskId: "qa-scoop-task" }, "arrival");
 await action({ action: "arrive", locationId: "qa-location-1" });
+await rejectedAction({ action: "complete_task", taskId: "qa-scoop-task" }, "start");
 await action({ action: "start_task", taskId: "qa-scoop-task" });
 current = await action({ action: "complete_task", taskId: "qa-scoop-task" });
 check(current.route.locations[0].tasks[0].status === "validation_pending", "Scoop completion was not queued for CRM validation.");
 await action({ action: "on_the_way", taskId: "qa-food-task", leadMinutes: 15, recommendedLeadMinutes: 15 });
+await rejectedAction({ action: "on_the_way", taskId: "qa-food-task", leadMinutes: 15, recommendedLeadMinutes: 15 }, "already queued");
 await action({ action: "arrive", locationId: "qa-location-2" });
 await action({ action: "start_task", taskId: "qa-food-task" });
 
@@ -53,10 +64,12 @@ const proof = await json("/api/field/photo/?taskId=qa-food-task", { method: "PUT
 check(proof.response.status === 201 && proof.body.ok, `Photo upload failed: ${JSON.stringify(proof.body)}`);
 current = await action({ action: "complete_task", taskId: "qa-food-task", placementConfirmed: true });
 check(current.route.totals.completed === current.route.totals.tasks, "Not every task reached a terminal state.");
+await rejectedAction({ action: "complete_route", endingMileage: 999, items: current.route.load.items.map((item) => ({ productId: item.product_id, returned: 0 })) }, "lower than starting");
+await rejectedAction({ action: "complete_route", endingMileage: 1012.4, items: current.route.load.items.map((item) => ({ productId: item.product_id, returned: 1 })) }, "cannot exceed");
 current = await action({ action: "complete_route", endingMileage: 1012.4, items: current.route.load.items.map((item) => ({ productId: item.product_id, returned: 0 })) });
 check(current.shift.status === "completed", "Route did not complete.");
 
 const proofResponse = await fetch(`${base}${proof.body.proof.url}`, { headers: { Cookie: cookie } });
 check(proofResponse.status === 200 && proofResponse.headers.get("content-type") === "image/png", "Private proof could not be retrieved.");
 
-console.log(JSON.stringify({ ok: true, shiftStatus: current.shift.status, taskCount: current.route.totals.tasks, completedTasks: current.route.totals.completed, proofStorage: "verified", crmValidation: "pending" }));
+console.log(JSON.stringify({ ok: true, shiftStatus: current.shift.status, taskCount: current.route.totals.tasks, completedTasks: current.route.totals.completed, proofStorage: "verified", crmValidation: "pending", stateGuardrails: "verified" }));

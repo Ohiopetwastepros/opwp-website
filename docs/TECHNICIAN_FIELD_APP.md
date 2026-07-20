@@ -1,6 +1,6 @@
 # OPWP technician field app
 
-Checkpoint: July 15, 2026
+Checkpoint: July 20, 2026
 
 ## What is built
 
@@ -15,7 +15,8 @@ Checkpoint: July 15, 2026
 - Scoop completion remains `validation_pending` until management validates the matching Sweep & Go job.
 - Delivery failures create a management change request and capture whether the bag stays on the truck, returns to the warehouse, is damaged, or is missing.
 - Technicians can record breaks and finish the day with ending mileage and returned/damaged inventory.
-- Management route control shows field/load/payment status, CRM validation, and exception approval/denial.
+- Management route control shows field/load/payment status, CRM validation, exception approval/denial, and protected delivery-proof review.
+- Server-side guardrails prevent load confirmation, route start, arrival, task work, duplicate on-the-way notices, mileage closeout, and inventory closeout from occurring out of sequence.
 
 ## Current integration boundaries
 

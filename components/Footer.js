@@ -9,7 +9,7 @@ export default function Footer() {
       >
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-            <img src="/assets/opwp-logo.png" alt="Ohio Pet Waste Pros logo" style={{ width: 54, height: 54, background: "#fff", borderRadius: "50%" }} />
+            <img src="/assets/opwp-logo.webp" alt="Ohio Pet Waste Pros logo" width="54" height="54" style={{ width: 54, height: 54, background: "#fff", borderRadius: "50%" }} />
             <span style={{ fontFamily: "var(--font-bricolage)", fontWeight: 800, fontSize: 18, lineHeight: 1.0, color: "#fff" }}>Ohio Pet<br />Waste Pros</span>
           </div>
           <p style={{ fontSize: 14.5, lineHeight: 1.6, margin: "0 0 20px", maxWidth: 330, color: "#9fb1c2" }}>
