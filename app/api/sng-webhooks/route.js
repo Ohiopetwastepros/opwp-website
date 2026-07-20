@@ -1,6 +1,7 @@
 import { getRuntimeEnv } from "@/lib/cloudflare";
 import { saveSngEvent } from "@/lib/db";
 import { processSngEvent, recoverFailedSngEvents } from "@/lib/sng-event-processor";
+import { timingSafeEqual } from "node:crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,15 @@ function inferEventType(body) {
   );
 }
 
-function authorized(request) {
+function secretMatches(expected, provided) {
+  if (!expected || !provided) return false;
+  const encoder = new TextEncoder();
+  const expectedBytes = encoder.encode(expected);
+  const providedBytes = encoder.encode(provided);
+  return expectedBytes.length === providedBytes.length && timingSafeEqual(expectedBytes, providedBytes);
+}
+
+function authentication(request) {
   const env = getRuntimeEnv();
   const expected = env.SNG_WEBHOOK_SECRET;
 
@@ -26,12 +35,17 @@ function authorized(request) {
     request.headers.get("x-webhook-secret") ||
     url.searchParams.get("secret");
 
-  if (!expected || !provided) return true;
-  return provided === expected;
+  const localSmoke = env.ADMIN_DEV_BYPASS === "true" && ["127.0.0.1", "localhost"].includes(url.hostname) && request.headers.get("x-opwp-local-smoke") === "true";
+  const verifiedSecret = secretMatches(expected, provided);
+  return {
+    authorized: !expected || !provided || verifiedSecret,
+    financialVerified: localSmoke || verifiedSecret,
+  };
 }
 
 export async function POST(request) {
-  if (!authorized(request)) {
+  const auth = authentication(request);
+  if (!auth.authorized) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
@@ -45,7 +59,7 @@ export async function POST(request) {
   const data = body?.data && typeof body.data === "object" ? body.data : body;
   const externalId = body?.id ?? body?.event_id ?? data?.job_id ?? data?.invoice_id ?? data?.shift_id ?? data?.client_id ?? data?.lead_id ?? data?.id;
   const processing = saved.configured
-    ? await processSngEvent({ id: saved.id, eventType, externalId, body })
+    ? await processSngEvent({ id: saved.id, eventType, externalId, body, allowFinancialMutation: auth.financialVerified })
     : { processed: false, error: "D1 is not configured." };
   const recovery = saved.configured
     ? await recoverFailedSngEvents({ limit: 5, excludeId: saved.id })

@@ -17,6 +17,7 @@ DELETE FROM dog_food_payments WHERE order_id IN (SELECT id FROM dog_food_orders 
 DELETE FROM dog_food_deliveries WHERE order_id IN (SELECT id FROM dog_food_orders WHERE customer_id='qa-food-customer' AND source='admin_manual');
 DELETE FROM dog_food_order_items WHERE order_id IN (SELECT id FROM dog_food_orders WHERE customer_id='qa-food-customer' AND source='admin_manual');
 DELETE FROM dog_food_orders WHERE customer_id='qa-food-customer' AND source='admin_manual';
+DELETE FROM sng_events WHERE customer_name='QA Dog Food Reconciliation';
 -- The smoke Worker must run with FIELD_AUTH_SECRET=field-smoke-local-secret.
 INSERT INTO route_partner_members (id,organization_id,email,display_name,role,external_employee_id,status)
 VALUES ('qa-field-member','org-opwp','field.qa@opwp.local','Field QA','technician','qa-tech','active')
@@ -24,7 +25,7 @@ ON CONFLICT(organization_id,email) DO UPDATE SET display_name='Field QA',role='t
 INSERT INTO route_partner_field_credentials (member_id,pin_salt,pin_hash,failed_attempts,locked_until)
 VALUES ((SELECT id FROM route_partner_members WHERE email='field.qa@opwp.local'),'opwp-field-smoke-fixture','kmHfvGzzNlCZELS1Q3ddE3Vhkqcuv4H3m8Fn0iavGc8',0,NULL)
 ON CONFLICT(member_id) DO UPDATE SET pin_salt=excluded.pin_salt,pin_hash=excluded.pin_hash,failed_attempts=0,locked_until=NULL;
-INSERT OR REPLACE INTO dog_food_customers (id,first_name,last_name,email,phone,customer_type,status) VALUES ('qa-food-customer','Test','Customer','qa-food@example.invalid','4190000000','route_partner','active');
+INSERT OR REPLACE INTO dog_food_customers (id,first_name,last_name,email,phone,customer_type,sng_client_id,status) VALUES ('qa-food-customer','Test','Customer','qa-food@example.invalid','4190000000','route_partner','qa-sng-food-client','active');
 INSERT OR REPLACE INTO dog_food_addresses (id,customer_id,line1,city,state,postal_code) VALUES ('qa-food-address','qa-food-customer','123 Test Lane','Holland','OH','43528');
 INSERT OR REPLACE INTO dog_food_orders (id,order_number,customer_id,address_id,order_type,status,subtotal_cents,tax_cents,total_cents) VALUES ('qa-food-order','QA-FIELD-001','qa-food-customer','qa-food-address','subscription','scheduled',5900,457,6357);
 DELETE FROM dog_food_order_items WHERE id='qa-food-item';
