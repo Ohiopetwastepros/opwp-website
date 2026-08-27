@@ -2,6 +2,7 @@ import { verifyAdminRequest } from "@/lib/admin-auth";
 import { getDb } from "@/lib/db";
 import { activateDogFoodSubscriptionFromOrder, recordDogFoodPayment } from "@/lib/dog-food-payments";
 import { createDogFoodPaymentSetup } from "@/lib/stripe";
+import { applicationConfig } from "@/lib/app-config";
 
 export const dynamic = "force-dynamic";
 
@@ -169,11 +170,11 @@ async function createOrder(db, body, actor) {
   return { orderId, orderNumber, totalCents: totals.total };
 }
 
-async function createStripeSetup(db, body, request) {
+async function createStripeSetup(db, body) {
   const customerId = clean(body.customerId, 100);
   const orderId = clean(body.orderId, 100) || null;
   if (!customerId) throw new Error("Choose a customer for secure payment setup.");
-  return createDogFoodPaymentSetup({ db, customerId, orderId, origin: new URL(request.url).origin });
+  return createDogFoodPaymentSetup({ db, customerId, orderId, origin: applicationConfig().siteOrigin });
 }
 
 export async function POST(request) {
@@ -191,7 +192,7 @@ export async function POST(request) {
         : action === "schedule_order"
           ? await scheduleOrder(current.db, body)
         : action === "create_stripe_setup"
-          ? await createStripeSetup(current.db, body, request)
+          ? await createStripeSetup(current.db, body)
         : null;
     if (!result) return Response.json({ ok: false, error: "The requested action is not supported." }, { status: 400 });
     console.log(JSON.stringify({ event: `dog_food_${action}`, actor: current.auth.email, ...result }));

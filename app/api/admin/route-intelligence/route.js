@@ -3,7 +3,7 @@ import { verifyAdminRequest } from "@/lib/admin-auth";
 import { getAirtableRouteSource } from "@/lib/airtable";
 import { getDb } from "@/lib/db";
 import { geoapifyConfigured } from "@/lib/geoapify";
-import { calculateActiveSubscriptionPlan, calculateRouteMetrics, geocodeActiveSubscriptionRouteBook, getActiveSubscriptionRouteSummary, normalizeSngDispatchJobs, publicRouteMetric, resolveRouteStops } from "@/lib/route-intelligence";
+import { calculateActiveSubscriptionPlan, calculateRouteMetrics, geocodeActiveSubscriptionRouteBook, getActiveSubscriptionRouteSummary, normalizeSngDispatchJobs, publicRouteMetric, resolveRouteStops, resolveTechnicianRouteDepots } from "@/lib/route-intelligence";
 import { sngConfigured, sngRequest, sngRows } from "@/lib/sweepandgo";
 
 export const dynamic = "force-dynamic";
@@ -110,7 +110,8 @@ export async function POST(request) {
     }
     const normalized = normalizeSngDispatchJobs(sourceRows).filter((stop) => stop.jobId);
     const stops = await resolveRouteStops(db, normalized, maxGeocodes);
-    const metrics = await calculateRouteMetrics(stops, { optimize: source === "airtable" });
+    const depots = await resolveTechnicianRouteDepots(db, stops);
+    const metrics = await calculateRouteMetrics(stops, { optimize: source === "airtable", depots });
 
     const snapshotStatements = metrics.map((metric) => db.prepare(
       `INSERT INTO dog_food_route_snapshots (id, service_date, provider, technician_id, route_id, source_payload)

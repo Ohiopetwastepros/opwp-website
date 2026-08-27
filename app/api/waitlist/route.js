@@ -1,13 +1,16 @@
 import { markSubmissionSynced, saveSubmission } from "@/lib/db";
 import { sngRequest } from "@/lib/sweepandgo";
+import { protectJsonRequest } from "@/lib/public-api-security";
+import { validateWaitlistInput } from "@/lib/public-input";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request) {
-  const body = await request.json().catch(() => null);
-  if (!body || !/^\d{5}$/.test(String(body.zip ?? ""))) {
-    return Response.json({ ok: false, error: "A valid ZIP code is required" }, { status: 400 });
-  }
+  const protectedRequest = await protectJsonRequest(request, { scope: "public_waitlist", limit: 5, windowSeconds: 3600, maxBytes: 16 * 1024, turnstile: true, action: "waitlist" });
+  if (protectedRequest.response) return protectedRequest.response;
+  const validation = validateWaitlistInput(protectedRequest.body);
+  if (!validation.ok) return Response.json({ ok: false, error: validation.error }, { status: 400 });
+  const body = validation.value;
 
   const saved = await saveSubmission({ kind: "waitlist", source: "website", body });
   const upstream = await sngRequest("/api/v2/client_on_boarding/out_of_service_form", {

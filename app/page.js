@@ -111,7 +111,7 @@ export default function HomePage() {
             <h1 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: 57, lineHeight: 0.99, letterSpacing: "-0.025em", margin: "0 0 22px" }}>The chore you can finally stop doing.</h1>
             <p style={{ fontSize: 19, lineHeight: 1.55, color: "#c4d2df", margin: "0 0 34px", maxWidth: 500 }}>Ohio Pet Waste Pros is your local, family-run pooper scooper service. Reliable weekly cleanups, a gate photo after every visit, double-bagged waste, and eco-friendly sanitizing and deodorizing — so your yard stays clean, safe, and ready to enjoy.</p>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 30 }}>
-              <Link href="/free-quote/" className="hov-cta" style={{ background: "#4F9E3A", color: "#fff", textDecoration: "none", padding: "16px 30px", borderRadius: 11, fontWeight: 800, fontSize: 16.5, boxShadow: "0 12px 26px -10px rgba(79,158,58,.7)" }}>Build My Plan — Free Quote</Link>
+              <Link href="/free-quote/" prefetch={false} className="hov-cta" style={{ background: "#397D2D", color: "#fff", textDecoration: "none", padding: "16px 30px", borderRadius: 11, fontWeight: 800, fontSize: 16.5, boxShadow: "0 12px 26px -10px rgba(57,125,45,.7)" }}>Build My Plan — Free Quote</Link>
               <a href="tel:419-262-2371" className="hov-white-08" style={{ background: "rgba(255,255,255,.1)", border: "1.5px solid rgba(255,255,255,.3)", color: "#fff", textDecoration: "none", padding: "16px 28px", borderRadius: 11, fontWeight: 700, fontSize: 16.5 }}>Call 419-262-2371</a>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap", color: "#aebfce", fontSize: 14, fontWeight: 600 }}>
@@ -122,7 +122,7 @@ export default function HomePage() {
             </div>
           </div>
           <div style={{ position: "relative" }}>
-            <img src="/assets/photos/hero-craig-driveway.webp" alt="Ohio Pet Waste Pros technician with scooping equipment in a Toledo-area driveway" style={{ width: "100%", aspectRatio: "4/5", objectFit: "cover", borderRadius: 22, boxShadow: "0 30px 60px -26px rgba(0,0,0,.6)" }} />
+            <img src="/assets/photos/hero-craig-driveway-640.webp" srcSet="/assets/photos/hero-craig-driveway-360.webp 360w, /assets/photos/hero-craig-driveway-640.webp 640w, /assets/photos/hero-craig-driveway-800.webp 800w" sizes="(max-width: 768px) calc(100vw - 56px), 520px" alt="Ohio Pet Waste Pros technician with scooping equipment in a Toledo-area driveway" width="1238" height="1400" fetchPriority="high" decoding="async" style={{ width: "100%", aspectRatio: "4/5", objectFit: "cover", borderRadius: 22, boxShadow: "0 30px 60px -26px rgba(0,0,0,.6)" }} />
           </div>
         </div>
       </section>
@@ -143,7 +143,7 @@ export default function HomePage() {
       {/* ===== REVIEWS MARQUEE ===== */}
       <section style={{ background: "#F6F5EF", padding: "64px 0 70px" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px", textAlign: "center", marginBottom: 36 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#658461", marginBottom: 10 }}>Local proof</div>
+          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#4D6F49", marginBottom: 10 }}>Local proof</div>
           <h2 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 34, letterSpacing: "-0.02em", margin: "0 0 12px" }}>Trusted by dog owners across Greater Toledo</h2>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 10, fontSize: 15, color: "#475259", fontWeight: 600 }}>
             <span style={{ color: "#E7A734", letterSpacing: "2px", fontSize: 18 }}>★★★★★</span>
@@ -160,7 +160,7 @@ export default function HomePage() {
                   <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#1A3C5A", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>{r.initial}</div>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 14, color: "#1C2A33" }}>{r.name}</div>
-                    <div style={{ fontSize: 11.5, color: "#8a96a0" }}>Verified Google review</div>
+                    <div style={{ fontSize: 11.5, color: "#65757F" }}>Verified Google review</div>
                   </div>
                 </div>
               </div>
@@ -173,19 +173,19 @@ export default function HomePage() {
       <section style={{ background: "#fff", padding: "84px 0" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px", display: "grid", gridTemplateColumns: "0.95fr 1.05fr", gap: 56, alignItems: "center" }} className="opwp-gsplit">
           <div style={{ position: "relative" }}>
-            <img src="/assets/photos/team-new-sign.webp" alt="The family team behind Ohio Pet Waste Pros with their We Scoop Dog Poop sign" style={{ width: "100%", aspectRatio: "5/6", objectFit: "cover", borderRadius: 22, boxShadow: "0 24px 48px -24px rgba(20,48,74,.4)" }} />
+            <img src="/assets/photos/team-new-sign-360.webp" srcSet="/assets/photos/team-new-sign-360.webp 360w, /assets/photos/team-new-sign.webp 440w" sizes="(max-width: 768px) calc(100vw - 56px), 500px" alt="The family team behind Ohio Pet Waste Pros with their We Scoop Dog Poop sign" width="440" height="586" loading="lazy" decoding="async" style={{ width: "100%", aspectRatio: "5/6", objectFit: "cover", borderRadius: 22, boxShadow: "0 24px 48px -24px rgba(20,48,74,.4)" }} />
           </div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#658461", marginBottom: 12 }}>Family-run &amp; dog-loving</div>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#4D6F49", marginBottom: 12 }}>Family-run &amp; dog-loving</div>
             <h2 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 38, lineHeight: 1.05, letterSpacing: "-0.02em", margin: "0 0 18px" }}>The part of dog ownership you can finally hand off.</h2>
             <p style={{ fontSize: 17, lineHeight: 1.6, color: "#475259", margin: "0 0 26px", maxWidth: 520 }}>We&apos;re a local, family-owned business in NW Ohio &amp; SE Michigan — built for homeowners, seniors, and busy families who want their yard clean, safe, and ready to enjoy without planning the weekend around a scooper.</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 15 }}>
-              <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}><span style={{ color: "#4F9E3A", fontSize: 18, marginTop: 1 }}>✓</span><span style={{ fontSize: 15.5, lineHeight: 1.5, color: "#36424b" }}><strong>Waste is hauled away or double-bagged</strong> — never left lying in your yard.</span></div>
-              <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}><span style={{ color: "#4F9E3A", fontSize: 18, marginTop: 1 }}>✓</span><span style={{ fontSize: 15.5, lineHeight: 1.5, color: "#36424b" }}><strong>A photo of your closed gate</strong> after every visit, so your pets stay safe.</span></div>
-              <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}><span style={{ color: "#4F9E3A", fontSize: 18, marginTop: 1 }}>✓</span><span style={{ fontSize: 15.5, lineHeight: 1.5, color: "#36424b" }}><strong>No contracts</strong> — keep service only as long as it helps.</span></div>
-              <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}><span style={{ color: "#4F9E3A", fontSize: 18, marginTop: 1 }}>✓</span><span style={{ fontSize: 15.5, lineHeight: 1.5, color: "#36424b" }}><strong>Eco-friendly, pet-safe sanitizing</strong> and equipment cleaned between every yard.</span></div>
+              <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}><span style={{ color: "#397D2D", fontSize: 18, marginTop: 1 }}>✓</span><span style={{ fontSize: 15.5, lineHeight: 1.5, color: "#36424b" }}><strong>Waste is hauled away or double-bagged</strong> — never left lying in your yard.</span></div>
+              <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}><span style={{ color: "#397D2D", fontSize: 18, marginTop: 1 }}>✓</span><span style={{ fontSize: 15.5, lineHeight: 1.5, color: "#36424b" }}><strong>A photo of your closed gate</strong> after every visit, so your pets stay safe.</span></div>
+              <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}><span style={{ color: "#397D2D", fontSize: 18, marginTop: 1 }}>✓</span><span style={{ fontSize: 15.5, lineHeight: 1.5, color: "#36424b" }}><strong>No contracts</strong> — keep service only as long as it helps.</span></div>
+              <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}><span style={{ color: "#397D2D", fontSize: 18, marginTop: 1 }}>✓</span><span style={{ fontSize: 15.5, lineHeight: 1.5, color: "#36424b" }}><strong>Eco-friendly, pet-safe sanitizing</strong> and equipment cleaned between every yard.</span></div>
             </div>
-            <Link href="/about-our-pet-waste-removal-team/" style={{ display: "inline-block", marginTop: 30, color: "#1A3C5A", fontWeight: 700, fontSize: 15.5, textDecoration: "none", borderBottom: "2px solid #4F9E3A", paddingBottom: 3 }}>Meet the team →</Link>
+            <Link href="/about-our-pet-waste-removal-team/" style={{ display: "inline-block", marginTop: 30, color: "#1A3C5A", fontWeight: 700, fontSize: 15.5, textDecoration: "none", borderBottom: "2px solid #397D2D", paddingBottom: 3 }}>Meet the team →</Link>
           </div>
         </div>
       </section>
@@ -199,22 +199,22 @@ export default function HomePage() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 20 }} className="opwp-g4">
             <div style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 18, padding: 28 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: "#4F9E3A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, marginBottom: 18 }}>📷</div>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: "#397D2D", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, marginBottom: 18 }}>📷</div>
               <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 18, margin: "0 0 9px" }}>Gate security assurance</h3>
               <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "#aebfce" }}>We photograph your closed gate after every cleanup, confirming your yard is secure and your pets are safe.</p>
             </div>
             <div style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 18, padding: 28 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: "#4F9E3A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, marginBottom: 18 }}>♻️</div>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: "#397D2D", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, marginBottom: 18 }}>♻️</div>
               <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 18, margin: "0 0 9px" }}>Discreet disposal</h3>
               <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "#aebfce" }}>Waste is carefully double-bagged and tucked into your trash bin — clean, odor-free, and out of sight.</p>
             </div>
             <div style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 18, padding: 28 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: "#4F9E3A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, marginBottom: 18 }}>💬</div>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: "#397D2D", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, marginBottom: 18 }}>💬</div>
               <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 18, margin: "0 0 9px" }}>Service updates</h3>
               <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "#aebfce" }}>A quick text before we arrive and after we finish keeps you informed without needing to be home.</p>
             </div>
             <div style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 18, padding: 28 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: "#4F9E3A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, marginBottom: 18 }}>🧴</div>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: "#397D2D", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, marginBottom: 18 }}>🧴</div>
               <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 18, margin: "0 0 9px" }}>Sanitized equipment</h3>
               <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "#aebfce" }}>Tools are disinfected with kennel-grade, eco-friendly solution between every property to stop the spread of bacteria.</p>
             </div>
@@ -226,31 +226,31 @@ export default function HomePage() {
       <section style={{ background: "#fff", padding: "84px 0" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
           <div style={{ marginBottom: 40, maxWidth: 620 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#658461", marginBottom: 12 }}>Services</div>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#4D6F49", marginBottom: 12 }}>Services</div>
             <h2 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 36, letterSpacing: "-0.02em", margin: "0 0 12px" }}>Pick the cleanup your yard needs</h2>
             <p style={{ fontSize: 17, lineHeight: 1.55, color: "#475259", margin: 0 }}>Most clients start with weekly service — it keeps dog waste from ever becoming a bigger job.</p>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 22, marginBottom: 22 }} className="opwp-g3">
             <Link href="/weekly-dog-poop-removal/" style={{ textDecoration: "none", color: "inherit", border: "1px solid #ece9df", borderRadius: 18, overflow: "hidden", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.04)", display: "block" }}>
-              <img src="/assets/photos/scooping-bell.webp" alt="Weekly dog poop removal in a Toledo-area residential yard" style={{ width: "100%", height: 180, objectFit: "cover" }} />
+              <img src="/assets/photos/scooping-bell-360.webp" srcSet="/assets/photos/scooping-bell-360.webp 360w, /assets/photos/scooping-bell-640.webp 640w" sizes="(max-width: 768px) calc(100vw - 56px), 380px" alt="Weekly dog poop removal in a Toledo-area residential yard" width="640" height="853" loading="lazy" decoding="async" style={{ width: "100%", height: 180, objectFit: "cover" }} />
               <div style={{ padding: 24 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#658461", marginBottom: 8 }}>Most popular</div>
+                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#4D6F49", marginBottom: 8 }}>Most popular</div>
                 <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 21, margin: "0 0 9px" }}>Weekly cleanups</h3>
                 <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.55, color: "#475259" }}>A dependable weekly route keeps your yard clean, safe, and ready to use — the easiest way to stay ahead of it.</p>
               </div>
             </Link>
             <Link href="/bi-weekly-dog-poop-removal/" style={{ textDecoration: "none", color: "inherit", border: "1px solid #ece9df", borderRadius: 18, overflow: "hidden", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.04)", display: "block" }}>
-              <img src="/assets/photos/craig-standing-horizontal.webp" alt="Bi-weekly dog waste removal service" style={{ width: "100%", height: 180, objectFit: "cover" }} />
+              <img src="/assets/photos/craig-standing-horizontal-360.webp" srcSet="/assets/photos/craig-standing-horizontal-360.webp 360w, /assets/photos/craig-standing-horizontal-640.webp 640w" sizes="(max-width: 768px) calc(100vw - 56px), 380px" alt="Bi-weekly dog waste removal service" width="640" height="480" loading="lazy" decoding="async" style={{ width: "100%", height: 180, objectFit: "cover" }} />
               <div style={{ padding: 24 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#658461", marginBottom: 8 }}>Lighter-use yards</div>
+                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#4D6F49", marginBottom: 8 }}>Lighter-use yards</div>
                 <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 21, margin: "0 0 9px" }}>Bi-weekly cleanups</h3>
                 <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.55, color: "#475259" }}>Every-other-week service for yards that still need dependable, professional pet waste removal.</p>
               </div>
             </Link>
             <Link href="/one-time-yard-cleanup/" style={{ textDecoration: "none", color: "inherit", border: "1px solid #ece9df", borderRadius: 18, overflow: "hidden", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.04)", display: "block" }}>
-              <img src="/assets/photos/cody-scooping-vest.webp" alt="One-time and spring cleanup dog waste removal" style={{ width: "100%", height: 180, objectFit: "cover" }} />
+              <img src="/assets/photos/cody-scooping-vest-360.webp" srcSet="/assets/photos/cody-scooping-vest-360.webp 360w, /assets/photos/cody-scooping-vest-640.webp 640w" sizes="(max-width: 768px) calc(100vw - 56px), 380px" alt="One-time and spring cleanup dog waste removal" width="640" height="853" loading="lazy" decoding="async" style={{ width: "100%", height: 180, objectFit: "cover" }} />
               <div style={{ padding: 24 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#658461", marginBottom: 8 }}>Fresh start</div>
+                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#4D6F49", marginBottom: 8 }}>Fresh start</div>
                 <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 21, margin: "0 0 9px" }}>One-time &amp; spring cleanup</h3>
                 <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.55, color: "#475259" }}>Get a built-up yard back under control before guests, mowing, or starting recurring service.</p>
               </div>
@@ -281,7 +281,7 @@ export default function HomePage() {
       <section style={{ background: "#17181C", color: "#fff", padding: "82px 0", position: "relative", overflow: "hidden" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 28px", textAlign: "center" }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.16)", borderRadius: 99, padding: "6px 15px", fontSize: 12, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#e9c64a", marginBottom: 22 }}>🦴 Now offering · premium dog food</div>
-          <img src="/assets/edf/logo.png" alt="Extreme Dog Fuel logo" style={{ display: "block", height: 70, margin: "0 auto 22px", borderRadius: 8 }} />
+          <img src="/assets/edf/logo.png" alt="Extreme Dog Fuel logo" width="200" height="130" loading="lazy" decoding="async" style={{ display: "block", width: "auto", height: 70, margin: "0 auto 22px", borderRadius: 8 }} />
           <h2 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: 38, lineHeight: 1.04, letterSpacing: "-0.02em", margin: "0 0 16px" }}>Premium nutrition for your dog, too</h2>
           <p style={{ fontSize: 17, lineHeight: 1.6, color: "#b9bcc4", margin: "0 auto 14px", maxWidth: 620 }}>We don&apos;t just keep your yard clean — we help keep your dog healthy. Ohio Pet Waste Pros now offers <strong style={{ color: "#fff" }}>Extreme Dog Fuel</strong>: premium, veterinarian-recommended kibble with no corn, wheat, soy, or glutens. Four formulas for every age and activity level — delivered right with your service.</p>
           <div style={{ fontSize: 13.5, color: "#8b8f98", fontWeight: 600, letterSpacing: "0.02em", marginBottom: 44 }}>Elite Nutrition · Recommended by Veterinarians · Made in the USA</div>
@@ -290,28 +290,28 @@ export default function HomePage() {
         <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 28px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 20 }} className="opwp-g4">
             <div style={{ background: "#fff", borderRadius: 18, padding: "20px 18px 22px", textAlign: "center", boxShadow: "0 20px 40px -22px rgba(0,0,0,.6)" }}>
-              <img src="/assets/edf/22-12.png" alt="Extreme Dog Fuel 22-12 Chicken Meal & Brown Rice" style={{ width: "100%", height: 230, objectFit: "contain", marginBottom: 14 }} />
+              <img src="/assets/edf/22-12.webp" alt="Extreme Dog Fuel 22-12 Chicken Meal & Brown Rice" width="346" height="539" loading="lazy" decoding="async" style={{ width: "100%", height: 230, objectFit: "contain", marginBottom: 14 }} />
               <div style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: 22, color: "#1A3C5A" }}>22-12</div>
               <div style={{ fontSize: 13.5, color: "#5b6770", lineHeight: 1.4, marginTop: 4 }}>Chicken Meal &amp; Brown Rice<br />For less active dogs</div>
             </div>
             <div style={{ background: "#fff", borderRadius: 18, padding: "20px 18px 22px", textAlign: "center", boxShadow: "0 20px 40px -22px rgba(0,0,0,.6)" }}>
-              <img src="/assets/edf/26-14.png" alt="Extreme Dog Fuel 26-14 for puppies and active dogs" style={{ width: "100%", height: 230, objectFit: "contain", marginBottom: 14 }} />
+              <img src="/assets/edf/26-14.webp" alt="Extreme Dog Fuel 26-14 for puppies and active dogs" width="351" height="543" loading="lazy" decoding="async" style={{ width: "100%", height: 230, objectFit: "contain", marginBottom: 14 }} />
               <div style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: 22, color: "#1A3C5A" }}>26-14</div>
               <div style={{ fontSize: 13.5, color: "#5b6770", lineHeight: 1.4, marginTop: 4 }}>For puppies &amp; active dogs<br />Folic acid, vitamins &amp; minerals</div>
             </div>
             <div style={{ background: "#fff", borderRadius: 18, padding: "20px 18px 22px", textAlign: "center", boxShadow: "0 20px 40px -22px rgba(0,0,0,.6)" }}>
-              <img src="/assets/edf/26-18.png" alt="Extreme Dog Fuel 26-18 for active dogs with joint and skin system" style={{ width: "100%", height: 230, objectFit: "contain", marginBottom: 14 }} />
+              <img src="/assets/edf/26-18.webp" alt="Extreme Dog Fuel 26-18 for active dogs with joint and skin system" width="350" height="539" loading="lazy" decoding="async" style={{ width: "100%", height: 230, objectFit: "contain", marginBottom: 14 }} />
               <div style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: 22, color: "#1A3C5A" }}>26-18</div>
               <div style={{ fontSize: 13.5, color: "#5b6770", lineHeight: 1.4, marginTop: 4 }}>For active dogs<br />Joint, glucosamine &amp; skin system</div>
             </div>
             <div style={{ background: "#fff", borderRadius: 18, padding: "20px 18px 22px", textAlign: "center", boxShadow: "0 20px 40px -22px rgba(0,0,0,.6)" }}>
-              <img src="/assets/edf/30-20.png" alt="Extreme Dog Fuel 30-20 Pro-Athlete formula" style={{ width: "100%", height: 230, objectFit: "contain", marginBottom: 14 }} />
+              <img src="/assets/edf/30-20.webp" alt="Extreme Dog Fuel 30-20 Pro-Athlete formula" width="345" height="523" loading="lazy" decoding="async" style={{ width: "100%", height: 230, objectFit: "contain", marginBottom: 14 }} />
               <div style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: 22, color: "#1A3C5A" }}>30-20</div>
               <div style={{ fontSize: 13.5, color: "#5b6770", lineHeight: 1.4, marginTop: 4 }}>Pro-Athlete formula<br />For puppies &amp; active dogs</div>
             </div>
           </div>
           <div style={{ textAlign: "center", marginTop: 42 }}>
-            <Link href="/dog-food/" className="hov-cta" style={{ display: "inline-block", background: "#4F9E3A", color: "#fff", textDecoration: "none", padding: "16px 32px", borderRadius: 12, fontWeight: 800, fontSize: 16.5, boxShadow: "0 14px 28px -12px rgba(79,158,58,.7)" }}>Explore Extreme Dog Fuel</Link>
+            <Link href="/dog-food/" className="hov-cta" style={{ display: "inline-block", background: "#397D2D", color: "#fff", textDecoration: "none", padding: "16px 32px", borderRadius: 12, fontWeight: 800, fontSize: 16.5, boxShadow: "0 14px 28px -12px rgba(57,125,45,.7)" }}>Explore Extreme Dog Fuel</Link>
           </div>
         </div>
       </section>
@@ -320,7 +320,7 @@ export default function HomePage() {
       <section style={{ background: "#F6F5EF", padding: "84px 0" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
           <div style={{ textAlign: "center", marginBottom: 46 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#658461", marginBottom: 12 }}>How it works</div>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#4D6F49", marginBottom: 12 }}>How it works</div>
             <h2 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 36, letterSpacing: "-0.02em", margin: 0 }}>A clean yard in five simple steps</h2>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 18 }} className="opwp-g5">
@@ -345,7 +345,7 @@ export default function HomePage() {
               <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.5, color: "#5b6770" }}>Manage your subscription, invoices, and yard details in one place.</p>
             </div>
             <div style={{ background: "#fff", borderRadius: 16, padding: "26px 22px" }}>
-              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#4F9E3A", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Bricolage Grotesque'", fontWeight: 800, marginBottom: 16 }}>5</div>
+              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#397D2D", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Bricolage Grotesque'", fontWeight: 800, marginBottom: 16 }}>5</div>
               <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 16.5, margin: "0 0 8px" }}>Enjoy your space</h3>
               <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.5, color: "#5b6770" }}>Spend time in your yard, not cleaning it — we keep it spotless year-round.</p>
             </div>
@@ -357,7 +357,7 @@ export default function HomePage() {
       <section id="areas" style={{ background: "#fff", padding: "84px 0", scrollMarginTop: 90 }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 50, alignItems: "center" }} className="opwp-gsplit">
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#658461", marginBottom: 12 }}>Service areas</div>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#4D6F49", marginBottom: 12 }}>Service areas</div>
             <h2 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 34, letterSpacing: "-0.02em", margin: "0 0 16px" }}>Dog waste removal across NW Ohio &amp; SE Michigan</h2>
             <p style={{ fontSize: 16.5, lineHeight: 1.6, color: "#475259", margin: "0 0 24px" }}>We proudly provide professional pet waste removal and yard sanitizing throughout the greater Toledo area and Southern Michigan.</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 9 }}>
@@ -376,7 +376,7 @@ export default function HomePage() {
       <section style={{ background: "#F6F5EF", padding: "84px 0" }}>
         <div style={{ maxWidth: 820, margin: "0 auto", padding: "0 28px" }}>
           <div style={{ textAlign: "center", marginBottom: 42 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#658461", marginBottom: 12 }}>Questions</div>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#4D6F49", marginBottom: 12 }}>Questions</div>
             <h2 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 36, letterSpacing: "-0.02em", margin: 0 }}>What clients ask before booking</h2>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -384,7 +384,7 @@ export default function HomePage() {
               <div key={i} style={{ background: "#fff", border: "1px solid #ece9df", borderRadius: 14, overflow: "hidden" }}>
                 <div style={{ width: "100%", textAlign: "left", padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 17, color: "#1C2A33" }}>
                   <span>{f.q}</span>
-                  <span style={{ color: "#4F9E3A", fontSize: 22, flex: "none" }}>−</span>
+                  <span style={{ color: "#397D2D", fontSize: 22, flex: "none" }}>−</span>
                 </div>
                 <div style={{ padding: "0 24px 22px", fontSize: 15, lineHeight: 1.6, color: "#475259" }}>{f.a}</div>
               </div>
@@ -402,7 +402,7 @@ export default function HomePage() {
           <h2 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: 40, lineHeight: 1.05, letterSpacing: "-0.025em", margin: "0 0 16px" }}>Ready to make dog poop the easiest part of your week?</h2>
           <p style={{ fontSize: 18, lineHeight: 1.55, color: "#c4d2df", margin: "0 0 32px" }}>Get your free Toledo-area quote in about a minute — then let our family take it from here.</p>
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
-            <Link href="/free-quote/" className="hov-cta" style={{ background: "#4F9E3A", color: "#fff", textDecoration: "none", padding: "17px 34px", borderRadius: 12, fontWeight: 800, fontSize: 17, boxShadow: "0 14px 28px -12px rgba(79,158,58,.7)" }}>Get My Free Quote</Link>
+            <Link href="/free-quote/" prefetch={false} className="hov-cta" style={{ background: "#397D2D", color: "#fff", textDecoration: "none", padding: "17px 34px", borderRadius: 12, fontWeight: 800, fontSize: 17, boxShadow: "0 14px 28px -12px rgba(57,125,45,.7)" }}>Get My Free Quote</Link>
             <a href="tel:419-262-2371" style={{ background: "rgba(255,255,255,.12)", border: "1.5px solid rgba(255,255,255,.32)", color: "#fff", textDecoration: "none", padding: "17px 30px", borderRadius: 12, fontWeight: 700, fontSize: 17 }}>Call 419-262-2371</a>
           </div>
         </div>

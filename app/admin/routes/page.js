@@ -49,7 +49,7 @@ export default async function RoutesPage() {
               </div>
             </section>
             <OnboardingRouteTool />
-            <OfficeAccessManager />
+            <div id="office-access"><OfficeAccessManager /></div>
             <RouteAnalysisClient initialSummary={source} />
           </>
         )}

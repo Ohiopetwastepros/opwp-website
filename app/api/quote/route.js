@@ -1,15 +1,19 @@
 import { normalizeFrequency, normalizeLastCleaned, sngRequest } from "@/lib/sweepandgo";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
+  const rate = await checkRateLimit(request, { scope: "public_quote", limit: 60, windowSeconds: 300, failClosed: true });
+  if (!rate.allowed) return rateLimitResponse(rate);
   const { searchParams } = new URL(request.url);
   const zip = searchParams.get("zip");
   const dogs = searchParams.get("dogs");
   const frequency = searchParams.get("frequency");
   const lastCleaned = searchParams.get("last_cleaned") || "one_month";
 
-  if (!/^\d{5}$/.test(zip ?? "") || !dogs || !frequency) {
+  const dogCount = Number(dogs);
+  if (!/^\d{5}$/.test(zip ?? "") || !Number.isInteger(dogCount) || dogCount < 1 || dogCount > 20 || !["twice_a_week", "once_a_week", "bi_weekly", "monthly", "one_time"].includes(String(frequency))) {
     return Response.json({ configured: false, error: "Need valid zip, dogs, and frequency" }, { status: 400 });
   }
 
@@ -26,7 +30,7 @@ export async function GET(request) {
     return Response.json({ configured: false, reason: "no_credentials" });
   }
   if (!upstream.ok) {
-    return Response.json({ configured: true, ok: false, status: upstream.status, raw: upstream.data });
+    return Response.json({ configured: true, ok: false, status: upstream.status, error: "Pricing is temporarily unavailable." });
   }
 
   const value = upstream.data?.price?.value ?? upstream.data?.price ?? null;

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { adminSessionCookie, createAdminSession, expiredAdminSessionCookie, loginFingerprint, verifyAdminCredentials, verifyAdminRequest } from "@/lib/admin-auth";
+import { readBoundedJson } from "@/lib/public-api-security";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +27,11 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  let body;
-  try { body = await request.json(); } catch { return NextResponse.json({ ok: false, error: "Enter your username and password." }, { status: 400 }); }
+  const rate = await checkRateLimit(request, { scope: "admin_login", limit: 10, windowSeconds: 900, failClosed: true });
+  if (!rate.allowed) return rateLimitResponse(rate);
+  const parsed = await readBoundedJson(request, 8 * 1024);
+  if (parsed.response) return parsed.response;
+  const body = parsed.body;
   const username = String(body?.username || "").trim().slice(0, 160);
   const password = String(body?.password || "").slice(0, 256);
   if (!username || !password) return NextResponse.json({ ok: false, error: "Enter your username and password." }, { status: 400 });

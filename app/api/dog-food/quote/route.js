@@ -1,12 +1,15 @@
 import { queueDogFoodFollowUp, saveSubmission } from "@/lib/db";
+import { protectJsonRequest } from "@/lib/public-api-security";
 
 export const runtime = "nodejs";
 
 const CONSENT_TEXT = "I consent to receive marketing and service messages from Ohio Pet Waste Pros at the phone number provided. Message frequency may vary; message & data rates may apply. Reply STOP to opt out.";
 
 export async function POST(request) {
+  const protectedRequest = await protectJsonRequest(request, { scope: "dog_food_quote", limit: 10, windowSeconds: 3600, maxBytes: 32 * 1024, turnstile: true, action: "dog_food_quote" });
+  if (protectedRequest.response) return protectedRequest.response;
   try {
-    const body = await request.json();
+    const body = protectedRequest.body;
     const customer = body?.customer ?? {};
     const phoneDigits = String(customer.phone ?? "").replace(/\D/g, "");
 

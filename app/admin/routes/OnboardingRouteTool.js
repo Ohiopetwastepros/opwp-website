@@ -36,7 +36,7 @@ export default function OnboardingRouteTool({ endpoint = "/api/admin/route-assig
     finally { setLoading(false); }
   }
 
-  return <section className={styles.assignmentTool}>
+  return <section id="new-client-routing" className={styles.assignmentTool}>
     <div className={styles.assignmentHead}><div><div className={styles.eyebrow}>OPWP Route Assignment Tool · live Airtable edition</div><h2>Type an address. Confirm the best service day.</h2><p>The engine refreshes the active Airtable customer book when needed, then tests real road-time insertion into every weekday route.{officeMode ? " Use this recommendation when confirming the customer's service day." : " Excel is no longer part of the operating flow."}</p></div><span>Live customers + road time</span></div>
     <form className={styles.assignmentForm} onSubmit={analyze}>
       <label className={styles.addressField}><span>Full service address</span><input required value={form.address} onChange={update("address")} placeholder="123 Main St, Toledo, OH 43615" autoComplete="street-address" /></label>

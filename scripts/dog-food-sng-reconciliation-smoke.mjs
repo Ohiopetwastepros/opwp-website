@@ -46,16 +46,16 @@ const unverifiedInvoiceId = `98${Date.now()}`;
 await post("/api/sng-webhooks/", {
   type: "client:invoice_finalized",
   data: { invoice_id: unverifiedInvoiceId, client: "qa-sng-food-client", client_name: "QA Dog Food Reconciliation", total: "63.57", subtotal: "59.00", tax: "4.57", items: [{ description: "Dog Food Delivery – Blue Bag", quantity: "1.00", unit_amount: "59.00", amount: "59.00" }] },
-}, 200, false);
+}, 401, false);
 const unverifiedPayment = await post("/api/sng-webhooks/", {
   type: "client:client_payment_accepted",
   data: { client: "qa-sng-food-client", client_name: "QA Dog Food Reconciliation", amount: 63.57, reference_number: `QA-UNVERIFIED-${crypto.randomUUID()}` },
-}, 200, false);
-if (unverifiedPayment.processing?.reconciliation?.reason !== "webhook_not_verified") throw new Error("An unverified payment was not quarantined.");
+}, 401, false);
+if (unverifiedPayment.ok !== false) throw new Error("An unverified webhook was not rejected.");
 const stillEditable = await post("/api/admin/dog-food/", {
   action: "update_order", orderId: unverifiedOrder.result.orderId, plan: "on_demand", delivery: "route_day", scheduledDate: "2026-07-22",
   items: [{ productId: "edf-26-14-blue-40", quantity: 2 }],
 });
 if (stillEditable.result.totalCents !== 12714) throw new Error("The unverified payment changed financial state.");
 
-console.log(JSON.stringify({ ok: true, orderNumber: created.result.orderNumber, amountCents: created.result.totalCents, invoiceMatched: true, paymentReference: "recorded", paidOrderLocked: true, unverifiedPayment: "quarantined" }));
+console.log(JSON.stringify({ ok: true, orderNumber: created.result.orderNumber, amountCents: created.result.totalCents, invoiceMatched: true, paymentReference: "recorded", paidOrderLocked: true, unverifiedWebhook: "rejected" }));

@@ -106,6 +106,7 @@ Create or regenerate an Airtable personal access token from Airtable's Developer
 Hub with these minimum scopes:
 
 - `data.records:read`
+- `data.records:write`
 - `schema.bases:read`
 
 Limit the token to the OPWP operations base when possible. Store it as the
@@ -114,13 +115,19 @@ the backend. The current admin KPI dashboard already shows live 30-day Sweep &
 Go metrics and can be expanded to merge Airtable historical revenue, churn, and
 operations data.
 
+The hourly `15 * * * *` pipeline also syncs Google Business Profile reviews
+before refreshing the Airtable cockpit snapshot. Configure the four
+`GOOGLE_BUSINESS_*` Worker secrets and follow `docs/GOOGLE_REVIEW_SYNC.md`.
+The one-time alias-field setup requires Airtable schema-write permission; the
+runtime token does not need schema-write permission afterward.
+
 ## Sweep & Go webhook cutover
 
 To remove Pipedream/Zapier-style middleware, update the Sweep & Go Open API token
 webhook URL to the Cloudflare backend:
 
 ```text
-https://opwp-website.ohiopetwastepros.workers.dev/api/sng-webhooks
+https://opwp-website.ohiopetwastepros.workers.dev/api/sng-webhooks?secret=<SNG_WEBHOOK_SECRET>
 ```
 
 Keep all needed events enabled on the same Sweep & Go token. This one all-events
@@ -134,9 +141,12 @@ token replaces:
 The backend stores incoming events in D1 and shows them under the admin
 dashboard's Sweep & Go event stream. The admin dashboard also summarizes the
 last 30 days of received events into completed jobs, skipped jobs, churn
-signals, payroll shifts, payroll hours, and logged miles. `SNG_WEBHOOK_SECRET`
-remains available for a future signed URL/header if Sweep & Go supports one, but
-the current receiver accepts the clean Sweep & Go webhook URL above.
+signals, payroll shifts, payroll hours, and logged miles. The receiver fails
+closed unless the request supplies `SNG_WEBHOOK_SECRET` in the
+`x-sng-webhook-secret` or `x-webhook-secret` header, or in the `secret`
+query parameter. Sweep & Go's token configuration uses the query-parameter form
+because it does not expose custom webhook headers. Use a high-entropy value and
+URL-encode it when configuring the provider.
 
 ## Dog-food URL warning
 
@@ -216,3 +226,65 @@ Current production Worker version: `df2ac38a-ed7c-49c2-92b0-c624b7fee73d` (2026-
   `.next` files. Remove only the verified generated `.next` directory and retry.
 - The worktree contains extensive user-owned uncommitted backend changes.
   Preserve unrelated edits and do not reset the worktree.
+
+## Production hardening requirements
+
+Before production, set independent `ADMIN_SESSION_SECRET` and
+`FIELD_AUTH_SECRET` values. Generate at least 32 random bytes for each.
+`ADMIN_PASSWORD` is only the login credential and is not a production
+signing-key fallback.
+
+Create separate Cloudflare Turnstile widgets for development/staging and
+production. Restrict the production widget to `ohiopetwastepros.com` and the
+approved Worker preview hostname. Set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in the
+Cloudflare build environment and `TURNSTILE_SECRET_KEY` as a Worker secret.
+Server-side Siteverify validation is mandatory.
+
+Create the private proof-photo bucket and bind it before production:
+
+1. Run `npx wrangler r2 bucket create opwp-field-proofs`.
+2. Confirm `wrangler.jsonc` binds that bucket as `FIELD_PROOFS`.
+3. Deploy and verify an assigned technician can upload/read a proof.
+4. Verify a different or unauthenticated technician receives 401/404.
+
+The D1 fallback remains available for local testing and emergencies, but the
+System Health page will show yellow until R2 is active.
+
+Apply migrations only after reviewing the remote pending list. The historical
+duplicate `0022` filenames must not be renamed because D1 tracks applied
+migration filenames. Run `npm run check:migrations` before every deployment,
+then apply `0030_production_hardening.sql`.
+
+## Notification provider
+
+No production SMS provider is claimed by this repository. Queued records remain
+queued until a provider confirms acceptance. `SMS_PROVIDER` defaults to
+`unconfigured`. `QUO_API_BASE_URL`, `QUO_API_TOKEN`, and `QUO_SENDER_ID`
+are reserved for a future Quo adapter after the API contract and credentials are
+available.
+
+## Deployment roles and cutover
+
+- SOURCE OF TRUTH: GitHub
+- STAGING/PREVIEW: Cloudflare workers.dev
+- PRODUCTION APP: Cloudflare Worker
+- PUBLIC DOMAIN: ohiopetwastepros.com after controlled cutover
+- LEGACY SITE: WordPress remains until cutover validation is complete
+
+There is no committed Vercel configuration in this repository. If Vercel remains
+connected in GitHub, treat it as preview/status-only until the owner removes the
+external integration. A Vercel success status does not mean Cloudflare production
+was deployed.
+
+Cutover checklist:
+
+1. Confirm CI, dependency audit, migration check, Next build, and OpenNext build.
+2. Set all production secrets and the Turnstile build variable.
+3. Create/bind `FIELD_PROOFS` and apply the reviewed D1 migrations.
+4. Configure Sweep & Go with the exact HTTPS webhook URL and URL-encoded secret.
+5. Verify missing/bad webhook credentials return 401 and a correct fixture is accepted.
+6. Verify Stripe webhook signing, QuickBooks callback URI, and connected health.
+7. Verify admin, office, field, proof-photo, quote, waitlist, onboarding, and dog-food flows.
+8. Review `/admin/system-health/` with no red production blockers.
+9. Attach the custom domain to the Worker while retaining a tested rollback path.
+10. Run DNS/HTTPS/redirect/SEO smoke tests, then retire WordPress only after sign-off.

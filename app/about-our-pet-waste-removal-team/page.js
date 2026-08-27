@@ -622,62 +622,6 @@ export default function AboutPage() {
                 </p>
               </div>
             </div>
-            <div
-              style={{
-                border: "1px solid #e7e6df",
-                borderRadius: "18px",
-                overflow: "hidden",
-                background: "#fff",
-              }}
-            >
-              <img
-                src="/assets/photos/team-bria.webp"
-                alt="Bria, Ohio Pet Waste Pros technician"
-                style={{
-                  width: "100%",
-                  height: "240px",
-                  objectFit: "cover",
-                  objectPosition: "center top",
-                  display: "block",
-                }}
-              />
-              <div style={{ padding: "20px" }}>
-                <h3
-                  style={{
-                    fontFamily: "'Bricolage Grotesque'",
-                    fontWeight: 700,
-                    fontSize: "18px",
-                    margin: "0 0 3px",
-                  }}
-                >
-                  Bria M.
-                </h3>
-                <div
-                  style={{
-                    fontSize: "12.5px",
-                    fontWeight: 700,
-                    letterSpacing: "0.05em",
-                    textTransform: "uppercase",
-                    color: "#658461",
-                    marginBottom: "10px",
-                  }}
-                >
-                  Technician
-                </div>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: "13.5px",
-                    lineHeight: 1.55,
-                    color: "#5b6770",
-                  }}
-                >
-                  Detail-oriented and always greeted with a wagging tail. Bria
-                  keeps yards clean and safe so families can enjoy them
-                  worry-free.
-                </p>
-              </div>
-            </div>
           </div>
         </div>
       </section>

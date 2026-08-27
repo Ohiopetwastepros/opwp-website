@@ -7,6 +7,19 @@ CF_ACCESS_AUD=""
 ADMIN_DEV_BYPASS="true"
 ADMIN_USERNAME="owner"
 ADMIN_PASSWORD="use-a-strong-local-development-password"
+ADMIN_SESSION_SECRET=""
+FIELD_AUTH_SECRET=""
+PUBLIC_API_DEV_BYPASS="false"
+APP_ENV="development"
+ENVIRONMENT="development"
+SITE_ORIGIN="http://localhost:3000"
+WORKER_ORIGIN="http://localhost:8787"
+
+# Public site key is safe for the browser; the secret is server-only. Use
+# Cloudflare's documented test keys locally or create separate local/prod widgets.
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=""
+TURNSTILE_SECRET_KEY=""
+TURNSTILE_HOSTNAMES="localhost,127.0.0.1"
 
 # Stripe test keys first. Store live values with Wrangler secrets, never here.
 STRIPE_SECRET_KEY=""
@@ -16,6 +29,19 @@ NEXT_PUBLIC_AIRTABLE_OPS_URL="https://airtable.com/appcAWPBQB8GmOrcT/tblhi8MGUOs
 AIRTABLE_BASE_ID="appcAWPBQB8GmOrcT"
 AIRTABLE_OPERATIONS_TABLE_ID="tblhi8MGUOsWNmd37"
 AIRTABLE_API_KEY=""
+GEOAPIFY_API_KEY=""
+
+# Google Business Profile review sync. Create OAuth credentials in the
+# opwp-review-sync-503019 project and authorize the business.manage scope.
+# Store all real values as Cloudflare secrets, including the location resource.
+GOOGLE_BUSINESS_CLIENT_ID=""
+GOOGLE_BUSINESS_CLIENT_SECRET=""
+GOOGLE_BUSINESS_REFRESH_TOKEN=""
+GOOGLE_BUSINESS_LOCATION="accounts/ACCOUNT_ID/locations/LOCATION_ID"
+
+# Browser key restricted to approved OPWP website referrers and only the
+# Maps JavaScript API plus Geocoding API. Never commit the real key.
+GOOGLE_MAPS_BROWSER_KEY=""
 
 # QuickBooks Online production OAuth. Store real values with Wrangler secrets.
 QB_CLIENT_ID=""
@@ -25,6 +51,29 @@ QB_REDIRECT_URI="https://opwp-website.ohiopetwastepros.workers.dev/api/quickbook
 # unless the QuickBooks connection is re-authorized.
 QB_TOKEN_ENCRYPTION_KEY=""
 QB_ENVIRONMENT="sandbox"
+QB_CALLBACK_ORIGIN="http://localhost:3000"
+
+# Notification delivery remains queued unless a real provider adapter is
+# configured. Quo values are reserved pending its confirmed API contract.
+SMS_PROVIDER="unconfigured"
+QUO_API_BASE_URL=""
+QUO_API_TOKEN=""
+QUO_SENDER_ID=""
+
+# Optional local smoke-test targets. These are not production secrets.
+SMOKE_BASE_URL="http://127.0.0.1:3000"
+DOG_FOOD_SMOKE_BASE="http://127.0.0.1:3000"
+DOG_FOOD_ADMIN_SMOKE_BASE="http://127.0.0.1:3000"
+FIELD_SMOKE_BASE="http://127.0.0.1:3000"
+FIELD_SMOKE_DATE=""
+STRIPE_SMOKE_WEBHOOK_SECRET=""
+
+# DB is a D1 binding and FIELD_PROOFS is an R2 binding declared in
+# wrangler.jsonc; neither is a text environment variable.
+
+# Shared only with Personal Financial OS. Generate a long random value and
+# store it as a Wrangler secret in production; never put the real value here.
+FINANCIAL_OS_SYNC_TOKEN=""
 
 # Warren can be connected when its API base URL, authentication scheme, and
 # endpoint documentation are available.

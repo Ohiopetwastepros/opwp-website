@@ -1,0 +1,47 @@
+name: Production quality gate
+
+on:
+  pull_request:
+  push:
+    branches: [main, "codex/**"]
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      APP_ENV: production
+      ADMIN_USERNAME: ci-admin
+      ADMIN_PASSWORD: ci-password-not-for-production
+      ADMIN_SESSION_SECRET: ci-admin-session-secret-not-for-production
+      FIELD_AUTH_SECRET: ci-field-auth-secret-not-for-production
+      SNG_WEBHOOK_SECRET: ci-sng-secret
+      STRIPE_WEBHOOK_SECRET: whsec_ci_fixture
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+      TURNSTILE_HOSTNAMES: localhost,127.0.0.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run audit:production
+      - run: npm run check:migrations
+      - run: npm run audit:routes
+      - run: npm test
+      - run: npm run test:smoke
+      - run: npm run build
+      - name: Protected-route and webhook smoke tests
+        shell: bash
+        run: |
+          npm run start -- --hostname 127.0.0.1 > /tmp/opwp-next.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid || true' EXIT
+          for attempt in {1..40}; do
+            if curl --silent --fail http://127.0.0.1:3000/ > /dev/null; then break; fi
+            sleep 1
+          done
+          npm run test:http-security
+      - run: npm run build:cloudflare
+      - run: git diff --check

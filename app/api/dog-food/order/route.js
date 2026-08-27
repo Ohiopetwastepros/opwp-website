@@ -1,4 +1,6 @@
 import { cancelDogFoodFollowUp, getDb, saveSubmission } from "@/lib/db";
+import { applicationConfig } from "@/lib/app-config";
+import { protectJsonRequest } from "@/lib/public-api-security";
 import { createDogFoodCheckout, stripeConfigured } from "@/lib/stripe";
 
 export const runtime = "nodejs";
@@ -96,8 +98,10 @@ async function createCommerceOrder(body, submissionId) {
 }
 
 export async function POST(request) {
+  const protectedRequest = await protectJsonRequest(request, { scope: "dog_food_order", limit: 5, windowSeconds: 3600, maxBytes: 128 * 1024, turnstile: true, action: "dog_food_order" });
+  if (protectedRequest.response) return protectedRequest.response;
   try {
-    const body = await request.json();
+    const body = protectedRequest.body;
     const customer = body?.customer ?? {};
     const dogs = Array.isArray(body?.dogs) ? body.dogs : [];
 
@@ -163,7 +167,7 @@ export async function POST(request) {
     let checkout = null;
     if (commerceOrder && stripeConfigured()) {
       try {
-        checkout = await createDogFoodCheckout({ db: getDb(), orderId: commerceOrder.orderId, origin: new URL(request.url).origin });
+        checkout = await createDogFoodCheckout({ db: getDb(), orderId: commerceOrder.orderId, origin: applicationConfig().siteOrigin });
       } catch (error) {
         console.error(JSON.stringify({ event: "dog_food_checkout_creation_failed", orderId: commerceOrder.orderId, message: error instanceof Error ? error.message : "failed" }));
       }
@@ -175,6 +179,9 @@ export async function POST(request) {
       stored: stored.configured,
       checkoutUrl: checkout?.checkoutUrl || null,
       paymentConfigured: stripeConfigured(),
+      orderCreated: Boolean(commerceOrder || stored.configured),
+      checkoutCreated: Boolean(checkout?.checkoutUrl),
+      requiresManualPaymentFollowup: !checkout?.checkoutUrl,
     });
   } catch {
     return Response.json({ error: "We could not submit the order. Please try again." }, { status: 500 });

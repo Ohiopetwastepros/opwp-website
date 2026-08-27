@@ -133,7 +133,7 @@ export default function Header({ active }) {
                         <Link key={href} href={href} className="hov-soft" style={{ textDecoration: "none", padding: "7px 9px", borderRadius: 8, color: "#2b3942", fontWeight: 600, fontSize: 14 }}>{name}</Link>
                       ))}
                     </div>
-                    <Link href="/service-areas/" style={{ textDecoration: "none", color: "#4F9E3A", fontWeight: 700, fontSize: 14 }}>View all 25 service areas →</Link>
+                    <Link href="/service-areas/" style={{ textDecoration: "none", color: "#397D2D", fontWeight: 700, fontSize: 14 }}>View all 25 service areas →</Link>
                   </div>
                 )}
               </div>
@@ -142,13 +142,13 @@ export default function Header({ active }) {
               <Link href="/about-our-pet-waste-removal-team/" style={{ ...NAV_LINK, color: c("about") }}>About</Link>
               <Link href="/blog/" style={{ ...NAV_LINK, color: c("blog") }}>Blog</Link>
               <Link href="/contact/" style={{ ...NAV_LINK, color: c("contact") }}>Contact</Link>
-              <a href="https://client.sweepandgo.com/login" style={{ textDecoration: "none", color: "#9fc3e0", fontWeight: 600 }}>Client Login</a>
+              <a href="https://client.sweepandgo.com/login" style={{ textDecoration: "none", color: "#D7E9F7", fontWeight: 600 }}>Client Login</a>
             </div>
           </nav>
 
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <a className="opwp-phone" href="tel:419-262-2371" style={{ textDecoration: "none", color: "#fff", fontFamily: "var(--font-bricolage)", fontWeight: 700, fontSize: 16, whiteSpace: "nowrap" }}>419-262-2371</a>
-            <Link href="/free-quote/" className="hov-cta opwp-cta" style={{ background: "#4F9E3A", color: "#fff", textDecoration: "none", padding: "12px 22px", borderRadius: 99, fontWeight: 800, fontSize: 15, whiteSpace: "nowrap", boxShadow: "0 8px 18px -8px rgba(79,158,58,.7)" }}>Get My Price</Link>
+            <Link href="/free-quote/" prefetch={false} className="hov-cta opwp-cta" style={{ background: "#397D2D", color: "#fff", textDecoration: "none", padding: "12px 22px", borderRadius: 99, fontWeight: 800, fontSize: 15, whiteSpace: "nowrap", boxShadow: "0 8px 18px -8px rgba(57,125,45,.7)" }}>Get My Price</Link>
             <button
               className="opwp-burger"
               onClick={() => setOpen((v) => !v)}
@@ -194,7 +194,7 @@ export default function Header({ active }) {
             <Link href="/contact/" onClick={close} style={mItem}>Contact</Link>
             <a href="https://client.sweepandgo.com/login" style={{ ...mItem }}>Client Login</a>
 
-            <Link href="/free-quote/" onClick={close} style={{ textAlign: "center", background: "#4F9E3A", color: "#fff", textDecoration: "none", padding: "14px", borderRadius: 12, fontWeight: 800, margin: "14px 0 4px" }}>Get My Free Quote</Link>
+            <Link href="/free-quote/" prefetch={false} onClick={close} style={{ textAlign: "center", background: "#397D2D", color: "#fff", textDecoration: "none", padding: "14px", borderRadius: 12, fontWeight: 800, margin: "14px 0 4px" }}>Get My Free Quote</Link>
 
             <a href="tel:419-262-2371" style={{ textDecoration: "none", color: "#fff", fontFamily: "var(--font-bricolage)", fontWeight: 700, fontSize: 18, padding: "10px 4px 2px" }}>📞 419-262-2371</a>
             <a href="mailto:Craig@ohiopetwastepros.com" style={{ textDecoration: "none", color: "#cdd8e2", padding: "2px 4px", fontWeight: 500, fontSize: 14.5 }}>Craig@ohiopetwastepros.com</a>

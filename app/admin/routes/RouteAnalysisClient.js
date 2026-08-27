@@ -32,7 +32,7 @@ export default function RouteAnalysisClient({ initialSummary }) {
       row.revenue += Number(route.routeRevenue || 0);
       technicians.set(route.technicianName, row);
     }
-    return [...technicians.values()].map((row) => ({ ...row, revenuePerHour: row.minutes ? row.revenue / (row.minutes / 60) : 0, capacityHours: Math.max(0, 40 - row.minutes / 60) }));
+    return [...technicians.values()].map((row) => ({ ...row, revenuePerHour: row.minutes ? row.revenue / (row.minutes / 60) : 0 }));
   }, [transition]);
 
   async function refreshPlan() {
@@ -50,7 +50,7 @@ export default function RouteAnalysisClient({ initialSummary }) {
   }
 
   return <>
-    <section className={styles.controlPanel}>
+    <section id="route-analysis" className={styles.controlPanel}>
       <div className={styles.controlIntro}><div className={styles.eyebrow}>Current paid route book</div><h2>Plan from every active subscription</h2><p>Source data comes from the protected hourly Airtable snapshot. Coordinates and route results are retained in D1 so the dashboard does not depend on a live Airtable request.</p></div>
       <div className={styles.controls}><button type="button" onClick={refreshPlan} disabled={loading}>{loading ? <><i />Refreshing route book…</> : "Refresh road-time plan"}</button></div>
     </section>
@@ -82,7 +82,7 @@ export default function RouteAnalysisClient({ initialSummary }) {
     {loading ? <section className={styles.loading}><div className={styles.loadingMark}><i /></div><div><strong>Updating the route book</strong><p>Reusing street coordinates and calculating road-time sequences without changing any customer commitments.</p></div></section> : null}
 
     {plan ? <section className={styles.results}>
-      <div className={styles.resultHead}><div><div className={styles.eyebrow}>Road-time model · week of {plan.planningWeekStart ? new Date(`${plan.planningWeekStart}T12:00:00`).toLocaleDateString() : "current"}</div><h2>Shortest current-week sequence by day and technician</h2><p>Weekly work is always included. Biweekly A/B and monthly cohorts are anchored from the latest completed service date; depot travel is not included yet.</p></div><span className={`${styles.status} ${plan.status === "complete" ? styles.complete : ""}`}>{plan.status}</span></div>
+      <div className={styles.resultHead}><div><div className={styles.eyebrow}>Road-time model · week of {plan.planningWeekStart ? new Date(`${plan.planningWeekStart}T12:00:00`).toLocaleDateString() : "current"}</div><h2>Shortest current-week sequence by day and technician</h2><p>Weekly work is always included. Biweekly A/B and monthly cohorts are anchored from the latest completed service date; Tony&apos;s drive time and mileage include travel from and back to his Perrysburg depot.</p></div><span className={`${styles.status} ${plan.status === "complete" ? styles.complete : ""}`}>{plan.status}</span></div>
       <div className={styles.summaryGrid}><div><span>Route sectors</span><strong>{number(plan.routes?.length)}</strong></div><div><span>Road miles</span><strong>{number(totals.miles, 1)}</strong></div><div><span>Drive time</span><strong>{hours(totals.drive)}</strong></div><div><span>Service time</span><strong>{hours(totals.service)}</strong></div><div><span>Snapshot</span><strong className={styles.smallStrong}>{plan.sourceSnapshotAt ? new Date(plan.sourceSnapshotAt).toLocaleDateString() : "Current"}</strong></div></div>
       <div className={styles.routeGrid}>{(plan.routes ?? []).map((route) => <article className={styles.routeCard} key={`${route.technicianId}-${route.routeId}`}>
         <header><div><span>{route.routeId}</span><h3>{route.technicianName || "Unassigned"}</h3></div><b>{number(route.distanceMiles, 1)} mi</b></header>
@@ -93,7 +93,7 @@ export default function RouteAnalysisClient({ initialSummary }) {
     </section> : <section className={styles.loading}><div className={styles.loadingMark}>→</div><div><strong>The route plan is being assembled automatically</strong><p>{number(summary?.activeCustomers - summary?.geocodedCustomers)} addresses remain to be street-matched. The hourly recovery job will continue until the road-time model is complete.</p></div></section>}
 
     {transition ? <section className={styles.candidates}>
-      <div className={styles.candidateHead}><div><div className={styles.eyebrow}>Read-only future-state scenario</div><h2>Craig office transition + Tony full-time</h2></div><p>Customer service days stay fixed. Craig retains one dense Monday route during the transition; Tony and Bria own the remaining route books, with Tony carrying Wednesday and Friday. Nothing is written back.</p></div>
+      <div className={styles.candidateHead}><div><div className={styles.eyebrow}>Current staffing scenario</div><h2>Tony full-time + Craig relief</h2></div><p>Tony is the sole regular route owner Monday through Friday. Craig provides Monday-only relief when needed, and Bria is excluded from future route ownership.</p></div>
       <div className={styles.summaryGrid}>
         <div><span>Modeled customers moved</span><strong>{number(transition.changedCustomers)}</strong></div>
         <div><span>Current fragmented miles</span><strong>{number(transition.currentTotals?.miles, 1)}</strong></div>
@@ -102,10 +102,15 @@ export default function RouteAnalysisClient({ initialSummary }) {
         <div><span>Team revenue / hr</span><strong className={Number(transition.modeledTotals?.revenuePerPlannedHour) >= 100 ? "" : styles.belowTarget}>{money(transition.modeledTotals?.revenuePerPlannedHour)}</strong></div>
       </div>
       <div className={styles.scenarioGrid}>
-        {transitionTechnicians.map((row) => <article className={styles.scenarioCard} key={row.technician}><span>Future field book</span><h3>{row.technician}</h3><strong>{hours(row.minutes)}</strong><p>{number(row.stops)} stops · {number(row.miles, 1)} road miles · {money(row.revenuePerHour)}/hour · {number(row.capacityHours, 1)} hours open to 40.</p></article>)}
+        {transitionTechnicians.map((row) => {
+          const isTony = row.technician.toLowerCase().includes("tony");
+          const operationalHours = transition.staffingGuarantee?.paidOperationalHoursToMinimum ?? Math.max(0, 40 - row.minutes / 60);
+          const hoursBeforeCutoff = transition.staffingGuarantee?.hoursBeforeCutoff ?? Math.max(0, 45 - Math.max(40, row.minutes / 60));
+          return <article className={styles.scenarioCard} key={row.technician}><span>Future field book</span><h3>{row.technician}</h3><strong>{hours(row.minutes)}</strong><p>{number(row.stops)} stops · {number(row.miles, 1)} road miles · {money(row.revenuePerHour)}/hour{isTony ? ` · ${number(operationalHours, 1)} operational hours to the 40-hour guarantee · ${number(hoursBeforeCutoff, 1)} hours remain to the 45-hour cutoff.` : "."}</p></article>;
+        })}
       </div>
       <div className={styles.tableWrap}><table className={styles.routeTable}><thead><tr><th>Day</th><th>Modeled owner</th><th>Stops</th><th>Miles</th><th>Field time</th><th>Revenue</th><th>Revenue / hour</th></tr></thead><tbody>{(transition.routes ?? []).map((route) => <tr key={`transition-${route.technicianName}-${route.routeId}`}><td><strong>{route.routeId}</strong></td><td>{route.technicianName}</td><td>{number(route.stopCount)}</td><td>{number(route.distanceMiles, 1)}</td><td>{hours(route.plannedMinutes)}</td><td>{money(route.routeRevenue)}</td><td><span className={Number(route.revenuePerPlannedHour) >= 100 ? styles.gain : styles.warningRate}>{money(route.revenuePerPlannedHour)}</span></td></tr>)}</tbody></table></div>
-      <div className={styles.disclosure}><strong>Scenario boundary:</strong> This compares open customer-to-customer routes. Depot travel, breaks, vehicle loading, one-time jobs, and paid non-route time remain excluded. “Customers moved” means modeled technician ownership only; no customer day changes and no SNG/Airtable updates occur.</div>
+      <div className={styles.disclosure}><strong>Staffing rule:</strong> Tony is guaranteed at least {number(transition.staffingGuarantee?.minimumPaidHours || 40)} paid hours each week, and {number(transition.staffingGuarantee?.weeklyHoursCutoff || 45)} hours is the management cutoff. Tony&apos;s modeled road time includes both depot legs. The model reserves {number(transition.staffingGuarantee?.paidOperationalHoursToMinimum, 1)} hours beyond route time for approved operational work and retains {number(transition.staffingGuarantee?.hoursBeforeCutoff, 1)} hours below the cutoff for breaks, delays, overflow, and one-time jobs. “Customers moved” means modeled technician ownership only; no customer day changes and no SNG/Airtable updates occur.</div>
     </section> : null}
 
     {mondayTests.length ? <section className={styles.candidates}>

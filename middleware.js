@@ -6,9 +6,29 @@ import { verifyFieldRequest, verifyOfficeRequest } from "@/lib/field-auth";
 const PUBLIC_ADMIN_PATHS = new Set(["/admin/login", "/admin/login/", "/api/admin/session", "/api/admin/session/"]);
 const PUBLIC_FIELD_PATHS = new Set(["/field/login", "/field/login/", "/api/field/session", "/api/field/session/"]);
 const PUBLIC_OFFICE_PATHS = new Set(["/office/login", "/office/login/", "/api/office/session", "/api/office/session/"]);
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+function crossSiteMutation(request) {
+  if (SAFE_METHODS.has(request.method)) return false;
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      return new URL(origin).origin !== request.nextUrl.origin;
+    } catch {
+      return true;
+    }
+  }
+  return request.headers.get("sec-fetch-site") === "cross-site";
+}
 
 export async function middleware(request) {
   const { pathname, search } = request.nextUrl;
+  if (crossSiteMutation(request)) {
+    return NextResponse.json(
+      { ok: false, code: "CROSS_SITE_REQUEST_REJECTED", error: "Cross-site requests are not allowed." },
+      { status: 403, headers: { "Cache-Control": "no-store" } },
+    );
+  }
   if (PUBLIC_OFFICE_PATHS.has(pathname)) return NextResponse.next();
   if (pathname === "/office" || pathname.startsWith("/office/") || pathname.startsWith("/api/office/")) {
     const auth = await verifyOfficeRequest(request.headers, getDb());

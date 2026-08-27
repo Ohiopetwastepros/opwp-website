@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import TurnstileWidget from "@/components/TurnstileWidget";
 import styles from "./dog-food.module.css";
 
 const FORMULAS = {
@@ -130,6 +131,10 @@ export default function DogFoodOrderTool({ paymentConfigured = false }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [partialSubmissionId, setPartialSubmissionId] = useState(null);
+  const [quoteTurnstileToken, setQuoteTurnstileToken] = useState("");
+  const [quoteTurnstileReset, setQuoteTurnstileReset] = useState(0);
+  const [orderTurnstileToken, setOrderTurnstileToken] = useState("");
+  const [orderTurnstileReset, setOrderTurnstileReset] = useState(0);
   const [expandedFormula, setExpandedFormula] = useState(null);
   const [formulaDetailTab, setFormulaDetailTab] = useState("overview");
   const [sameDayAvailable, setSameDayAvailable] = useState(false);
@@ -254,6 +259,10 @@ export default function DogFoodOrderTool({ paymentConfigured = false }) {
       setError("Complete the contact fields and text consent to save your quote and continue.");
       return;
     }
+    if (step === 1 && !partialSubmissionId) {
+      setError("Complete verification and wait for your quote to be securely saved.");
+      return;
+    }
     if (step === 2 && !dogsAreValid()) {
       setError("Complete every required questionnaire item for each dog before continuing.");
       return;
@@ -268,6 +277,10 @@ export default function DogFoodOrderTool({ paymentConfigured = false }) {
 
   async function submitOrder() {
     setError("");
+    if (!orderTurnstileToken) {
+      setError("Please complete verification before submitting the order.");
+      return;
+    }
     if (!deliveryIsValid()) {
       setError("Please complete the delivery address before ordering.");
       return;
@@ -281,7 +294,7 @@ export default function DogFoodOrderTool({ paymentConfigured = false }) {
       const response = await fetch("/api/dog-food/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customer, dogs, recommendations, orderLines, plan, delivery, totals, partialSubmissionId, billingConsent }),
+        body: JSON.stringify({ customer, dogs, recommendations, orderLines, plan, delivery, totals, partialSubmissionId, billingConsent, turnstileToken: orderTurnstileToken }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "We could not submit your order.");
@@ -293,6 +306,7 @@ export default function DogFoodOrderTool({ paymentConfigured = false }) {
       setResult(data);
     } catch (submissionError) {
       setError(submissionError.message || "We could not submit your order. Please try again.");
+      setOrderTurnstileReset((value) => value + 1);
     } finally {
       setSubmitting(false);
     }
@@ -313,20 +327,24 @@ export default function DogFoodOrderTool({ paymentConfigured = false }) {
   }, []);
 
   useEffect(() => {
-    if (!quoteReady || leadSentRef.current) return;
+    if (!quoteReady || !quoteTurnstileToken || leadSentRef.current) return;
     leadSentRef.current = true;
     fetch("/api/dog-food/quote", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ customer, quote: { bagPrice: 59, tax: 4.57, total: 63.57 } }),
+      body: JSON.stringify({ customer, quote: { bagPrice: 59, tax: 4.57, total: 63.57 }, turnstileToken: quoteTurnstileToken }),
     })
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Partial quote capture failed.");
         setPartialSubmissionId(data.id);
       })
-      .catch(() => { leadSentRef.current = false; });
-  }, [quoteReady, customer]);
+      .catch((captureError) => {
+        leadSentRef.current = false;
+        setError(captureError.message || "We could not save your quote. Please retry.");
+        setQuoteTurnstileReset((value) => value + 1);
+      });
+  }, [quoteReady, customer, quoteTurnstileToken]);
 
   if (result) {
     return (
@@ -334,7 +352,7 @@ export default function DogFoodOrderTool({ paymentConfigured = false }) {
         <div className={styles.successIcon}>✓</div>
         <span>Order request {result.orderNumber}</span>
         <h3>Thanks, {customer.firstName}. Your order is in.</h3>
-        <p>Your request is saved, but secure checkout is not available yet. An OPWP team member will confirm your delivery day and finish payment with you.</p>
+        <p>{result.requiresManualPaymentFollowup ? "Your order request is saved, but checkout was not completed. An OPWP team member will confirm your delivery day and finish payment with you." : "Your order request is saved."}</p>
         <div className={styles.successSummary}>
           <span>{dogs.length} {dogs.length === 1 ? "dog" : "dogs"}</span>
           <span>{orderLines.reduce((sum, line) => sum + line.quantity, 0)} {orderLines.length === 1 ? "bag" : "bags"}</span>
@@ -442,9 +460,10 @@ export default function DogFoodOrderTool({ paymentConfigured = false }) {
                 <input type="checkbox" checked={customer.consent} onChange={(event) => updateCustomer("consent", event.target.checked)} />
                 <span>I consent to receive marketing and service messages from Ohio Pet Waste Pros at the phone number provided. Message frequency may vary; message &amp; data rates may apply. Reply STOP to opt out.</span>
               </label>
+              <TurnstileWidget action="dog_food_quote" onToken={setQuoteTurnstileToken} resetKey={quoteTurnstileReset} />
               {quoteReady && (
                 <div className={styles.quoteReveal} role="status">
-                  <span>Your quote is saved</span>
+                  <span>{partialSubmissionId ? "Your quote is saved" : "Saving your verified quote…"}</span>
                   <strong>{money(63.57)} <small>per 40 lb bag</small></strong>
                   <small>{money(59)} food + {money(4.57)} Lucas County tax • free recurring route-day delivery</small>
                   <p>If you stop here, your saved quote may receive one helpful follow-up text. Finishing the order automatically cancels that reminder.</p>
@@ -630,13 +649,14 @@ export default function DogFoodOrderTool({ paymentConfigured = false }) {
                 <span><strong>Authorize monthly delivery and billing</strong>I authorize OPWP to securely save my payment method with Stripe and charge the current order total now. Future dog-food orders will be charged approximately 48 hours before each confirmed monthly delivery. I can update, pause, or cancel before the next charge.</span>
               </label>}
               <div className={styles.paymentNotice}><strong>{paymentConfigured ? "Secure payment powered by Stripe" : "Secure payment setup is coming next"}</strong><span>{paymentConfigured ? "Your order is created using the prices shown here, then you will continue to Stripe to pay. OPWP never receives or stores your full card number." : "Your request will be saved without charging a card. OPWP will confirm the first route date and complete payment with you while Stripe activation is finalized."}</span></div>
+              <TurnstileWidget action="dog_food_order" onToken={setOrderTurnstileToken} resetKey={orderTurnstileReset} />
             </section>
           )}
 
           {error && <div className={styles.errorMessage} role="alert">{error}</div>}
           <div className={styles.formActions}>
             {step > 1 && <button type="button" className={styles.backButton} onClick={goBack}>Back</button>}
-            {step < 4 ? <button type="button" className={styles.nextButton} onClick={goNext}>Continue <span>→</span></button> : <button type="button" className={styles.orderButton} onClick={submitOrder} disabled={submitting}>{submitting ? (paymentConfigured ? "Opening secure checkout…" : "Saving order…") : (paymentConfigured ? "Order & Pay Securely" : "Submit Order Request")} <span>→</span></button>}
+            {step < 4 ? <button type="button" className={styles.nextButton} onClick={goNext}>Continue <span>→</span></button> : <button type="button" className={styles.orderButton} onClick={submitOrder} disabled={submitting || !orderTurnstileToken}>{submitting ? (paymentConfigured ? "Opening secure checkout…" : "Saving order…") : (paymentConfigured ? "Order & Pay Securely" : "Submit Order Request")} <span>→</span></button>}
           </div>
         </div>
 

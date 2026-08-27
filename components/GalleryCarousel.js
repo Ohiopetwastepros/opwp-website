@@ -17,6 +17,14 @@ const PHOTOS = [
   ["/assets/photos/dixie-photo.webp", "Dixie, the rescue dog who inspired Ohio Pet Waste Pros"],
 ];
 
+function responsivePhoto(src) {
+  const base = src.replace(/\.webp$/, "");
+  return {
+    src: `${base}-360.webp`,
+    srcSet: `${base}-360.webp 360w, ${base}-640.webp 640w, ${base}-800.webp 800w`,
+  };
+}
+
 export default function GalleryCarousel() {
   const trackRef = useRef(null);
   const [active, setActive] = useState(0);
@@ -77,20 +85,28 @@ export default function GalleryCarousel() {
               padding: "4px",
             }}
           >
-            {PHOTOS.map(([src, alt], i) => (
+            {PHOTOS.map(([src, alt], i) => {
+              const responsive = responsivePhoto(src);
+              return (
               <div
                 key={src}
                 className="opwp-gallery-item"
                 style={{ flex: "0 0 auto", scrollSnapAlign: "center" }}
               >
                 <img
-                  src={src}
+                  src={responsive.src}
+                  srcSet={responsive.srcSet}
+                  sizes="(max-width: 560px) 82vw, (max-width: 900px) 300px, 380px"
                   alt={alt}
                   loading="lazy"
+                  decoding="async"
+                  width="800"
+                  height="1067"
                   style={{ width: "100%", height: 360, objectFit: "cover", borderRadius: 18, boxShadow: "0 16px 36px -20px rgba(0,0,0,.5)", display: "block" }}
                 />
               </div>
-            ))}
+              );
+            })}
           </div>
 
           <button
@@ -100,17 +116,20 @@ export default function GalleryCarousel() {
           >›</button>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 22, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: 0, marginTop: 12, flexWrap: "wrap" }}>
           {PHOTOS.map((_, i) => (
             <button
               key={i}
               aria-label={`Go to photo ${i + 1}`}
+              aria-current={i === active ? "true" : undefined}
               onClick={() => scrollToIndex(i)}
               style={{
-                width: 9, height: 9, borderRadius: "50%", border: "none", cursor: "pointer",
-                background: i === active ? "#4F9E3A" : "#c9cfc6", padding: 0,
+                width: 28, height: 28, borderRadius: "50%", border: "none", cursor: "pointer",
+                background: "transparent", padding: 0, display: "grid", placeItems: "center",
               }}
-            />
+            >
+              <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: "50%", background: i === active ? "#397D2D" : "#9ba49a", display: "block" }} />
+            </button>
           ))}
         </div>
       </div>

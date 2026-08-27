@@ -56,7 +56,7 @@ a, button { transition: background-color .22s ease, color .22s ease, box-shadow 
 
 :where(button, [role="button"]):not(:disabled) { touch-action: manipulation; }
 
-.hov-cta:hover { background: #46902F !important; }
+.hov-cta:hover { background: #2F6825 !important; }
 .hov-soft:hover { background: #F1F3EE !important; }
 .hov-cream:hover { background: #eef0e9 !important; }
 .hov-white-08:hover { background: rgba(255,255,255,.16) !important; }

@@ -1,17 +1,24 @@
 import { saveSubmission } from "@/lib/db";
+import { protectJsonRequest, verifyTurnstile } from "@/lib/public-api-security";
+import { validateLeadInput } from "@/lib/public-input";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request) {
-  const body = await request.json().catch(() => null);
-  if (!body || typeof body !== "object") {
-    return Response.json({ ok: false, error: "Invalid request" }, { status: 400 });
+  const protectedRequest = await protectJsonRequest(request, { scope: "public_lead", limit: 10, windowSeconds: 3600, maxBytes: 32 * 1024, turnstile: false });
+  if (protectedRequest.response) return protectedRequest.response;
+  const validation = validateLeadInput(protectedRequest.body);
+  if (!validation.ok) return Response.json({ ok: false, error: validation.error }, { status: 400 });
+  if (validation.value.source === "question") {
+    const verification = await verifyTurnstile(request, protectedRequest.body.turnstileToken, "quote_question");
+    if (!verification.ok) return Response.json({ ok: false, error: verification.unavailable ? "Verification is temporarily unavailable. Please try again." : "Please complete the verification and try again." }, { status: verification.unavailable ? 503 : 403 });
   }
 
   const saved = await saveSubmission({
-    kind: body.source === "question" ? "question" : "partial_quote",
+    kind: validation.value.source === "question" ? "question" : "partial_quote",
     source: "website",
-    body,
+    status: validation.value.source === "partial_quote" ? "follow_up_pending" : "new",
+    body: validation.value,
   });
   return Response.json({ ok: true, stored: saved.configured, id: saved.id });
 }

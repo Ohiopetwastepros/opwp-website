@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import TurnstileWidget from "@/components/TurnstileWidget";
 import {
   PRICING, YARD_TIERS, CHARGE_LABEL,
   isInArea, haulAwayPrice, calcLocalQuote,
@@ -76,6 +77,7 @@ export default function QuoteForm() {
   const [coupon,     setCoupon]     = useState("");
   const [phone,      setPhone]      = useState("");
   const [consent,    setConsent]    = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
   const [selected,   setSelected]   = useState({});     // add-on ids
   const [showExtras, setShowExtras] = useState(false);
   const [showCoupon, setShowCoupon] = useState(false);
@@ -110,6 +112,8 @@ export default function QuoteForm() {
   const [ooaEmail,   setOoaEmail]   = useState("");
   const [ooaPhone,   setOoaPhone]   = useState("");
   const [ooaConsent, setOoaConsent] = useState(false);
+  const [ooaTurnstileToken, setOoaTurnstileToken] = useState("");
+  const [ooaTurnstileReset, setOoaTurnstileReset] = useState(0);
 
   // "Have questions?" — ask before committing; sends the question + live quote context.
   const [showQuestions, setShowQuestions] = useState(false);
@@ -119,11 +123,16 @@ export default function QuoteForm() {
   const [qText,    setQText]    = useState("");
   const [qSending, setQSending] = useState(false);
   const [qSent,    setQSent]    = useState(false);
+  const [qError,   setQError]   = useState("");
+  const [qTurnstileToken, setQTurnstileToken] = useState("");
+  const [qTurnstileReset, setQTurnstileReset] = useState(0);
 
   // ── Navigation / submission ──────────────────────────────────────────────
   const [step,        setStep]       = useState(1);   // 1 | 2 | "done" | "ooa-done"
   const [submitting,  setSubmitting] = useState(false);
   const [submitError, setSubmitError]= useState(null);
+  const [onboardTurnstileToken, setOnboardTurnstileToken] = useState("");
+  const [onboardTurnstileReset, setOnboardTurnstileReset] = useState(0);
 
   // ── Derived ─────────────────────────────────────────────────────────────
   const zipClean = zip.trim().slice(0, 5);
@@ -270,7 +279,7 @@ export default function QuoteForm() {
     last_time_yard_was_thoroughly_cleaned: lastCleaned,
     initial_cleanup_required: ["one_week","two_weeks","three_weeks","one_month","two_months","3_4_months"].includes(lastCleaned) ? 1 : 0,
     coupon:           coupon || undefined,
-    marketing_allowed: consent ? 1 : 0,
+    marketing_allowed: marketingConsent ? 1 : 0,
     terms_open_api:   termsAgreed ? 1 : 0,
     tracking_field:   heardAbout || "Website Instant Quote",
     // Dog info
@@ -296,15 +305,20 @@ export default function QuoteForm() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
+    if (!onboardTurnstileToken) {
+      setSubmitError("Please complete the verification before starting service.");
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     try {
       const r = await fetch("/api/onboard", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildPayload()),
+        body: JSON.stringify({ ...buildPayload(), turnstileToken: onboardTurnstileToken }),
       });
-      const j = await r.json();
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "We could not start service.");
       if (j.configured === false) {
         // Sweep & Go credentials are not configured yet — store for follow-up.
         setStep("done-manual");
@@ -316,36 +330,46 @@ export default function QuoteForm() {
           `Something went wrong on our end. Please call or text ${ORG_PHONE} and we'll get you set up right away.`
         );
       }
-    } catch {
+    } catch (error) {
       setSubmitError(
-        `Something went wrong. Please call or text ${ORG_PHONE} and we'll get you set up right away.`
+        error?.message || `Something went wrong. Please call or text ${ORG_PHONE} and we'll get you set up right away.`
       );
+      setOnboardTurnstileReset((value) => value + 1);
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleOOASubmit = async () => {
+    if (!ooaTurnstileToken || submitting) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
-      await fetch("/api/waitlist", {
+      const response = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ zip: zipClean, name: ooaName, email: ooaEmail, phone: ooaPhone, consent: ooaConsent }),
+        body: JSON.stringify({ zip: zipClean, name: ooaName, email: ooaEmail, phone: ooaPhone, consent: ooaConsent, turnstileToken: ooaTurnstileToken }),
       });
-    } catch { /* ignore */ }
-    setSubmitting(false);
-    setStep("ooa-done");
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok !== true) throw new Error(data.error || "We could not add you to the waitlist.");
+      setStep("ooa-done");
+    } catch (error) {
+      setSubmitError(error?.message || `Please retry or call/text ${ORG_PHONE} and we will help.`);
+      setOoaTurnstileReset((value) => value + 1);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const qValid = qName.trim() && qText.trim() &&
     (qPhone.replace(/\D/g, "").length >= 10 || qEmail.trim().includes("@"));
   const handleQuestionSubmit = async () => {
-    if (!qValid || qSending) return;
+    if (!qValid || !qTurnstileToken || qSending) return;
     setQSending(true);
+    setQError("");
     // Reuse the lead endpoint so the question rides in with the live quote context.
     try {
-      await fetch("/api/lead", {
+      const response = await fetch("/api/lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -355,11 +379,18 @@ export default function QuoteForm() {
           quote_monthly: monthlyTotal,
           coupon: coupon || undefined,
           selected_addons: Object.keys(selected).filter((k) => selected[k]),
+          turnstileToken: qTurnstileToken,
         }),
       });
-    } catch { /* ignore — fire-and-forget */ }
-    setQSending(false);
-    setQSent(true);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok !== true) throw new Error(data.error || "We could not send your question.");
+      setQSent(true);
+    } catch (error) {
+      setQError(error?.message || `Please retry or call/text ${ORG_PHONE}.`);
+      setQTurnstileReset((value) => value + 1);
+    } finally {
+      setQSending(false);
+    }
   };
 
   // ── Terminal states ────────────────────────────────────────────────────
@@ -502,10 +533,12 @@ export default function QuoteForm() {
               <input type="checkbox" checked={ooaConsent} onChange={(e) => setOoaConsent(e.target.checked)} style={{ marginTop: "2px", width: "16px", height: "16px", accentColor: "#4F9E3A" }} />
               <span>I consent to receive marketing messages from Ohio Pet Waste Pros. Message &amp; data rates may apply. Reply STOP to opt out.</span>
             </label>
+            <TurnstileWidget action="waitlist" onToken={setOoaTurnstileToken} resetKey={ooaTurnstileReset} />
+            {submitError ? <div role="alert" style={{ color: "#8a3b36", fontSize: "13px" }}>{submitError} Please retry, or call/text {ORG_PHONE}.</div> : null}
           </div>
           <button
             type="button" onClick={handleOOASubmit}
-            disabled={!ooaName.trim() || !ooaEmail.trim() || !ooaConsent || submitting}
+            disabled={!ooaName.trim() || !ooaEmail.trim() || !ooaConsent || !ooaTurnstileToken || submitting}
             style={{
               display: "block", width: "100%", textAlign: "center",
               background: ooaName.trim() && ooaEmail.trim() && ooaConsent ? "#1A3C5A" : "#b0bec5",
@@ -700,9 +733,16 @@ export default function QuoteForm() {
             <label style={lbl}>Email Address {req}</label>
             <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@example.com" style={inp} />
           </div>
+          <div style={{ background: "#f6f8f9", borderRadius: "10px", padding: "11px 13px", marginBottom: "12px", fontSize: "11.5px", color: "#687680", lineHeight: 1.5 }}>
+            We may securely save your phone, email, and ZIP so we can help finish an interrupted quote. This service follow-up does not enroll you in marketing.
+          </div>
           <label style={{ display: "flex", gap: "10px", alignItems: "flex-start", fontSize: "12px", lineHeight: 1.5, color: "#7c8891", marginBottom: "22px", cursor: "pointer" }}>
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: "2px", width: "16px", height: "16px", accentColor: "#4F9E3A" }} />
-            <span>I consent to receive marketing and service messages from Ohio Pet Waste Pros at the phone number provided. Message frequency may vary; message &amp; data rates may apply. Reply STOP to opt out.</span>
+            <span>I agree to receive transactional service messages about this quote, scheduling, and service at the phone number provided. Message &amp; data rates may apply.</span>
+          </label>
+          <label style={{ display: "flex", gap: "10px", alignItems: "flex-start", fontSize: "12px", lineHeight: 1.5, color: "#7c8891", marginBottom: "22px", cursor: "pointer" }}>
+            <input type="checkbox" checked={marketingConsent} onChange={(e) => setMarketingConsent(e.target.checked)} style={{ marginTop: "2px", width: "16px", height: "16px", accentColor: "#4F9E3A" }} />
+            <span>Optional: I also consent to marketing messages from Ohio Pet Waste Pros. Message frequency may vary; reply STOP to opt out.</span>
           </label>
 
           {/* Price panel — revealed only after phone + email are entered */}
@@ -870,10 +910,12 @@ export default function QuoteForm() {
                     <div style={{ fontSize: "11.5px", color: "#9aa6ae", lineHeight: 1.5, marginBottom: "14px" }}>
                       We include your ZIP, dog count, frequency, live price, coupon, and selected add-ons so the follow-up has your full quote context.
                     </div>
+                    <TurnstileWidget action="quote_question" onToken={setQTurnstileToken} resetKey={qTurnstileReset} />
+                    {qError ? <div role="alert" style={{ color: "#8a3b36", fontSize: "12px", margin: "8px 0" }}>{qError}</div> : null}
                     <button
                       type="button"
                       onClick={handleQuestionSubmit}
-                      disabled={!qValid || qSending}
+                      disabled={!qValid || !qTurnstileToken || qSending}
                       style={{
                         display: "block", width: "100%", textAlign: "center",
                         background: qValid && !qSending ? "#4F9E3A" : "#bcd3b1", color: "#fff",
@@ -1055,6 +1097,7 @@ export default function QuoteForm() {
       </label>
 
       {/* Error */}
+      <TurnstileWidget action="onboarding" onToken={setOnboardTurnstileToken} resetKey={onboardTurnstileReset} />
       {submitError && (
         <div style={{ background: "#fff5f4", border: "1.5px solid #f1c9c5", borderRadius: "12px", padding: "14px 16px", marginBottom: "18px", fontSize: "13.5px", color: "#8a3b36", lineHeight: 1.5 }}>
           {submitError}
@@ -1065,7 +1108,7 @@ export default function QuoteForm() {
       <button
         type="button"
         onClick={() => { if (step2Valid && !submitting) handleSubmit(); }}
-        disabled={!step2Valid || submitting}
+        disabled={!step2Valid || !onboardTurnstileToken || submitting}
         style={{
           display: "block", width: "100%", textAlign: "center",
           background: step2Valid ? "#4F9E3A" : "#bcd3b1", color: "#fff",

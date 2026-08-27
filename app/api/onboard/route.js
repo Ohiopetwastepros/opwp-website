@@ -1,16 +1,19 @@
-import { getDb, markSubmissionSynced, saveSubmission } from "@/lib/db";
+import { convertAbandonedQuote, getDb, markSubmissionSynced, saveSubmission } from "@/lib/db";
 import { recommendOnboardingRoute, saveOnboardingRouteAssignment } from "@/lib/route-intelligence";
 import { ensureFreshAirtableCockpitSnapshot } from "@/lib/airtable";
 import { getRuntimeEnv } from "@/lib/cloudflare";
 import { sngRequest, toOnboardingPayload } from "@/lib/sweepandgo";
+import { protectJsonRequest } from "@/lib/public-api-security";
+import { validateOnboardingInput } from "@/lib/public-input";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request) {
-  const body = await request.json().catch(() => null);
-  if (!body || !body.email || !body.zip_code || !body.first_name || !body.last_name) {
-    return Response.json({ ok: false, error: "Required customer fields are missing" }, { status: 400 });
-  }
+  const protectedRequest = await protectJsonRequest(request, { scope: "public_onboard", limit: 5, windowSeconds: 3600, maxBytes: 64 * 1024, turnstile: true, action: "onboarding" });
+  if (protectedRequest.response) return protectedRequest.response;
+  const validation = validateOnboardingInput(protectedRequest.body);
+  if (!validation.ok) return Response.json({ ok: false, error: validation.error }, { status: 400 });
+  const body = validation.value;
 
   const saved = await saveSubmission({ kind: "onboarding", source: "website", body });
   let routeAssignment = null;
@@ -33,12 +36,11 @@ export async function POST(request) {
   });
 
   await markSubmissionSynced(saved.id, upstream.data, upstream.ok);
+  if (upstream.ok || !upstream.configured) await convertAbandonedQuote({ email: body.email, phone: body.cell_phone_number });
   return Response.json({
     configured: upstream.configured,
     stored: saved.configured,
     ok: upstream.ok,
     status: upstream.status,
-    data: upstream.data,
-    route_assignment: routeAssignment,
   });
 }

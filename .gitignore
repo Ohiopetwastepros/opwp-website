@@ -4,7 +4,7 @@
 .pnp.js
 
 # next.js
-/.next/
+/.next*/
 /out/
 
 # production
@@ -24,8 +24,10 @@ opennext-preview*.log
 .env*.local
 .env
 .dev.vars
-/.open-next/
+/.open-next*/
 .wrangler/
+/tmp/
+/OPWP_Route_Assignment_Tool_V12.xlsx
 
 # vercel
 .vercel

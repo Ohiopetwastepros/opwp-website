@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "opwp-website",
   "main": ".open-next/worker.js",
-  "compatibility_date": "2026-07-15",
+  "compatibility_date": "2026-08-27",
   "compatibility_flags": ["nodejs_compat"],
   "preview_urls": false,
   "assets": {
@@ -17,10 +17,23 @@
       "migrations_dir": "migrations"
     }
   ],
+  "r2_buckets": [
+    {
+      "binding": "FIELD_PROOFS",
+      "bucket_name": "opwp-field-proofs"
+    }
+  ],
+  "vars": {
+    "APP_ENV": "production",
+    "SITE_ORIGIN": "https://ohiopetwastepros.com",
+    "WORKER_ORIGIN": "https://opwp-website.ohiopetwastepros.workers.dev",
+    "TURNSTILE_HOSTNAMES": "ohiopetwastepros.com,www.ohiopetwastepros.com,opwp-website.ohiopetwastepros.workers.dev"
+  },
   "observability": {
-    "enabled": true
+    "enabled": true,
+    "head_sampling_rate": 1
   },
   "triggers": {
-    "crons": ["0 11 * * *", "15 * * * *", "35 * * * *"]
+    "crons": ["0 11 * * *", "5 * * * *", "15 * * * *", "35 * * * *"]
   }
 }
