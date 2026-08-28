@@ -48,11 +48,11 @@ export async function POST(request) {
 
   await markSubmissionSynced(saved.id, upstream.data, upstream.ok);
   if (upstream.ok) await convertAbandonedQuote({ email: body.email, phone: body.cell_phone_number, funnelId: body.funnel_id });
-  await queueSubmissionNotificationSafe({
+  if (!upstream.ok) await queueSubmissionNotificationSafe({
     submissionId: saved.id,
-    type: upstream.ok ? "onboarding_succeeded" : "onboarding_failed",
+    type: "onboarding_failed",
     body,
-    providerStatus: upstream.ok ? "customer created" : upstream.configured ? `failed (${upstream.status || "provider error"})` : "not configured",
+    providerStatus: upstream.configured ? `failed (${upstream.status || "provider error"})` : "not configured",
   });
   const failure = upstream.ok ? null : publicOnboardingFailure(upstream);
   const responseBody = {

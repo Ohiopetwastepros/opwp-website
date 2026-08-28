@@ -27,7 +27,9 @@ export async function POST(request) {
         funnelId: validation.value.funnel_id,
         lifecycleStage: isPartial ? validation.value.lifecycle_stage : "details_started",
       });
-  const notification = await queueSubmissionNotificationSafe({ submissionId: saved.id, type: isPartial ? "partial_quote" : "question", body: validation.value });
+  const notification = isPartial
+    ? { status: "handled_by_sng_after_delay" }
+    : await queueSubmissionNotificationSafe({ submissionId: saved.id, type: "question", body: validation.value });
   const smsFollowup = isPartial
     ? await queuePartialQuoteFollowUp({ submissionId: saved.id, phone: validation.value.phone, consentAt: validation.value.follow_up_consent_at })
     : null;

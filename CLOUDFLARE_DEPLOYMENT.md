@@ -155,10 +155,40 @@ query parameter. Sweep & Go's token configuration uses the query-parameter form
 because it does not expose custom webhook headers. Use a high-entropy value and
 URL-encode it when configuring the provider.
 
-## Quote-funnel owner email
+## Quote-funnel recovery
 
-Quote leads, questions, waitlist requests, successful SNG onboarding, and failed
-SNG onboarding create transactional owner-email records in D1. Status is always
+Completed account creation is emailed by Sweep & Go itself. The website does
+not send a duplicate success email. A partial quote remains private in D1 for
+10 minutes; if onboarding has not started, the scheduled recovery job creates
+the corresponding Sweep & Go partial lead (which triggers SNG's existing owner
+email) and independently attempts the customer email and Quo text. Every channel
+has its own `queued`, `sending`, `sent`, `failed`, or `cancelled` record in
+`quote_follow_up_deliveries`. Starting onboarding cancels all pending channels
+before the SNG account-creation request.
+
+The SNG hosted-form identifiers are non-secret configuration:
+
+- `SNG_PUBLIC_API_BASE_URL=https://api.sweepandgo.com`
+- `SNG_ORGANIZATION_SLUG=ohio-pet-waste-pros-qkr3c`
+- `SNG_ORGANIZATION_FORM_ID=7063`
+
+Re-run `npm run audit:sng-form` after changing the SNG form. Confirm the form ID
+before deployment; an incorrect value fails visibly and does not mark the lead
+as delivered.
+
+Quo delivery uses `POST https://api.openphone.com/v1/messages`. Set
+`SMS_PROVIDER=quo`, `QUO_FROM_NUMBER=+14192622371`, and store `QUO_API_KEY` only
+as a Wrangler secret. Quo must have US carrier registration and prepaid API
+message credit. A text is marked sent only when Quo returns its message ID.
+
+Customer email is intentionally retained as queued until the Outlook/Microsoft
+connection grants `Mail.Send`. The existing read-only Microsoft connection is
+not treated as permission to send mail.
+
+## Legacy owner-email queue
+
+Questions, waitlist requests, and failed SNG onboarding create transactional
+owner-email records in D1. Status is always
 one of `queued`, `sending`, `sent`, `failed`, or `cancelled`; the application only
 uses `sent` after the provider returns a message ID. The hourly recovery job
 retries eligible failures with bounded backoff.
@@ -293,17 +323,17 @@ Apply migrations only after reviewing the remote pending list. The historical
 duplicate `0022` filenames must not be renamed because D1 tracks applied
 migration filenames. Run `npm run check:migrations` before every deployment,
 then apply all pending migrations. `0032_quote_follow_up_sms.sql` adds the
-consent-backed, status-tracked partial-quote SMS follow-up queue.
+consent-backed partial-quote schedule; `0033_quote_recovery_channels.sql` adds
+independent SNG-lead, Outlook-email, and Quo-SMS delivery state.
 
 ## Notification provider
 
-No production SMS provider is claimed by this repository. Queued records remain
-queued until a provider confirms acceptance. `SMS_PROVIDER` defaults to
-`unconfigured`. `QUO_API_BASE_URL`, `QUO_API_TOKEN`, and `QUO_SENDER_ID`
-are reserved for a future Quo adapter after the API contract and credentials are
-available. Partial-quote records in `quote_follow_ups` remain visibly `queued`;
-they are cancelled automatically when the corresponding customer completes
-Sweep & Go onboarding and are never marked `sent` without provider confirmation.
+The Quo adapter is implemented against the official API. It remains fail-safe
+and visibly queued unless `SMS_PROVIDER=quo`, `QUO_API_KEY`, and
+`QUO_FROM_NUMBER` are present. No provider call is retried automatically inside
+one request, preventing duplicate messages; bounded scheduled attempts use the
+per-channel delivery record. Pending recovery is cancelled automatically when
+the corresponding customer begins Sweep & Go onboarding.
 
 ## Deployment roles and cutover
 

@@ -59,12 +59,18 @@ QB_TOKEN_ENCRYPTION_KEY=""
 QB_ENVIRONMENT="sandbox"
 QB_CALLBACK_ORIGIN="http://localhost:3000"
 
-# Notification delivery remains queued unless a real provider adapter is
-# configured. Quo values are reserved pending its confirmed API contract.
+# Quo uses its API key directly in the Authorization header (not Bearer).
+# Store the production key with `wrangler secret put QUO_API_KEY`.
 SMS_PROVIDER="unconfigured"
-QUO_API_BASE_URL=""
-QUO_API_TOKEN=""
-QUO_SENDER_ID=""
+QUO_API_BASE_URL="https://api.openphone.com"
+QUO_API_KEY=""
+QUO_FROM_NUMBER="+14192622371"
+
+# Non-secret Sweep & Go hosted-form identifiers used only to create a partial
+# quote lead after the 10-minute abandonment delay.
+SNG_PUBLIC_API_BASE_URL="https://api.sweepandgo.com"
+SNG_ORGANIZATION_SLUG="ohio-pet-waste-pros-qkr3c"
+SNG_ORGANIZATION_FORM_ID="7063"
 
 # Optional local smoke-test targets. These are not production secrets.
 SMOKE_BASE_URL="http://127.0.0.1:3000"
