@@ -5,6 +5,7 @@ import { getAirtableBusinessCockpit } from "@/lib/airtable";
 import { getBriaRouteAllocation, getSngInvoiceMetrics, getSubscriptionCancellationMetrics, getSubscriptionStatusReviews, getSubscriptionSyncHealth, getSubscriptionTruth, listSngEvents, listSubmissions } from "@/lib/db";
 import { buildSubscriptionReconciliation, getSngAdminSnapshot, sngConfigured, sngRows } from "@/lib/sweepandgo";
 import { getQuickBooksFinancialSnapshot } from "@/lib/quickbooks";
+import { stripeConfigured } from "@/lib/stripe";
 import GoogleReviewTable from "./GoogleReviewTable";
 import styles from "./dashboard.module.css";
 
@@ -80,6 +81,19 @@ function TrendChart({ data = [], color = "#457b3b", fill = "#edf5ea" }) {
 
 function MiniMetric({ label, value }) {
   return <div className={styles.miniMetric}><div className={styles.miniLabel}>{label}</div><div className={styles.miniValue}>{value}</div></div>;
+}
+
+function RailItem({ icon, label, href, active = false }) {
+  return <a className={`${styles.railItem} ${active ? styles.railItemActive : ""}`} href={href}><span aria-hidden="true">{icon}</span><b>{label}</b></a>;
+}
+
+function ExecutiveMetric({ icon, label, value, meta, tone = "" }) {
+  return <article className={styles.executiveMetric}><span className={`${styles.metricIcon} ${tone ? styles[tone] : ""}`} aria-hidden="true">{icon}</span><div><div className={styles.metricLabel}>{label}</div><strong className={styles.metricValue}>{value}</strong><div className={styles.metricMeta}>{meta}</div></div></article>;
+}
+
+function SystemTile({ icon, name, detail, healthy = true, href = "" }) {
+  const content = <><span className={styles.systemIcon} aria-hidden="true">{icon}</span><div><strong>{name}</strong><small>{detail}</small></div><i className={healthy ? styles.statusGood : styles.statusWarn} aria-label={healthy ? "Operational" : "Needs attention"} /></>;
+  return href ? <a className={styles.systemTile} href={href}>{content}</a> : <div className={styles.systemTile}>{content}</div>;
 }
 
 function ValuePillar({ index, title, thesis, primaryLabel, primaryValue, metrics = [], href }) {
@@ -213,52 +227,65 @@ export default async function AdminPage({ searchParams }) {
     <main className={`${styles.shell} opwp-admin-shell`}>
       <aside className={styles.rail}>
         <div className={styles.railBrand}><span className={styles.mark}><img src="/assets/opwp-logo.png" alt="" /></span><div><strong>OPWP</strong><small>Operating Group</small></div></div>
-        <div className={styles.officeLaunchGroup}>
-          <a className={styles.officeQuickLaunch} href="/office/"><span>Office workspace · New</span><strong>Manual Client Entry</strong><small>Call guide, pricing, routing, and welcome text <b>→</b></small></a>
-          <a className={styles.officeAccountLink} href="/admin/routes/?manage=office-access#office-access"><span>Admin setup</span><strong>Manage office accounts</strong><b>→</b></a>
-        </div>
-        <nav className={styles.nav} aria-label="Executive navigation">
-          <NavGroup number="01" label="Executive overview" href="/admin/" active={view === "overview"}><a href="/admin/#overview">Company summary</a><a href="/admin/#value-drivers">Value drivers</a><a href="/admin/#owner-actions">Owner action queue</a></NavGroup>
-          <NavGroup number="02" label="Financial performance" href="/admin/financials/"><a href="/admin/financials/#performance">Performance</a><a href="/admin/financials/#position">Financial position</a><a href="/admin/financials/#decisions">Owner decisions</a></NavGroup>
-          <NavGroup number="03" label="Route operations" href="/admin/?view=operations" active={view === "operations"}><a className={styles.featuredTool} href="/admin/pricing-calculator/">Job pricing calculator <em>New</em></a><a className={styles.featuredTool} href="/office/">Manual client entry</a><a href="/admin/?view=operations#route-efficiency">Route efficiency</a><a href="/admin/?view=customers#estimate-reviews">Service-time reviews</a></NavGroup>
-          <NavGroup number="04" label="Route intelligence" href="/admin/routes/"><a href="/admin/routes/#new-client-routing">New-client routing</a><a href="/admin/routes/#route-analysis">Scenario analysis</a><a href="/admin/routes/#office-access">Office access</a></NavGroup>
-          <NavGroup number="05" label="Route Partner" href="/admin/route-partner/"><a href="/admin/route-partner/">Dispatch workspace</a><a href="/admin/route-partner/team/">Team management</a><a href="/field/">Field workspace</a></NavGroup>
-          <NavGroup number="06" label="Growth & retention" href="/admin/?view=customers" active={view === "customers"}><a href="/admin/?view=customers#service">Customer economics</a><a href="/admin/?view=customers#google-reviews">Review tracking</a><a href="/admin/?view=customers#subscription-reconciliation">Client reconciliation</a><a href="/admin/?view=customers#churn-reason-review">Churn review</a></NavGroup>
-          <NavGroup number="07" label="Extreme Dog Fuel" href="/admin/dog-food/"><a href="/admin/dog-food/">Operations</a><a href="/dog-food/">Customer order tool</a></NavGroup>
-          <NavGroup number="08" label="Management scorecard" href="/admin/?view=scorecard" active={view === "scorecard"}><a href="/admin/?view=scorecard#scorecard">Targets and accountability</a></NavGroup>
-          <NavGroup number="09" label="Systems & controls" href="/admin/system-health/" active={view === "systems"}><a href="/admin/system-health/">System Health</a><a href="/admin/?view=systems#systems">Operational controls</a><a href="/admin/events/">Event activity</a></NavGroup>
+        <nav className={styles.railNav} aria-label="Executive navigation">
+          <RailItem icon="⌂" label="Overview" href="/admin/" active={view === "overview"} />
+          <div className={styles.railSection}>Performance</div>
+          <RailItem icon="$" label="Financials" href="/admin/financials/" />
+          <RailItem icon="C" label="Customers" href="/admin/?view=customers" active={view === "customers"} />
+          <div className={styles.railSection}>Operations</div>
+          <RailItem icon="O" label="Operations" href="/admin/?view=operations" active={view === "operations"} />
+          <RailItem icon="R" label="Route Intelligence" href="/admin/routes/" />
+          <RailItem icon="P" label="Route Partner" href="/admin/route-partner/" />
+          <div className={styles.railSection}>Growth</div>
+          <RailItem icon="↗" label="Growth" href="/admin/?view=scorecard" active={view === "scorecard"} />
+          <RailItem icon="D" label="Dog Food" href="/admin/dog-food/" />
+          <div className={styles.railSection}>Systems</div>
+          <RailItem icon="S" label="Systems & Integrations" href="/admin/system-health/" active={view === "systems"} />
         </nav>
-        <div className={styles.railFoot}><span className={styles.live} /><div><strong>Systems online</strong><small>Protected executive access</small></div></div>
+        <a className={styles.ownerCard} href="/admin/routes/?manage=office-access#office-access"><span className={styles.ownerAvatar}>O</span><div><strong>{auth.email || "OPWP Owner"}</strong><small>Owner access</small></div><b>›</b></a>
       </aside>
       <div className={styles.workspace}><div className={styles.wrap}>
         <header className={styles.topbar}>
-          <div><div className={styles.eyebrow}>{viewConfig.eyebrow}</div><h1 className={styles.title}>{viewConfig.title}</h1><div className={styles.subtle}>{viewConfig.subtitle}</div></div>
-          <div className={styles.headerControls}><div className={styles.periodChip}>Trailing 30 days</div><div className={styles.asof}><span className={styles.live} />Data updated <b>{dataAsOf} ET</b></div></div>
+          <div><h1 className={styles.title}>{viewConfig.title}</h1><div className={styles.subtle}>{viewConfig.subtitle}</div></div>
+          <div className={styles.headerControls}><div className={styles.periodChip}>Trailing 30 days</div><a className={styles.headerButton} href="/admin/system-health/" aria-label="Open system health">Controls</a><div className={styles.asof}><span className={styles.live} />Data updated <b>{dataAsOf} ET</b></div></div>
         </header>
 
-        <div id="owner-attention" className={`${styles.alertStrip} ${primaryAlert.tone ? "" : styles.good}`}>
+        {view !== "overview" ? <div id="owner-attention" className={`${styles.alertStrip} ${primaryAlert.tone ? "" : styles.good}`}>
           <div className={styles.alertIcon}>{primaryAlert.tone ? "!" : "✓"}</div><div><div className={styles.alertTitle}>{primaryAlert.title}</div><div className={styles.alertText}>{primaryAlert.detail}</div></div>{primaryAlert.tone ? <a className={styles.alertAction} href={alertDestination(primaryAlert.href)}>Review issue</a> : <Badge tone={primaryAlert.tone}>Owner attention</Badge>}
-        </div>
+        </div> : null}
 
-        {view === "overview" ? <>
-          <section id="overview" className={styles.executiveHero}>
-            <div className={styles.heroStatement}><span>Enterprise recurring run rate</span><strong>{money(opwp.arr)}</strong><p>{money(opwp.mrr)} active subscription MRR across {number(currentRecurringCount)} paying cleanup customers.</p></div>
-            <div className={styles.heroMetrics}><MiniMetric label="Cash position" value={quickBooks.ok ? money(quickBooks.cash) : "Unavailable"} /><MiniMetric label="MTD revenue" value={quickBooks.ok ? money(quickBooks.revenue) : "Unavailable"} /><MiniMetric label="MTD net margin" value={quickBooks.ok ? percent(quickBooks.netMargin) : "Unavailable"} /><MiniMetric label="Route value / paid hr" value={opwp.technicianEconomicsReady ? moneyOrDash(opwp.routeRevenuePerHour30) : "Pending"} /></div>
+        {view === "overview" ? <div id="overview" className={styles.executiveDashboard}>
+          <section className={styles.executiveMetrics}>
+            <ExecutiveMetric icon="$" label="Cash on hand" value={quickBooks.ok ? money(quickBooks.cash) : "Unavailable"} meta={quickBooks.ok ? "QuickBooks current balance" : "QuickBooks sync required"} />
+            <ExecutiveMetric icon="↻" label="Monthly recurring revenue" value={money(opwp.mrr)} meta={`${number(currentRecurringCount)} paying cleanup customers`} />
+            <ExecutiveMetric icon="↗" label="Net income MTD" value={quickBooks.ok ? money(quickBooks.netIncome) : "Unavailable"} meta={quickBooks.ok ? `${percent(quickBooks.netMargin)} net margin` : "QuickBooks sync required"} />
+            <ExecutiveMetric icon="C" label="Paying customers" value={number(currentRecurringCount)} meta={`${number(opwp.pausedCustomers)} paused customers`} />
+            <ExecutiveMetric icon="R" label="Route revenue per paid hour" value={opwp.technicianEconomicsReady ? moneyOrDash(opwp.routeRevenuePerHour30, 2) : "Pending"} meta={`${percent(opwp.jobRevenueCoverage30)} data confidence`} tone={opwp.technicianEconomicsReady ? "" : "warn"} />
           </section>
-          <section id="value-drivers" className={styles.section}>
-            <div className={styles.sectionHead}><div><div className={styles.eyebrow}>Enterprise value drivers</div><h2 className={styles.sectionTitle}>What is moving the business</h2></div><div className={styles.sectionNote}>Each view answers one management question and keeps supporting detail off the owner landing page.</div></div>
-            <div className={styles.valueGrid}>
-              <ValuePillar index="01" title="Financial strength" thesis="Can the company fund growth while protecting liquidity?" primaryLabel="Cash available" primaryValue={quickBooks.ok ? money(quickBooks.cash) : "Unavailable"} metrics={[{ label: "MTD revenue", value: quickBooks.ok ? money(quickBooks.revenue) : "—" }, { label: "Net income", value: quickBooks.ok ? money(quickBooks.netIncome) : "—" }]} href="/admin/financials/" />
-              <ValuePillar index="02" title="Route economics" thesis="Are paid route hours converting into enough recurring value?" primaryLabel="Route value / paid hour" primaryValue={opwp.technicianEconomicsReady ? moneyOrDash(opwp.routeRevenuePerHour30) : "Pending"} metrics={[{ label: "Operating target", value: "$100/hr+" }, { label: "Data confidence", value: percent(opwp.jobRevenueCoverage30) }]} href="/admin/?view=operations" />
-              <ValuePillar index="03" title="Recurring customer base" thesis="Is the core subscription asset growing and staying durable?" primaryLabel="Cleanup MRR" primaryValue={money(opwp.coreSubscriptionMrr ?? opwp.mrr)} metrics={[{ label: "Paying customers", value: number(currentRecurringCount) }, { label: "Churn · 30d", value: `${number(opwp.grossChurnCount30)} · ${money(opwp.grossLostMrr30)}` }]} href="/admin/?view=customers" />
-              <ValuePillar index="04" title="Growth platforms" thesis="Is new demand building beyond the existing route book?" primaryLabel="Open quoted MRR" primaryValue={money(opwp.quotedPipeline)} metrics={[{ label: "One-time revenue · 30d", value: opwp.oneTimeDataAvailable ? money(opwp.oneTimeRevenue30) : "Unavailable" }, { label: "Dog food sales · 30d", value: money(dogFood.revenue30) }]} href="/admin/?view=customers" />
-            </div>
+
+          <section className={styles.overviewMiddle}>
+            <div className={styles.dashboardPanel}><div className={styles.dashboardPanelHead}><div><h2>Revenue &amp; route trend</h2><p>Allocated recurring route value by week</p></div><span>Last 5 weeks</span></div><TrendChart data={opwp.revenueTrend} color="#13994b" fill="#dff4e7" /><div className={styles.chartSummary}><b>{money(opwp.jobRevenue30)}</b><span>completed route value · 30d</span></div></div>
+            <div className={styles.dashboardPanel}><div className={styles.dashboardPanelHead}><div><h2>Customer churn exposure</h2><p>Validated lost recurring revenue by week</p></div><span>{number(opwp.grossChurnCount30)} events</span></div><TrendChart data={opwp.churnTrend} color="#d14343" fill="#fbe5e5" /><div className={styles.chartSummary}><b>{money(opwp.grossLostMrr30)}</b><span>gross lost MRR · 30d</span></div></div>
+            <div className={styles.dashboardPanel}><div className={styles.dashboardPanelHead}><div><h2>Growth opportunities</h2><p>Current revenue-building signals</p></div><a href="/admin/?view=customers">View all</a></div><div className={styles.pipelineList}>
+              <a href="/admin/?view=customers"><span className={styles.pipelineIcon}>Q</span><div><strong>Open quoted pipeline</strong><small>{number(opwp.openLeads)} active opportunities</small></div><b>{money(opwp.quotedPipeline)} MRR</b></a>
+              <a href="/admin/?view=customers"><span className={styles.pipelineIcon}>1×</span><div><strong>One-time services</strong><small>Finalized revenue in the last 30 days</small></div><b>{opwp.oneTimeDataAvailable ? money(opwp.oneTimeRevenue30) : "Unavailable"}</b></a>
+              <a href="/admin/dog-food/"><span className={styles.pipelineIcon}>DF</span><div><strong>Dog food sales</strong><small>Paid sales in the last 30 days</small></div><b>{money(dogFood.revenue30)}</b></a>
+            </div><div className={styles.pipelineTotal}><span>Current growth value</span><strong>{money((opwp.quotedPipeline || 0) + (opwp.oneTimeRevenue30 || 0) + (dogFood.revenue30 || 0))}</strong></div></div>
           </section>
-          <section id="owner-actions" className={`${styles.equalCol} ${styles.section}`}>
-            <div className={styles.panel}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Owner action queue</h3><div className={styles.panelSub}>Only exceptions that can change revenue, cost, cash, or customer trust</div></div><Badge tone={alerts.some((alert) => alert.tone) ? "warn" : ""}>{alerts.some((alert) => alert.tone) ? `${alerts.length} priorities` : "Clear"}</Badge></div><div className={styles.drivers}>{alerts.map((alert, index) => <a className={styles.driver} href={alertDestination(alert.href)} key={alert.title}><div><div className={styles.driverName}>{index + 1}. {alert.title}</div><div className={styles.driverMeta}>{alert.tone ? `Why this needs review: ${alert.detail}` : alert.detail}</div></div><Badge tone={alert.tone}>{alert.tone ? "Review →" : "Clear"}</Badge></a>)}</div></div>
-            <div className={styles.panel}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Today&apos;s operating pulse</h3><div className={styles.panelSub}>Current-day execution with customer risk separated</div></div></div><div className={styles.miniGrid}><MiniMetric label="Scheduled visits" value={number(jobsToday.length)} /><MiniMetric label="Completed" value={number(completedToday)} /><MiniMetric label="Completion" value={percent(todayCompletionRate)} /><MiniMetric label="Paused customers" value={number(opwp.pausedCustomers)} /><MiniMetric label="Held MRR" value={money(opwp.pausedMrr)} /><MiniMetric label="Open quoted MRR" value={money(opwp.quotedPipeline)} /></div></div>
+
+          <section id="owner-actions" className={styles.overviewLower}>
+            <div className={styles.dashboardPanel}><div className={styles.dashboardPanelHead}><div><h2>Executive Action Center</h2><p>Exceptions requiring owner attention</p></div><Badge tone={alerts.some((alert) => alert.tone) ? "warn" : ""}>{alerts.some((alert) => alert.tone) ? `${alerts.length} priorities` : "Clear"}</Badge></div><div className={styles.actionList}>{alerts.map((alert, index) => <a href={alertDestination(alert.href)} key={alert.title}><span className={`${styles.actionIcon} ${alert.tone ? styles[alert.tone] : ""}`}>{index + 1}</span><div><strong>{alert.title}</strong><small>{alert.detail}</small></div><b>Review</b></a>)}</div></div>
+            <div className={styles.dashboardPanel}><div className={styles.dashboardPanelHead}><div><h2>Operating Pulse <small>(Today)</small></h2><p>Current-day service execution</p></div><a href="/admin/?view=operations">View details</a></div><div className={styles.pulseGrid}><MiniMetric label="Scheduled visits" value={number(jobsToday.length)} /><MiniMetric label="Completion rate" value={percent(todayCompletionRate)} /><MiniMetric label="Paused customers" value={number(opwp.pausedCustomers)} /><MiniMetric label="Held MRR" value={money(opwp.pausedMrr)} /><MiniMetric label="Completed visits" value={number(completedToday)} /><MiniMetric label="Open quoted MRR" value={money(opwp.quotedPipeline)} /></div></div>
+            <div className={styles.dashboardPanel}><div className={styles.dashboardPanelHead}><div><h2>System Health</h2><p>Production integrations and storage</p></div><a href="/admin/system-health/">View all</a></div><div className={styles.healthGrid}>
+              <SystemTile icon="S" name="Sweep & Go" detail={sngConfigured() ? "Operational" : "Not configured"} healthy={sngConfigured()} />
+              <SystemTile icon="Q" name="QuickBooks" detail={quickBooks.ok ? "Operational" : quickBooks.connected ? "Sync needs attention" : "Not connected"} healthy={quickBooks.ok} />
+              <SystemTile icon="A" name="Airtable" detail={cockpit.ok ? "Operational" : "Needs attention"} healthy={cockpit.ok} />
+              <SystemTile icon="$" name="Stripe" detail={stripeConfigured() ? "Operational" : "Not configured"} healthy={stripeConfigured()} />
+              <SystemTile icon="D1" name="Cloudflare D1" detail={submissions.configured ? "Operational" : "Not configured"} healthy={submissions.configured} href="/admin/events/" />
+              <SystemTile icon="P" name="Field Photos" detail="Private R2 storage" healthy />
+            </div><div className={styles.healthFooter}><div><span>Route efficiency</span><strong>{opwp.technicianEconomicsReady ? moneyOrDash(opwp.routeRevenuePerHour30) : "Pending"}</strong></div><div><span>Churn · 30d</span><strong>{number(opwp.grossChurnCount30)} · {money(opwp.grossLostMrr30)}</strong></div></div></div>
           </section>
-        </> : null}
+        </div> : null}
 
         {view === "operations" ? <section id="route-efficiency" className={styles.section}>
           <div className={styles.sectionHead}><div><div className={styles.eyebrow}>Primary operating constraint</div><h2 className={styles.sectionTitle}>Route efficiency command center</h2></div><div className={styles.sectionNote}>Target: at least $100 of allocated recurring route value per paid route hour. Office, training, and administrative time must be separated from route time.</div></div>
