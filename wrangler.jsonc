@@ -31,6 +31,9 @@
     "OWNER_NOTIFICATION_EMAIL": "Craig@ohiopetwastepros.com",
     "EMAIL_FROM": "Craig@ohiopetwastepros.com",
     "EMAIL_FROM_NAME": "Craig | Ohio Pet Waste Pros",
+    "EMAIL_PROVIDER": "resend",
+    "EMAIL_SENDING_ENABLED": "false",
+    "RESEND_API_BASE_URL": "https://api.resend.com",
     "SMS_PROVIDER": "quo",
     "QUO_API_BASE_URL": "https://api.openphone.com",
     "QUO_FROM_NUMBER": "+14192622371"

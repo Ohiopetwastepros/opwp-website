@@ -21,8 +21,12 @@ NEXT_PUBLIC_TURNSTILE_SITE_KEY=""
 TURNSTILE_SECRET_KEY=""
 TURNSTILE_HOSTNAMES="localhost,127.0.0.1"
 
-# Transactional owner alerts. EMAIL is a Cloudflare Email Service binding,
-# not a text variable. Delivery remains queued until that binding is active.
+# Transactional owner/customer email. Store the real Resend key only as a
+# Cloudflare secret. Delivery remains queued until the provider is configured.
+EMAIL_PROVIDER="unconfigured"
+EMAIL_SENDING_ENABLED="false"
+RESEND_API_BASE_URL="https://api.resend.com"
+RESEND_API_KEY=""
 OWNER_NOTIFICATION_EMAIL="owner@example.com"
 EMAIL_FROM="owner@example.com"
 EMAIL_FROM_NAME="Owner | Ohio Pet Waste Pros"

@@ -183,10 +183,11 @@ Quo delivery uses `POST https://api.openphone.com/v1/messages`. Set
 as a Wrangler secret. Quo must have US carrier registration and prepaid API
 message credit. A text is marked sent only when Quo returns its message ID.
 
-Customer email is retained as queued until Cloudflare Email Sending is enabled
-and the Worker has an `EMAIL` binding. It is sent from and replies to
+Customer email is retained as queued until Resend verifies the sending domain
+and the Worker has the `RESEND_API_KEY` secret. It is sent from and replies to
 `Craig@ohiopetwastepros.com`; the application only marks it sent after the
-provider returns a message ID.
+provider returns a message ID. Every request uses a stable Resend idempotency
+key so retries cannot duplicate the same email.
 
 ## Legacy owner-email queue
 
@@ -196,24 +197,22 @@ one of `queued`, `sending`, `sent`, `failed`, or `cancelled`; the application on
 uses `sent` after the provider returns a message ID. The hourly recovery job
 retries eligible failures with bounded backoff.
 
-The adapter targets Cloudflare Email Service. This currently requires the
-Cloudflare Workers Paid plan. Set the non-secret Worker variables
-`OWNER_NOTIFICATION_EMAIL`, `EMAIL_FROM`, and `EMAIL_FROM_NAME`, onboard
-`ohiopetwastepros.com` as a sending domain, and add this binding after Cloudflare
-Email Sending is active for the account:
+The production adapter uses Resend Free (`EMAIL_PROVIDER=resend`), which allows
+3,000 transactional emails per month and 100 per day. Store `RESEND_API_KEY`
+only with `wrangler secret put`; the key must be restricted to sending access.
+The verified sender is `Craig@ohiopetwastepros.com` and replies return to the
+same mailbox. These messages are transactional responses to an explicitly
+requested quote, not bulk marketing.
 
-```jsonc
-"send_email": [
-  {
-    "name": "EMAIL",
-    "allowed_sender_addresses": ["Craig@ohiopetwastepros.com"]
-  }
-]
-```
+Keep `EMAIL_SENDING_ENABLED=false` until Resend reports the domain as verified.
+Then set it to `true`, rebuild, deploy, and send one controlled quote-follow-up
+test. The queue remains fail-closed while the flag is false.
 
-Do not restrict `allowed_destination_addresses`: quote follow-up must reach the
-validated address supplied by each potential customer. These messages are
-transactional responses to an explicitly requested quote, not bulk marketing.
+Resend requires `resend._domainkey`, `rsend`, and `send` authentication records.
+They are staged in Cloudflare DNS. As of August 28, 2026, the public domain still
+uses `ns1.bluehost.com` and `ns2.bluehost.com`, so those records are not live
+until they are also added in Bluehost or the nameservers are cut over to
+Cloudflare. Do not modify the Microsoft 365 MX or autodiscover records.
 
 Until the binding is active, notifications remain truthfully queued and the
 protected `/admin/system-health/` page reports `delivery binding pending`.
