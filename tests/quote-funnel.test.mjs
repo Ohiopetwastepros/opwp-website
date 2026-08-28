@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSubmissionNotification, escapeEmailHtml, normalizeFunnelId, normalizeFunnelStage, PARTIAL_QUOTE_FOLLOW_UP_DELAY_MINUTES } from "../lib/quote-funnel.mjs";
+import { buildCustomerQuoteFollowUpEmail, buildSubmissionNotification, escapeEmailHtml, normalizeFunnelId, normalizeFunnelStage, PARTIAL_QUOTE_FOLLOW_UP_DELAY_MINUTES } from "../lib/quote-funnel.mjs";
 import {
   OPWP_SNG_FORM_OPTIONS,
   normalizeHowHeard,
@@ -104,6 +104,14 @@ test("partial quote follow-up requires explicit scoped consent", () => {
 
 test("partial quote customer follow-up waits ten minutes", () => {
   assert.equal(PARTIAL_QUOTE_FOLLOW_UP_DELAY_MINUTES, 10);
+});
+
+test("partial quote customer email identifies Craig and invites a direct reply", () => {
+  const content = buildCustomerQuoteFollowUpEmail();
+  assert.match(content.subject, /Ohio Pet Waste Pros quote/i);
+  assert.match(content.text, /This is Craig with Ohio Pet Waste Pros/);
+  assert.match(content.text, /reply directly to this email/i);
+  assert.match(content.text, /\(419\) 262-2371/);
 });
 
 test("no-card onboarding requires a question but still validates for account creation", () => {

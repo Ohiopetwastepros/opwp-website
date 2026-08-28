@@ -160,8 +160,10 @@ URL-encode it when configuring the provider.
 Completed account creation is emailed by Sweep & Go itself. The website does
 not send a duplicate success email. A partial quote remains private in D1 for
 10 minutes; if onboarding has not started, the scheduled recovery job creates
-the corresponding Sweep & Go partial lead (which triggers SNG's existing owner
-email) and independently attempts the customer email and Quo text. Every channel
+the corresponding Sweep & Go partial lead, queues a website owner alert to
+`Craig@ohiopetwastepros.com`, and independently attempts the customer email and
+Quo text. Sweep & Go's own lead-notification recipient is configured inside the
+SNG organization and should also be set to `Craig@ohiopetwastepros.com`. Every channel
 has its own `queued`, `sending`, `sent`, `failed`, or `cancelled` record in
 `quote_follow_up_deliveries`. Starting onboarding cancels all pending channels
 before the SNG account-creation request.
@@ -181,9 +183,10 @@ Quo delivery uses `POST https://api.openphone.com/v1/messages`. Set
 as a Wrangler secret. Quo must have US carrier registration and prepaid API
 message credit. A text is marked sent only when Quo returns its message ID.
 
-Customer email is intentionally retained as queued until the Outlook/Microsoft
-connection grants `Mail.Send`. The existing read-only Microsoft connection is
-not treated as permission to send mail.
+Customer email is retained as queued until Cloudflare Email Sending is enabled
+and the Worker has an `EMAIL` binding. It is sent from and replies to
+`Craig@ohiopetwastepros.com`; the application only marks it sent after the
+provider returns a message ID.
 
 ## Legacy owner-email queue
 
@@ -193,7 +196,8 @@ one of `queued`, `sending`, `sent`, `failed`, or `cancelled`; the application on
 uses `sent` after the provider returns a message ID. The hourly recovery job
 retries eligible failures with bounded backoff.
 
-The adapter targets Cloudflare Email Service. Set the non-secret Worker variables
+The adapter targets Cloudflare Email Service. This currently requires the
+Cloudflare Workers Paid plan. Set the non-secret Worker variables
 `OWNER_NOTIFICATION_EMAIL`, `EMAIL_FROM`, and `EMAIL_FROM_NAME`, onboard
 `ohiopetwastepros.com` as a sending domain, and add this binding after Cloudflare
 Email Sending is active for the account:
@@ -202,11 +206,14 @@ Email Sending is active for the account:
 "send_email": [
   {
     "name": "EMAIL",
-    "allowed_destination_addresses": ["Craig@ohiopetwastepros.com"],
-    "allowed_sender_addresses": ["website@ohiopetwastepros.com"]
+    "allowed_sender_addresses": ["Craig@ohiopetwastepros.com"]
   }
 ]
 ```
+
+Do not restrict `allowed_destination_addresses`: quote follow-up must reach the
+validated address supplied by each potential customer. These messages are
+transactional responses to an explicitly requested quote, not bulk marketing.
 
 Until the binding is active, notifications remain truthfully queued and the
 protected `/admin/system-health/` page reports `delivery binding pending`.

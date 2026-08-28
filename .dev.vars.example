@@ -24,8 +24,8 @@ TURNSTILE_HOSTNAMES="localhost,127.0.0.1"
 # Transactional owner alerts. EMAIL is a Cloudflare Email Service binding,
 # not a text variable. Delivery remains queued until that binding is active.
 OWNER_NOTIFICATION_EMAIL="owner@example.com"
-EMAIL_FROM="website@example.com"
-EMAIL_FROM_NAME="Ohio Pet Waste Pros Website"
+EMAIL_FROM="owner@example.com"
+EMAIL_FROM_NAME="Owner | Ohio Pet Waste Pros"
 
 # Stripe test keys first. Store live values with Wrangler secrets, never here.
 STRIPE_SECRET_KEY=""
