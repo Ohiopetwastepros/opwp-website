@@ -30,7 +30,10 @@
     "TURNSTILE_HOSTNAMES": "ohiopetwastepros.com,www.ohiopetwastepros.com,opwp-website.ohiopetwastepros.workers.dev",
     "OWNER_NOTIFICATION_EMAIL": "Craig@ohiopetwastepros.com",
     "EMAIL_FROM": "website@ohiopetwastepros.com",
-    "EMAIL_FROM_NAME": "Ohio Pet Waste Pros Website"
+    "EMAIL_FROM_NAME": "Ohio Pet Waste Pros Website",
+    "SMS_PROVIDER": "quo",
+    "QUO_API_BASE_URL": "https://api.openphone.com",
+    "QUO_FROM_NUMBER": "+14192622371"
   },
   "observability": {
     "enabled": true,
