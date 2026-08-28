@@ -12,7 +12,7 @@ for (const path of ["/api/admin/operations-audit/", "/api/field/today/", "/api/o
   assert.equal(await status(path), 401, path + " should reject unauthenticated requests");
 }
 assert.equal(await status("/api/field/photo/not-a-proof/"), 401);
-const growthMutation = await status("/api/admin/growth-desk/123e4567-e89b-12d3-a456-426614174000", {
+const growthMutation = await status("/api/admin/growth-desk/123e4567-e89b-12d3-a456-426614174000/", {
   method: "PATCH",
   headers: { "content-type": "application/json", origin: base },
   body: JSON.stringify({ action: "add_note", note: "unauthenticated security check" }),
