@@ -133,6 +133,19 @@ export default function QuoteForm() {
   const [submitError, setSubmitError]= useState(null);
   const [onboardTurnstileToken, setOnboardTurnstileToken] = useState("");
   const [onboardTurnstileReset, setOnboardTurnstileReset] = useState(0);
+  const [funnelId, setFunnelId] = useState("");
+  const [partialRetry, setPartialRetry] = useState(0);
+
+  useEffect(() => {
+    const storageKey = "opwp_quote_funnel_id";
+    let id = "";
+    try { id = window.sessionStorage.getItem(storageKey) || ""; } catch { /* storage can be unavailable */ }
+    if (!/^[A-Za-z0-9_-]{16,80}$/.test(id)) {
+      id = crypto.randomUUID();
+      try { window.sessionStorage.setItem(storageKey, id); } catch { /* keep the in-memory ID */ }
+    }
+    setFunnelId(id);
+  }, []);
 
   // ── Derived ─────────────────────────────────────────────────────────────
   const zipClean = zip.trim().slice(0, 5);
@@ -210,22 +223,36 @@ export default function QuoteForm() {
 
   // Partial-lead capture — fires once when phone + email are both valid, so we can
   // follow up on quotes that never complete signup (SNG-style abandoned-quote email).
-  const leadSentRef = useRef(false);
+  const leadStageRef = useRef("");
   useEffect(() => {
-    if (!inArea || !phoneReady || !emailReady || leadSentRef.current) return;
-    leadSentRef.current = true;
-    fetch("/api/lead", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        source: "partial_quote",
-        zip: zipClean, phone, email,
-        dogs, frequency, last_cleaned: lastCleaned, yard_size: yardSize,
-        quote_monthly: monthlyTotal,
-        coupon: coupon || undefined,
-      }),
-    }).catch(() => {});
-  }, [inArea, phoneReady, emailReady, zipClean, phone, email, dogs, frequency, yardSize, monthlyTotal]);
+    if (step !== 1 && step !== 2) return;
+    const lifecycleStage = step === 2 ? "details_started" : "quote_viewed";
+    if (!funnelId || !inArea || !phoneReady || !emailReady || leadStageRef.current === lifecycleStage) return;
+    let cancelled = false;
+    const capture = async () => {
+      try {
+        const response = await fetch("/api/lead", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source: "partial_quote", funnel_id: funnelId, lifecycle_stage: lifecycleStage,
+            zip: zipClean, phone, email,
+            dogs, frequency, last_cleaned: lastCleaned, yard_size: yardSize,
+            quote_monthly: monthlyTotal,
+            selected_addons: Object.keys(selected).filter((key) => selected[key]),
+            coupon: coupon || undefined,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.ok !== true) throw new Error("partial_quote_capture_failed");
+        if (!cancelled) leadStageRef.current = lifecycleStage;
+      } catch {
+        if (!cancelled && partialRetry < 2) window.setTimeout(() => setPartialRetry((value) => value + 1), 1500 * (partialRetry + 1));
+      }
+    };
+    capture();
+    return () => { cancelled = true; };
+  }, [funnelId, inArea, phoneReady, emailReady, zipClean, phone, email, dogs, frequency, lastCleaned, yardSize, monthlyTotal, selected, coupon, step, partialRetry]);
 
   // If the dog count pushes the current frequency past its cap (e.g. Monthly + 2 dogs),
   // fall back to Weekly so the form never sits on a disabled option.
@@ -301,6 +328,7 @@ export default function QuoteForm() {
     quoted_monthly_total:    monthlyTotal,
     route_monthly_revenue:   monthly,
     selected_addons:         Object.keys(selected).filter((k) => selected[k]),
+    funnel_id:               funnelId,
   });
 
   // ── Handlers ─────────────────────────────────────────────────────────────
@@ -374,6 +402,7 @@ export default function QuoteForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           source: "question",
+          funnel_id: funnelId,
           name: qName, phone: qPhone, email: qEmail, question: qText,
           zip: zipClean, dogs, frequency, last_cleaned: lastCleaned, yard_size: yardSize,
           quote_monthly: monthlyTotal,

@@ -86,11 +86,16 @@ have all been tested on the Workers preview URL.
 ## Direct integrations now in place
 
 - `/api/quote`: pulls current price and cross-sells from Sweep & Go.
-- `/api/onboard`: stores the request in D1, then creates the customer directly
-  through Sweep & Go's residential onboarding endpoint.
+- `/api/onboard`: idempotently stores the conversion, then creates the customer
+  directly through Sweep & Go's residential onboarding endpoint. A retry for the
+  same browser funnel cannot create a second customer.
 - `/api/waitlist`: stores the request and sends it to Sweep & Go's out-of-area
   lead endpoint.
-- `/api/lead`: stores abandoned quotes and questions directly in D1.
+- `/api/lead`: stores or updates abandoned quotes and questions directly in D1.
+  Sweep & Go does not document an endpoint for creating an in-area partial lead,
+  so D1 is the private pre-conversion funnel and Sweep & Go remains the CRM and
+  customer system of record after conversion. Partial quote entry never implies
+  marketing consent.
 - `/api/sng-webhooks`: receives Sweep & Go webhook events directly into D1.
 - `/admin/`: shows the D1 website inbox plus current Sweep & Go clients, leads,
   dispatch-board jobs, the Sweep & Go event stream, forward-looking business
@@ -147,6 +152,32 @@ closed unless the request supplies `SNG_WEBHOOK_SECRET` in the
 query parameter. Sweep & Go's token configuration uses the query-parameter form
 because it does not expose custom webhook headers. Use a high-entropy value and
 URL-encode it when configuring the provider.
+
+## Quote-funnel owner email
+
+Quote leads, questions, waitlist requests, successful SNG onboarding, and failed
+SNG onboarding create transactional owner-email records in D1. Status is always
+one of `queued`, `sending`, `sent`, `failed`, or `cancelled`; the application only
+uses `sent` after the provider returns a message ID. The hourly recovery job
+retries eligible failures with bounded backoff.
+
+The adapter targets Cloudflare Email Service. Set the non-secret Worker variables
+`OWNER_NOTIFICATION_EMAIL`, `EMAIL_FROM`, and `EMAIL_FROM_NAME`, onboard
+`ohiopetwastepros.com` as a sending domain, and add this binding after Cloudflare
+Email Sending is active for the account:
+
+```jsonc
+"send_email": [
+  {
+    "name": "EMAIL",
+    "allowed_destination_addresses": ["Craig@ohiopetwastepros.com"],
+    "allowed_sender_addresses": ["website@ohiopetwastepros.com"]
+  }
+]
+```
+
+Until the binding is active, notifications remain truthfully queued and the
+protected `/admin/system-health/` page reports `delivery binding pending`.
 
 ## Dog-food URL warning
 

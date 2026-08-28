@@ -1,10 +1,11 @@
-import { convertAbandonedQuote, getDb, markSubmissionSynced, saveSubmission } from "@/lib/db";
+import { beginOnboardingSubmission, convertAbandonedQuote, getDb, markSubmissionSynced } from "@/lib/db";
 import { recommendOnboardingRoute, saveOnboardingRouteAssignment } from "@/lib/route-intelligence";
 import { ensureFreshAirtableCockpitSnapshot } from "@/lib/airtable";
 import { getRuntimeEnv } from "@/lib/cloudflare";
 import { sngRequest, toOnboardingPayload } from "@/lib/sweepandgo";
 import { protectJsonRequest } from "@/lib/public-api-security";
 import { validateOnboardingInput } from "@/lib/public-input";
+import { queueSubmissionNotificationSafe } from "@/lib/submission-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,13 @@ export async function POST(request) {
   if (!validation.ok) return Response.json({ ok: false, error: validation.error }, { status: 400 });
   const body = validation.value;
 
-  const saved = await saveSubmission({ kind: "onboarding", source: "website", body });
+  const saved = await beginOnboardingSubmission({ body, funnelId: body.funnel_id });
+  if (saved.completed) {
+    return Response.json({ configured: true, stored: true, ok: true, status: 200, idempotent: true });
+  }
+  if (!saved.claimed) {
+    return Response.json({ ok: false, error: "This signup is already being processed. Please wait a moment before retrying." }, { status: 409 });
+  }
   let routeAssignment = null;
   try {
     const db = getDb();
@@ -36,11 +43,21 @@ export async function POST(request) {
   });
 
   await markSubmissionSynced(saved.id, upstream.data, upstream.ok);
-  if (upstream.ok || !upstream.configured) await convertAbandonedQuote({ email: body.email, phone: body.cell_phone_number });
-  return Response.json({
+  if (upstream.ok) await convertAbandonedQuote({ email: body.email, phone: body.cell_phone_number, funnelId: body.funnel_id });
+  await queueSubmissionNotificationSafe({
+    submissionId: saved.id,
+    type: upstream.ok ? "onboarding_succeeded" : "onboarding_failed",
+    body,
+    providerStatus: upstream.ok ? "customer created" : upstream.configured ? `failed (${upstream.status || "provider error"})` : "not configured",
+  });
+  const responseBody = {
     configured: upstream.configured,
     stored: saved.configured,
     ok: upstream.ok,
     status: upstream.status,
-  });
+    error: upstream.ok ? undefined : upstream.configured
+      ? "Sweep & Go could not create the account. Nothing was charged; please retry or contact us."
+      : "Account setup is temporarily unavailable. Nothing was charged; please contact us.",
+  };
+  return Response.json(responseBody, { status: upstream.ok ? 200 : upstream.configured ? 502 : 503 });
 }

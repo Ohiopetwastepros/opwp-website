@@ -2,6 +2,7 @@ import { markSubmissionSynced, saveSubmission } from "@/lib/db";
 import { sngRequest } from "@/lib/sweepandgo";
 import { protectJsonRequest } from "@/lib/public-api-security";
 import { validateWaitlistInput } from "@/lib/public-input";
+import { queueSubmissionNotificationSafe } from "@/lib/submission-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ export async function POST(request) {
   });
 
   await markSubmissionSynced(saved.id, upstream.data, upstream.ok);
+  await queueSubmissionNotificationSafe({ submissionId: saved.id, type: "waitlist", body, providerStatus: upstream.ok ? "accepted" : "failed" });
   return Response.json({
     configured: upstream.configured,
     stored: saved.configured,

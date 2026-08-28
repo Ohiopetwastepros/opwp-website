@@ -27,7 +27,10 @@
     "APP_ENV": "production",
     "SITE_ORIGIN": "https://ohiopetwastepros.com",
     "WORKER_ORIGIN": "https://opwp-website.ohiopetwastepros.workers.dev",
-    "TURNSTILE_HOSTNAMES": "ohiopetwastepros.com,www.ohiopetwastepros.com,opwp-website.ohiopetwastepros.workers.dev"
+    "TURNSTILE_HOSTNAMES": "ohiopetwastepros.com,www.ohiopetwastepros.com,opwp-website.ohiopetwastepros.workers.dev",
+    "OWNER_NOTIFICATION_EMAIL": "Craig@ohiopetwastepros.com",
+    "EMAIL_FROM": "website@ohiopetwastepros.com",
+    "EMAIL_FROM_NAME": "Ohio Pet Waste Pros Website"
   },
   "observability": {
     "enabled": true,
