@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TurnstileWidget from "@/components/TurnstileWidget";
 import {
   PRICING, YARD_TIERS, CHARGE_LABEL,
@@ -14,17 +14,18 @@ const SNG_PAY_URL  = "https://client.sweepandgo.com/ohio-pet-waste-pros-qkr3c/re
 // Areas we service — mirrors the "Areas To Clean" options enabled in Sweep & Go.
 const AREA_OPTIONS = [
   "Back Yard", "Behind Shed", "Kids Play Area",
-  "Area With Mulch", "Area With Rocks", "Pool Area", "Area With Pine Straw",
+  "Area with Mulch", "Area with Rocks", "Pool Area", "Area With Pine Straw",
 ];
+const GATE_OPTIONS = [["left", "Left side"], ["right", "Right side"], ["alley", "Alley"], ["no_gate", "No gate"], ["other", "Other"]];
+const GARBAGE_CAN_OPTIONS = [["left", "Left side"], ["right", "Right side"], ["alley", "Alley"], ["other", "Other"]];
 const HEARD_ABOUT = [
-  { id: "google_search",   label: "Google Search" },
-  { id: "google_maps",     label: "Google Maps" },
-  { id: "facebook",        label: "Facebook / Social Media" },
-  { id: "nextdoor",        label: "Nextdoor" },
-  { id: "friend_referral", label: "Friend or Neighbor" },
-  { id: "door_hanger",     label: "Door Hanger / Flyer" },
-  { id: "yard_sign",       label: "Yard Sign" },
-  { id: "other",           label: "Other" },
+  { id: "search_engine", label: "Google / Search Engine" },
+  { id: "previous_client", label: "Previous Customer" },
+  { id: "referred_by_family_or_friend", label: "Friend or Neighbor" },
+  { id: "social_media", label: "Facebook / Social Media" },
+  { id: "vehicle_signage", label: "Vehicle or Yard Sign" },
+  { id: "gift_certificate", label: "Gift Certificate" },
+  { id: "other", label: "Other" },
 ];
 
 // ── Shared styles ──────────────────────────────────────────────────────────
@@ -101,8 +102,6 @@ export default function QuoteForm() {
   const [areasOpen,           setAreasOpen]           = useState(false);
   // Notifications are auto-set (no longer asked on the form):
   // "Job completed (with photo)" delivered by text — the completion photo is proof of service.
-  const notifMessage = "job_completed";
-  const notifType    = "text";
   const [heardAbout,          setHeardAbout]          = useState("");
   const [additionalComments,  setAdditionalComments]  = useState("");
   const [termsAgreed,         setTermsAgreed]         = useState(false);
@@ -135,6 +134,39 @@ export default function QuoteForm() {
   const [onboardTurnstileReset, setOnboardTurnstileReset] = useState(0);
   const [funnelId, setFunnelId] = useState("");
   const [partialRetry, setPartialRetry] = useState(0);
+  const signupFormRef = useRef(null);
+
+  // Browsers can visually autofill controlled inputs without firing React's
+  // change event. Sync the real control values so validation matches the UI.
+  const syncSignupAutofill = useCallback(() => {
+    const form = signupFormRef.current;
+    if (!form) return;
+    const sync = (name, current, setter, transform = (value) => value) => {
+      const control = form.elements.namedItem(name);
+      if (!control || typeof control.value !== "string") return;
+      const value = transform(control.value);
+      // Autofill sync may run during the step transition before React has
+      // painted the controlled value. Never let that transient blank erase it.
+      if (value && value !== current) setter(value);
+    };
+    sync("first_name", firstName, setFirstName);
+    sync("last_name", lastName, setLastName);
+    sync("email", email, setEmail);
+    sync("home_address", address, setAddress);
+    sync("city", city, setCity);
+    sync("state", usState, setUsState, (value) => value.toUpperCase().slice(0, 2));
+  }, [firstName, lastName, email, address, city, usState]);
+
+  useEffect(() => {
+    if (step !== 2) return undefined;
+    const timers = [50, 250, 750, 1500].map((delay) => window.setTimeout(syncSignupAutofill, delay));
+    const onFocus = () => window.setTimeout(syncSignupAutofill, 0);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      timers.forEach(window.clearTimeout);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [step, syncSignupAutofill]);
 
   useEffect(() => {
     const storageKey = "opwp_quote_funnel_id";
@@ -308,19 +340,17 @@ export default function QuoteForm() {
     coupon:           coupon || undefined,
     marketing_allowed: marketingConsent ? 1 : 0,
     terms_open_api:   termsAgreed ? 1 : 0,
-    tracking_field:   heardAbout || "Website Instant Quote",
+    tracking_field:   heardAbout,
     // Dog info
     "dog_name[]":     [dogName || ""],
     "safe_dog[]":     [safeDog],
     "dog_comment[]":  [dogComment || ""],
     // Internal metadata saved in D1 and included in Sweep & Go account notes where supported.
     gate_location:    gateLocation,
-    gate_code:        gateCode || undefined,
-    has_doggie_door:  doggieDoor,
+    gated_community:  gateCode || undefined,
+    doggie_door:      doggieDoor || undefined,
     garbage_can_location: garbageCan,
     areas_to_clean:   areasToClean,
-    notification_message: notifMessage,
-    notification_type:    notifType,
     account_note:     buildAccountNote() || undefined,
     // Yard / pricing meta
     yard_size_tier:          yardSize,
@@ -756,11 +786,11 @@ export default function QuoteForm() {
           {/* Phone + email + consent — required before the quote is revealed */}
           <div style={{ marginBottom: "16px" }}>
             <label style={lbl}>Cell Phone Number {req}</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="(419) 000-0000" style={inp} />
+            <input name="phone" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} onInput={(e) => setPhone(e.currentTarget.value)} inputMode="tel" placeholder="(419) 000-0000" style={inp} />
           </div>
           <div style={{ marginBottom: "16px" }}>
             <label style={lbl}>Email Address {req}</label>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@example.com" style={inp} />
+            <input name="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} onInput={(e) => setEmail(e.currentTarget.value)} type="email" placeholder="you@example.com" style={inp} />
           </div>
           <div style={{ background: "#f6f8f9", borderRadius: "10px", padding: "11px 13px", marginBottom: "12px", fontSize: "11.5px", color: "#687680", lineHeight: 1.5 }}>
             We may securely save your phone, email, and ZIP so we can help finish an interrupted quote. This service follow-up does not enroll you in marketing.
@@ -969,7 +999,7 @@ export default function QuoteForm() {
   // STEP 2 — Complete Signup
   // ══════════════════════════════════════════════════════════════════════
   return (
-    <div style={{ background: "#fff", borderRadius: "22px", padding: "34px", boxShadow: "0 30px 60px -28px rgba(0,0,0,.5)" }}>
+    <form ref={signupFormRef} onSubmit={(event) => event.preventDefault()} onInput={syncSignupAutofill} autoComplete="on" style={{ background: "#fff", borderRadius: "22px", padding: "34px", boxShadow: "0 30px 60px -28px rgba(0,0,0,.5)" }}>
       <StepBar />
 
       <button type="button" onClick={() => setStep(1)} style={{
@@ -994,29 +1024,29 @@ export default function QuoteForm() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
         <div>
           <label style={lbl}>First Name {req}</label>
-          <input value={firstName} onChange={(e) => setFirstName(e.target.value)} style={inp} />
+          <input name="first_name" autoComplete="given-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} style={inp} />
         </div>
         <div>
           <label style={lbl}>Last Name {req}</label>
-          <input value={lastName} onChange={(e) => setLastName(e.target.value)} style={inp} />
+          <input name="last_name" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)} style={inp} />
         </div>
       </div>
       <div style={{ marginBottom: "14px" }}>
         <label style={lbl}>Email Address {req}</label>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@example.com" style={inp} />
+        <input name="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@example.com" style={inp} />
       </div>
       <div style={{ marginBottom: "14px" }}>
         <label style={lbl}>Home Address {req}</label>
-        <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St" style={inp} />
+        <input name="home_address" autoComplete="street-address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St" style={inp} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 100px", gap: "14px", marginBottom: "22px" }}>
         <div>
           <label style={lbl}>City {req}</label>
-          <input value={city} onChange={(e) => setCity(e.target.value)} style={inp} />
+          <input name="city" autoComplete="address-level2" value={city} onChange={(e) => setCity(e.target.value)} style={inp} />
         </div>
         <div>
           <label style={lbl}>State {req}</label>
-          <input value={usState} onChange={(e) => setUsState(e.target.value.toUpperCase())} maxLength={2} style={{ ...inp, textTransform: "uppercase" }} />
+          <input name="state" autoComplete="address-level1" value={usState} onChange={(e) => setUsState(e.target.value.toUpperCase())} maxLength={2} style={{ ...inp, textTransform: "uppercase" }} />
         </div>
       </div>
 
@@ -1031,7 +1061,7 @@ export default function QuoteForm() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "8px" }}>
           {[
             ["yes",      "Yes — completely safe"],
-            ["indoors",  "No — keep indoors during service"],
+            ["no",       "No — keep indoors during service"],
           ].map(([val, label]) => (
             <Btn key={val} active={safeDog === val} onClick={() => setSafeDog(val)}>{label}</Btn>
           ))}
@@ -1046,7 +1076,10 @@ export default function QuoteForm() {
       <div style={secHead()}>Property Access</div>
       <div style={{ marginBottom: "14px" }}>
         <label style={lbl}>Where is your gate located? {req}</label>
-        <input value={gateLocation} onChange={(e) => setGateLocation(e.target.value)} placeholder="e.g. Left side of house" style={inp} />
+        <select value={gateLocation} onChange={(e) => setGateLocation(e.target.value)} style={inp}>
+          <option value="">Select…</option>
+          {GATE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
         <div>
@@ -1064,7 +1097,10 @@ export default function QuoteForm() {
       </div>
       <div style={{ marginBottom: "14px" }}>
         <label style={lbl}>Where is the garbage can located? {req}</label>
-        <input value={garbageCan} onChange={(e) => setGarbageCan(e.target.value)} placeholder="e.g. Right side of house" style={inp} />
+        <select value={garbageCan} onChange={(e) => setGarbageCan(e.target.value)} style={inp}>
+          <option value="">Select…</option>
+          {GARBAGE_CAN_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
       </div>
       <div style={{ marginBottom: "22px", position: "relative" }}>
         <label style={{ ...lbl, marginBottom: "10px" }}>Which areas should we clean? {opt}</label>
@@ -1152,6 +1188,6 @@ export default function QuoteForm() {
       <div style={{ textAlign: "center", fontSize: "12px", color: "#9aa6ae", marginTop: "12px" }}>
         Next step: payment setup on Sweep &amp; Go · 🔒 Secure
       </div>
-    </div>
+    </form>
   );
 }

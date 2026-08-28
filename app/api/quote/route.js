@@ -13,7 +13,7 @@ export async function GET(request) {
   const lastCleaned = searchParams.get("last_cleaned") || "one_month";
 
   const dogCount = Number(dogs);
-  if (!/^\d{5}$/.test(zip ?? "") || !Number.isInteger(dogCount) || dogCount < 1 || dogCount > 20 || !["twice_a_week", "once_a_week", "bi_weekly", "monthly", "one_time"].includes(String(frequency))) {
+  if (!/^\d{5}$/.test(zip ?? "") || !Number.isInteger(dogCount) || dogCount < 1 || dogCount > 7 || !["twice_a_week", "once_a_week", "every_other_week", "bi_weekly", "once_a_month", "monthly", "one_time"].includes(String(frequency))) {
     return Response.json({ configured: false, error: "Need valid zip, dogs, and frequency" }, { status: 400 });
   }
 

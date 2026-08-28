@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildSubmissionNotification, escapeEmailHtml, normalizeFunnelId, normalizeFunnelStage } from "../lib/quote-funnel.mjs";
-import { normalizeHowHeard, validSngHowHeardValues } from "../lib/sng-onboarding.mjs";
+import {
+  OPWP_SNG_FORM_OPTIONS,
+  normalizeHowHeard,
+  repeatDogValue,
+  selectedSngCrossSells,
+  validSngHowHeardValues,
+} from "../lib/sng-onboarding.mjs";
+import { validateOnboardingInput } from "../lib/public-input.js";
 
 test("funnel IDs and stages fail closed", () => {
   assert.equal(normalizeFunnelId("short"), "");
@@ -14,6 +21,55 @@ test("website attribution values map to documented Sweep & Go enums", () => {
   const inputs = ["google_search", "google_maps", "facebook", "nextdoor", "friend_referral", "door_hanger", "yard_sign", "other"];
   for (const input of inputs) assert.equal(validSngHowHeardValues.has(normalizeHowHeard(input)), true, input);
   assert.equal(normalizeHowHeard("unexpected"), "other");
+});
+
+test("OPWP onboarding choices match the configured Sweep & Go enums", () => {
+  assert.deepEqual(OPWP_SNG_FORM_OPTIONS.safeDog, ["yes", "no"]);
+  assert.deepEqual(OPWP_SNG_FORM_OPTIONS.gateLocations, ["left", "right", "alley", "no_gate", "other"]);
+  assert.deepEqual(OPWP_SNG_FORM_OPTIONS.garbageCanLocations, ["left", "right", "alley", "other"]);
+  assert.equal(OPWP_SNG_FORM_OPTIONS.areasToClean.includes("Area with Mulch"), true);
+  assert.equal(OPWP_SNG_FORM_OPTIONS.areasToClean.includes("Area With Mulch"), false);
+});
+
+test("multi-dog fields stay index-aligned and add-ons use OPWP cross-sell IDs", () => {
+  assert.deepEqual(repeatDogValue(["Dixie"], 3, { firstOnly: true }), ["Dixie", "", ""]);
+  assert.deepEqual(repeatDogValue(["no"], 3), ["no", "no", "no"]);
+  assert.deepEqual(selectedSngCrossSells(["front_yard", "haul_away", "food_blue"]), {
+    ids: [2851, 3200],
+    names: "Add Front Yard Scooping,Haul Away Service",
+  });
+});
+
+test("onboarding validation rejects values Sweep & Go cannot accept", () => {
+  const valid = {
+    funnel_id: "1234567890abcdef",
+    first_name: "Test",
+    last_name: "Customer",
+    email: "test@example.com",
+    cell_phone_number: "4195550100",
+    home_address: "123 Main St",
+    city: "Toledo",
+    state: "OH",
+    zip_code: "43604",
+    number_of_dogs: 2,
+    clean_up_frequency: "once_a_week",
+    last_time_yard_was_thoroughly_cleaned: "one_month",
+    initial_cleanup_required: 1,
+    marketing_allowed: 0,
+    terms_open_api: 1,
+    tracking_field: "search_engine",
+    "dog_name[]": ["Dixie"],
+    "safe_dog[]": ["yes"],
+    "dog_comment[]": [""],
+    gate_location: "left",
+    garbage_can_location: "right",
+    areas_to_clean: ["Back Yard"],
+    selected_addons: ["front_yard"],
+  };
+  assert.equal(validateOnboardingInput(valid).ok, true);
+  assert.equal(validateOnboardingInput({ ...valid, gate_location: "behind the shed" }).ok, false);
+  assert.equal(validateOnboardingInput({ ...valid, "safe_dog[]": ["indoors"] }).ok, false);
+  assert.equal(validateOnboardingInput({ ...valid, areas_to_clean: ["Area With Mulch"] }).ok, false);
 });
 
 test("owner notification escapes untrusted lead content", () => {
