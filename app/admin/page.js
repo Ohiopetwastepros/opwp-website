@@ -238,6 +238,7 @@ export default async function AdminPage({ searchParams }) {
           <RailItem icon="P" label="Route Partner" href="/admin/route-partner/" />
           <div className={styles.railSection}>Growth</div>
           <RailItem icon="↗" label="Growth" href="/admin/?view=scorecard" active={view === "scorecard"} />
+          <RailItem icon="Q" label="Quote Funnel" href="/admin/quote-funnel/" />
           <RailItem icon="D" label="Dog Food" href="/admin/dog-food/" />
           <div className={styles.railSection}>Systems</div>
           <RailItem icon="S" label="Systems & Integrations" href="/admin/system-health/" active={view === "systems"} />
