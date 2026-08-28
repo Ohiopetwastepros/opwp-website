@@ -330,9 +330,10 @@ independent SNG-lead, Outlook-email, and Quo-SMS delivery state.
 
 The Quo adapter is implemented against the official API. It remains fail-safe
 and visibly queued unless `SMS_PROVIDER=quo`, `QUO_API_KEY`, and
-`QUO_FROM_NUMBER` are present. No provider call is retried automatically inside
-one request, preventing duplicate messages; bounded scheduled attempts use the
-per-channel delivery record. Pending recovery is cancelled automatically when
+`QUO_FROM_NUMBER` are present. Non-idempotent SNG lead creation and Quo message
+calls are not retried automatically, preventing duplicate leads or texts after
+an ambiguous provider timeout; a failed channel remains visible for manual
+review. Pending recovery is cancelled automatically when
 the corresponding customer begins Sweep & Go onboarding.
 
 ## Deployment roles and cutover
