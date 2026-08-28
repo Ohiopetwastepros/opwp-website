@@ -1156,6 +1156,7 @@ export default function QuoteForm() {
       </label>
 
       {/* Error */}
+      <div style={{ fontSize: "12px", fontWeight: 700, color: "#63727c", marginBottom: "7px" }}>Security verification</div>
       <TurnstileWidget action="onboarding" onToken={setOnboardTurnstileToken} resetKey={onboardTurnstileReset} />
       {submitError && (
         <div style={{ background: "#fff5f4", border: "1.5px solid #f1c9c5", borderRadius: "12px", padding: "14px 16px", marginBottom: "18px", fontSize: "13.5px", color: "#8a3b36", lineHeight: 1.5 }}>

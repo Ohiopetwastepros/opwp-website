@@ -4,6 +4,7 @@ import { buildSubmissionNotification, escapeEmailHtml, normalizeFunnelId, normal
 import {
   OPWP_SNG_FORM_OPTIONS,
   normalizeHowHeard,
+  publicOnboardingFailure,
   repeatDogValue,
   selectedSngCrossSells,
   validSngHowHeardValues,
@@ -98,4 +99,17 @@ test("partial quote follow-up requires explicit scoped consent", () => {
   assert.equal(accepted.value.follow_up_allowed, true);
   assert.equal(accepted.value.follow_up_consent_version, "quote_service_sms_v1");
   assert.equal(accepted.value.marketing_consent, false);
+});
+
+test("onboarding failures distinguish an existing SNG account without exposing provider details", () => {
+  assert.deepEqual(publicOnboardingFailure({
+    configured: true,
+    data: { error: "A client with this email has already been onboarded." },
+  }), {
+    code: "account_exists",
+    message: "An account already exists for this email. Nothing was charged. Please use Client Login or contact us for help with the existing account.",
+  });
+  const other = publicOnboardingFailure({ configured: true, data: { error: "Internal provider detail" } });
+  assert.equal(other.code, "provider_rejected");
+  assert.equal(other.message.includes("Internal provider detail"), false);
 });

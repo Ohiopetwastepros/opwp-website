@@ -6,6 +6,7 @@ import { sngRequest, toOnboardingPayload } from "@/lib/sweepandgo";
 import { protectJsonRequest } from "@/lib/public-api-security";
 import { validateOnboardingInput } from "@/lib/public-input";
 import { queueSubmissionNotificationSafe } from "@/lib/submission-notifications";
+import { publicOnboardingFailure } from "@/lib/sng-onboarding.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -50,14 +51,14 @@ export async function POST(request) {
     body,
     providerStatus: upstream.ok ? "customer created" : upstream.configured ? `failed (${upstream.status || "provider error"})` : "not configured",
   });
+  const failure = upstream.ok ? null : publicOnboardingFailure(upstream);
   const responseBody = {
     configured: upstream.configured,
     stored: saved.configured,
     ok: upstream.ok,
     status: upstream.status,
-    error: upstream.ok ? undefined : upstream.configured
-      ? "Sweep & Go could not create the account. Nothing was charged; please retry or contact us."
-      : "Account setup is temporarily unavailable. Nothing was charged; please contact us.",
+    errorCode: failure?.code,
+    error: failure?.message,
   };
   return Response.json(responseBody, { status: upstream.ok ? 200 : upstream.configured ? 502 : 503 });
 }
