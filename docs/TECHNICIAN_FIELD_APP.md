@@ -24,7 +24,7 @@ Checkpoint: July 20, 2026
 - Sweep & Go remains the scooping system of record. Its dispatched work is imported and its completed-job state is used to validate scoop completion.
 - The app does not create dog-food subscriptions in Sweep & Go.
 - On-the-way notifications are safely queued in `route_partner_notification_outbox`. A texting provider still needs to be connected before queued messages are actually sent.
-- Cloudflare R2 is not enabled on the current account. Proof images therefore use the bounded D1 fallback (maximum upload 1.25 MB after browser compression). Add an optional `FIELD_PROOFS` R2 binding before broad multi-business rollout.
+- Production uses the private `opwp-field-proofs` R2 bucket through the `FIELD_PROOFS` binding. The bounded D1 fallback (maximum upload 1.25 MB after browser compression) remains available for local testing and emergencies.
 
 ## First live test
 

@@ -2,19 +2,19 @@ import Link from "next/link";
 import GalleryCarousel from "@/components/GalleryCarousel";
 
 export const metadata = {
-  title: "Dog Poop Removal in Toledo, Sylvania & Perrysburg | Ohio Pet Waste Pros",
+  title: { absolute: "Dog Poop Removal Toledo, OH | Ohio Pet Waste Pros" },
   description:
-    "Ohio Pet Waste Pros is a family-owned pet waste removal service in Toledo, Sylvania, Perrysburg & SE Michigan. Weekly & bi-weekly pooper scooper service near you — gate photos, double-bagging, eco-friendly sanitizing. Pricing depends on how many dogs you have and how often you'd like service — get your exact price with our instant quote.",
+    "Family-owned dog poop removal in Toledo, Sylvania and Perrysburg. Weekly, biweekly and one-time yard cleanups with gate photos. Get a free quote.",
   alternates: { canonical: "/" },
   robots: { index: true, follow: true },
   openGraph: {
     type: "website",
-    title: "Dog Poop Removal in Toledo, Sylvania & Perrysburg | Ohio Pet Waste Pros",
+    title: "Dog Poop Removal Toledo, OH | Ohio Pet Waste Pros",
     description:
       "Family-owned dog waste removal in Greater Toledo & SE Michigan. Gate photos, hauled-away waste, eco-friendly sanitizing. Get your exact price with our instant quote.",
     url: "https://ohiopetwastepros.com/",
     siteName: "Ohio Pet Waste Pros",
-    images: ["https://ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png"],
+    images: ["https://ohiopetwastepros.com/assets/photos/hero-craig-driveway.webp"],
   },
   twitter: { card: "summary_large_image" },
   other: {
@@ -108,7 +108,10 @@ export default function HomePage() {
             <div style={{ display: "inline-flex", alignItems: "center", gap: 9, border: "1px solid rgba(255,255,255,.22)", borderRadius: 99, padding: "7px 15px", fontSize: 12.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#cdd8e2", marginBottom: 24 }}>
               <span style={{ color: "#E7A734" }}>★★★★★</span> Toledo · Sylvania · Perrysburg · SE Michigan
             </div>
-            <h1 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: 57, lineHeight: 0.99, letterSpacing: "-0.025em", margin: "0 0 22px" }}>The chore you can finally stop doing.</h1>
+            <h1 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: "clamp(43px,5vw,57px)", lineHeight: 0.99, letterSpacing: "-0.025em", margin: "0 0 22px" }}>
+              <span style={{ display: "block", color: "#9bd57e", fontSize: ".42em", lineHeight: 1.2, letterSpacing: ".02em", marginBottom: 12 }}>Dog poop removal in Greater Toledo</span>
+              The chore you can finally stop doing.
+            </h1>
             <p style={{ fontSize: 19, lineHeight: 1.55, color: "#c4d2df", margin: "0 0 34px", maxWidth: 500 }}>Ohio Pet Waste Pros is your local, family-run pooper scooper service. Reliable weekly cleanups, a gate photo after every visit, double-bagged waste, and eco-friendly sanitizing and deodorizing — so your yard stays clean, safe, and ready to enjoy.</p>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 30 }}>
               <Link href="/free-quote/" prefetch={false} className="hov-cta" style={{ background: "#397D2D", color: "#fff", textDecoration: "none", padding: "16px 30px", borderRadius: 11, fontWeight: 800, fontSize: 16.5, boxShadow: "0 12px 26px -10px rgba(57,125,45,.7)" }}>Build My Plan — Free Quote</Link>
@@ -122,7 +125,7 @@ export default function HomePage() {
             </div>
           </div>
           <div style={{ position: "relative" }}>
-            <img src="/assets/photos/hero-craig-driveway-640.webp" srcSet="/assets/photos/hero-craig-driveway-360.webp 360w, /assets/photos/hero-craig-driveway-640.webp 640w, /assets/photos/hero-craig-driveway-800.webp 800w" sizes="(max-width: 768px) calc(100vw - 56px), 520px" alt="Ohio Pet Waste Pros technician with scooping equipment in a Toledo-area driveway" width="1238" height="1400" fetchPriority="high" decoding="async" style={{ width: "100%", aspectRatio: "4/5", objectFit: "cover", borderRadius: 22, boxShadow: "0 30px 60px -26px rgba(0,0,0,.6)" }} />
+            <img src="/assets/photos/hero-craig-driveway-640.webp" srcSet="/assets/photos/hero-craig-driveway-360.webp 360w, /assets/photos/hero-craig-driveway-640.webp 640w, /assets/photos/hero-craig-driveway-800.webp 800w" sizes="(max-width: 768px) calc(100vw - 56px), 520px" alt="Ohio Pet Waste Pros technician with scooping equipment in a Toledo-area driveway" width="1238" height="1400" fetchPriority="high" decoding="async" style={{ width: "100%", height: "auto", objectFit: "cover", borderRadius: 22, boxShadow: "0 30px 60px -26px rgba(0,0,0,.6)" }} />
           </div>
         </div>
       </section>
@@ -173,7 +176,7 @@ export default function HomePage() {
       <section style={{ background: "#fff", padding: "84px 0" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px", display: "grid", gridTemplateColumns: "0.95fr 1.05fr", gap: 56, alignItems: "center" }} className="opwp-gsplit">
           <div style={{ position: "relative" }}>
-            <img src="/assets/photos/team-new-sign-360.webp" srcSet="/assets/photos/team-new-sign-360.webp 360w, /assets/photos/team-new-sign.webp 440w" sizes="(max-width: 768px) calc(100vw - 56px), 500px" alt="The family team behind Ohio Pet Waste Pros with their We Scoop Dog Poop sign" width="440" height="586" loading="lazy" decoding="async" style={{ width: "100%", aspectRatio: "5/6", objectFit: "cover", borderRadius: 22, boxShadow: "0 24px 48px -24px rgba(20,48,74,.4)" }} />
+            <img src="/assets/photos/team-new-sign-360.webp" srcSet="/assets/photos/team-new-sign-360.webp 360w, /assets/photos/team-new-sign.webp 440w" sizes="(max-width: 768px) calc(100vw - 56px), 500px" alt="The family team behind Ohio Pet Waste Pros with their We Scoop Dog Poop sign" width="440" height="586" loading="lazy" decoding="async" style={{ width: "100%", height: "auto", objectFit: "cover", borderRadius: 22, boxShadow: "0 24px 48px -24px rgba(20,48,74,.4)" }} />
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#4D6F49", marginBottom: 12 }}>Family-run &amp; dog-loving</div>

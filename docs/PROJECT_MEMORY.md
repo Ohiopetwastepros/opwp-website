@@ -156,7 +156,7 @@ Pipedream is not required for this flow. Keep old Pipedream workflows paused unt
 - Route release now creates a shift, required truck load, food-payment gate, and inventory requirements. The field workflow records mileage, breaks, arrivals, task state, food proof/placement, inventory disposition, and route closeout.
 - Scoop tasks require a second validation against Sweep & Go completion. Management route control now exposes CRM validation and field exception approval/denial.
 - The repeatable local two-stop field simulation passes all authenticated operations, including private photo upload/readback and inventory closeout.
-- Cloudflare R2 is not enabled on the account, so the initial release uses compressed D1 proof storage capped at 1.25 MB. Connect R2 before broad rollout.
+- Cloudflare R2 was enabled on 2026-08-28. Production proof images use the private `opwp-field-proofs` bucket through the `FIELD_PROOFS` binding; compressed D1 proof storage remains the bounded local/emergency fallback.
 - Customer texts are recorded in the notification outbox but are not sent until a messaging provider is connected.
 - Full workflow and test handoff: `docs/TECHNICIAN_FIELD_APP.md`.
 

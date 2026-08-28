@@ -250,6 +250,12 @@ Create the private proof-photo bucket and bind it before production:
 The D1 fallback remains available for local testing and emergencies, but the
 System Health page will show yellow until R2 is active.
 
+Production status (2026-08-28): the `opwp-field-proofs` Standard R2 bucket is
+active and bound privately as `FIELD_PROOFS`. The `OPWP Production Forms`
+Turnstile widget is active for the public domain and Worker hostname; its public
+site key is supplied by `.env.production`, while its secret is stored only as
+the `TURNSTILE_SECRET_KEY` Worker secret.
+
 Apply migrations only after reviewing the remote pending list. The historical
 duplicate `0022` filenames must not be renamed because D1 tracks applied
 migration filenames. Run `npm run check:migrations` before every deployment,
