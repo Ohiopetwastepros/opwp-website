@@ -8,6 +8,12 @@ service follow-up. That consent is versioned and timestamped in D1. It permits
 the abandoned-quote follow-up workflow but is not forwarded to Sweep & Go as
 blanket promotional-marketing consent.
 
+Customer abandoned-quote follow-up is scheduled 10 minutes after capture. As
+soon as a visitor submits completed onboarding, the queued customer follow-up is
+cancelled before the Sweep & Go account-creation call. Owner notification email
+is a separate operational alert and must not be represented as a customer
+follow-up message.
+
 ## Audited OPWP selections
 
 The following selections were verified against OPWP's live Sweep & Go registration-form configuration on August 28, 2026:
@@ -27,6 +33,17 @@ The UI can use friendlier internal frequency and yard-history names. `lib/sweepa
 For multiple dogs, the single simple safety answer is repeated for every dog because Sweep & Go expects index-aligned dog arrays. The supplied dog name and notes are assigned to the first dog; remaining entries are intentionally blank.
 
 Selected service add-ons use OPWP's current Sweep & Go cross-sell IDs. Dog-food products remain outside Sweep & Go's residential service cross-sells and retain their existing checkout workflow.
+
+## Card choice
+
+The signup asks whether the customer wants to add a card now. Sweep & Go's
+official onboarding API documents card token fields as optional, so selecting
+**No, I have a question first** requires a bounded question, creates the SNG
+account without card data, adds the question to the account note, and stops
+before payment. Selecting **Yes** creates the account and sends the customer to
+the secure Sweep & Go client portal; the OPWP website never collects or stores
+full card details. The former generic SNG registration handoff must not be used
+after account creation because it can start a duplicate registration.
 
 ## Drift check
 

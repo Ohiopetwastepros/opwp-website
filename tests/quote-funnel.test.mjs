@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSubmissionNotification, escapeEmailHtml, normalizeFunnelId, normalizeFunnelStage } from "../lib/quote-funnel.mjs";
+import { buildSubmissionNotification, escapeEmailHtml, normalizeFunnelId, normalizeFunnelStage, PARTIAL_QUOTE_FOLLOW_UP_DELAY_MINUTES } from "../lib/quote-funnel.mjs";
 import {
   OPWP_SNG_FORM_OPTIONS,
   normalizeHowHeard,
@@ -66,6 +66,7 @@ test("onboarding validation rejects values Sweep & Go cannot accept", () => {
     garbage_can_location: "right",
     areas_to_clean: ["Back Yard"],
     selected_addons: ["front_yard"],
+    card_choice: "yes",
   };
   assert.equal(validateOnboardingInput(valid).ok, true);
   assert.equal(validateOnboardingInput({ ...valid, gate_location: "behind the shed" }).ok, false);
@@ -99,6 +100,25 @@ test("partial quote follow-up requires explicit scoped consent", () => {
   assert.equal(accepted.value.follow_up_allowed, true);
   assert.equal(accepted.value.follow_up_consent_version, "quote_service_sms_v1");
   assert.equal(accepted.value.marketing_consent, false);
+});
+
+test("partial quote customer follow-up waits ten minutes", () => {
+  assert.equal(PARTIAL_QUOTE_FOLLOW_UP_DELAY_MINUTES, 10);
+});
+
+test("no-card onboarding requires a question but still validates for account creation", () => {
+  const base = {
+    funnel_id: "1234567890abcdef", first_name: "Test", last_name: "Customer", email: "test@example.com",
+    cell_phone_number: "4195550100", home_address: "123 Main St", city: "Toledo", state: "OH", zip_code: "43604",
+    number_of_dogs: 1, clean_up_frequency: "once_a_week", last_time_yard_was_thoroughly_cleaned: "one_month",
+    initial_cleanup_required: 1, marketing_allowed: 0, terms_open_api: 1, tracking_field: "search_engine",
+    "dog_name[]": [""], "safe_dog[]": ["yes"], "dog_comment[]": [""], gate_location: "left",
+    garbage_can_location: "right", areas_to_clean: ["Back Yard"], selected_addons: [], card_choice: "no",
+  };
+  assert.equal(validateOnboardingInput(base).ok, false);
+  const accepted = validateOnboardingInput({ ...base, service_question: "Can you confirm my first service day?" });
+  assert.equal(accepted.ok, true);
+  assert.equal(accepted.value.card_choice, "no");
 });
 
 test("onboarding failures distinguish an existing SNG account without exposing provider details", () => {

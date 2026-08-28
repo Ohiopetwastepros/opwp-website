@@ -9,7 +9,7 @@ import {
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const ORG_PHONE    = "(419) 262-2371";
-const SNG_PAY_URL  = "https://client.sweepandgo.com/ohio-pet-waste-pros-qkr3c/register";
+const SNG_CLIENT_URL = "https://client.sweepandgo.com/login";
 
 // Areas we service — mirrors the "Areas To Clean" options enabled in Sweep & Go.
 const AREA_OPTIONS = [
@@ -103,6 +103,8 @@ export default function QuoteForm() {
   // "Job completed (with photo)" delivered by text — the completion photo is proof of service.
   const [heardAbout,          setHeardAbout]          = useState("");
   const [additionalComments,  setAdditionalComments]  = useState("");
+  const [cardChoice,          setCardChoice]          = useState("");
+  const [serviceQuestion,     setServiceQuestion]     = useState("");
   const [termsAgreed,         setTermsAgreed]         = useState(false);
 
   // ── OOA lead capture ────────────────────────────────────────────────────
@@ -301,7 +303,7 @@ export default function QuoteForm() {
     email.trim().includes("@") &&
     address.trim() && city.trim() && usState.trim() &&
     safeDog && gateLocation.trim() && garbageCan.trim() &&
-    heardAbout && termsAgreed;
+    heardAbout && cardChoice && (cardChoice !== "no" || serviceQuestion.trim()) && termsAgreed;
 
   // ── Build account note ──────────────────────────────────────────────────
   const buildAccountNote = () => {
@@ -317,6 +319,9 @@ export default function QuoteForm() {
     }
     if (additionalComments.trim()) {
       parts.push(additionalComments.trim());
+    }
+    if (cardChoice === "no" && serviceQuestion.trim()) {
+      parts.push(`Payment setup: Customer requested contact before adding a card. Question: ${serviceQuestion.trim()}`);
     }
     return parts.join(" ");
   };
@@ -359,6 +364,8 @@ export default function QuoteForm() {
     quoted_monthly_total:    monthlyTotal,
     route_monthly_revenue:   monthly,
     selected_addons:         Object.keys(selected).filter((k) => selected[k]),
+    card_choice:             cardChoice,
+    service_question:        cardChoice === "no" ? serviceQuestion : undefined,
     funnel_id:               funnelId,
   });
 
@@ -383,7 +390,7 @@ export default function QuoteForm() {
         setStep("done-manual");
       } else if (j.ok) {
         // Account created in SNG → redirect to payment
-        setStep("done");
+        setStep(cardChoice === "no" ? "done-question" : "done");
       } else {
         setSubmitError(
           `Something went wrong on our end. Please call or text ${ORG_PHONE} and we'll get you set up right away.`
@@ -462,10 +469,10 @@ export default function QuoteForm() {
           Almost done, {firstName}!
         </div>
         <p style={{ fontSize: "15px", color: "#46545d", lineHeight: 1.6, marginBottom: "22px" }}>
-          Your account is set up. One last step — add your payment method to confirm your service start date.
+          Your account is set up. Continue to Sweep &amp; Go&apos;s secure client portal to complete card setup. Ohio Pet Waste Pros never receives or stores your full card number.
         </p>
         <a
-          href={SNG_PAY_URL}
+          href={SNG_CLIENT_URL}
           className="hov-cta"
           style={{
             display: "block", textAlign: "center", textDecoration: "none",
@@ -475,10 +482,24 @@ export default function QuoteForm() {
             boxShadow: "0 14px 28px -12px rgba(79,158,58,.7)",
           }}
         >
-          Set Up Autopay →
+          Open Secure Client Portal →
         </a>
         <p style={{ fontSize: "12.5px", color: "#9aa6ae", marginTop: "14px" }}>
           Powered by Sweep &amp; Go · No charge until service begins
+        </p>
+      </div>
+    );
+  }
+
+  if (step === "done-question") {
+    return (
+      <div style={{ background: "#fff", borderRadius: "22px", padding: "40px 34px", boxShadow: "0 30px 60px -28px rgba(0,0,0,.5)", textAlign: "center" }}>
+        <div style={{ fontSize: "48px", marginBottom: "12px" }}>✓</div>
+        <div style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: "26px", color: "#1A3C5A", marginBottom: "10px" }}>
+          Your account is created, {firstName}.
+        </div>
+        <p style={{ fontSize: "15px", color: "#46545d", lineHeight: 1.6, marginBottom: "14px" }}>
+          We received your question and did not collect any card information. We&apos;ll contact you before service begins to answer it and complete secure payment setup.
         </p>
       </div>
     );
@@ -1129,6 +1150,26 @@ export default function QuoteForm() {
       </div>
 
       {/* ── How heard + comments ── */}
+      <div style={{ marginBottom: "22px" }}>
+        <label style={lbl}>A card on file is required before service can start. Would you like to add one now? {req}</label>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+          <Btn active={cardChoice === "yes"} onClick={() => { setCardChoice("yes"); setServiceQuestion(""); }}>Yes</Btn>
+          <Btn active={cardChoice === "no"} onClick={() => setCardChoice("no")}>No, I have a question first</Btn>
+        </div>
+        {cardChoice === "no" && (
+          <div style={{ marginTop: "12px" }}>
+            <label style={lbl}>What would you like to ask before adding a card? {req}</label>
+            <textarea
+              value={serviceQuestion}
+              onChange={(event) => setServiceQuestion(event.target.value)}
+              maxLength={1500}
+              placeholder="Enter your question and we'll contact you before service begins."
+              style={{ ...inp, resize: "vertical", minHeight: "88px" }}
+            />
+          </div>
+        )}
+      </div>
+
       <div style={{ marginBottom: "14px" }}>
         <label style={lbl}>How did you hear about us? {req}</label>
         <select value={heardAbout} onChange={(e) => setHeardAbout(e.target.value)} style={inp}>

@@ -1,4 +1,4 @@
-import { beginOnboardingSubmission, convertAbandonedQuote, getDb, markSubmissionSynced } from "@/lib/db";
+import { beginOnboardingSubmission, cancelAbandonedQuoteFollowUp, convertAbandonedQuote, getDb, markSubmissionSynced } from "@/lib/db";
 import { recommendOnboardingRoute, saveOnboardingRouteAssignment } from "@/lib/route-intelligence";
 import { ensureFreshAirtableCockpitSnapshot } from "@/lib/airtable";
 import { getRuntimeEnv } from "@/lib/cloudflare";
@@ -24,6 +24,9 @@ export async function POST(request) {
   if (!saved.claimed) {
     return Response.json({ ok: false, error: "This signup is already being processed. Please wait a moment before retrying." }, { status: 409 });
   }
+  // Once onboarding is submitted, this is no longer an abandoned quote.
+  // Cancel customer follow-up before Sweep & Go can create the account.
+  await cancelAbandonedQuoteFollowUp({ email: body.email, funnelId: body.funnel_id });
   let routeAssignment = null;
   try {
     const db = getDb();
@@ -57,6 +60,8 @@ export async function POST(request) {
     stored: saved.configured,
     ok: upstream.ok,
     status: upstream.status,
+    cardChoice: body.card_choice,
+    requiresManualPaymentFollowup: upstream.ok && body.card_choice === "no",
     errorCode: failure?.code,
     error: failure?.message,
   };
