@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "build:cloudflare": "opennextjs-cloudflare build && node scripts/patch-open-next-worker.mjs",
+    "check:worker-startup": "wrangler check startup",
     "preview": "opennextjs-cloudflare build && node scripts/patch-open-next-worker.mjs && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && node scripts/patch-open-next-worker.mjs && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv",
@@ -29,7 +30,7 @@
     "react-dom": "19.0.0"
   },
   "devDependencies": {
-    "wrangler": "4.122.0"
+    "wrangler": "4.127.0"
   },
   "overrides": {
     "brace-expansion": "5.0.9",
