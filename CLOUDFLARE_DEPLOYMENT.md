@@ -94,8 +94,10 @@ have all been tested on the Workers preview URL.
 - `/api/lead`: stores or updates abandoned quotes and questions directly in D1.
   Sweep & Go does not document an endpoint for creating an in-area partial lead,
   so D1 is the private pre-conversion funnel and Sweep & Go remains the CRM and
-  customer system of record after conversion. Partial quote entry never implies
-  marketing consent.
+  customer system of record after conversion. A partial quote requires explicit
+  consent for automated messages about that requested quote and stores the
+  disclosure version and server timestamp. This scoped follow-up permission is
+  not treated as blanket promotional-marketing consent.
 - `/api/sng-webhooks`: receives Sweep & Go webhook events directly into D1.
 - `/admin/`: shows the D1 website inbox plus current Sweep & Go clients, leads,
   dispatch-board jobs, the Sweep & Go event stream, forward-looking business
@@ -290,7 +292,8 @@ the `TURNSTILE_SECRET_KEY` Worker secret.
 Apply migrations only after reviewing the remote pending list. The historical
 duplicate `0022` filenames must not be renamed because D1 tracks applied
 migration filenames. Run `npm run check:migrations` before every deployment,
-then apply `0030_production_hardening.sql`.
+then apply all pending migrations. `0032_quote_follow_up_sms.sql` adds the
+consent-backed, status-tracked partial-quote SMS follow-up queue.
 
 ## Notification provider
 
@@ -298,7 +301,9 @@ No production SMS provider is claimed by this repository. Queued records remain
 queued until a provider confirms acceptance. `SMS_PROVIDER` defaults to
 `unconfigured`. `QUO_API_BASE_URL`, `QUO_API_TOKEN`, and `QUO_SENDER_ID`
 are reserved for a future Quo adapter after the API contract and credentials are
-available.
+available. Partial-quote records in `quote_follow_ups` remain visibly `queued`;
+they are cancelled automatically when the corresponding customer completes
+Sweep & Go onboarding and are never marked `sent` without provider confirmation.
 
 ## Deployment roles and cutover
 

@@ -8,7 +8,7 @@ import {
   selectedSngCrossSells,
   validSngHowHeardValues,
 } from "../lib/sng-onboarding.mjs";
-import { validateOnboardingInput } from "../lib/public-input.js";
+import { validateLeadInput, validateOnboardingInput } from "../lib/public-input.js";
 
 test("funnel IDs and stages fail closed", () => {
   assert.equal(normalizeFunnelId("short"), "");
@@ -82,4 +82,20 @@ test("owner notification escapes untrusted lead content", () => {
   assert.equal(content.html.includes("&lt;script&gt;"), true);
   assert.equal(content.text.includes("A & B"), true);
   assert.equal(escapeEmailHtml('"<&'), "&quot;&lt;&amp;");
+});
+
+test("partial quote follow-up requires explicit scoped consent", () => {
+  const partial = {
+    source: "partial_quote",
+    funnel_id: "1234567890abcdef",
+    email: "test@example.com",
+    phone: "4195550100",
+    zip: "43604",
+  };
+  assert.equal(validateLeadInput(partial).ok, false);
+  const accepted = validateLeadInput({ ...partial, follow_up_consent: true });
+  assert.equal(accepted.ok, true);
+  assert.equal(accepted.value.follow_up_allowed, true);
+  assert.equal(accepted.value.follow_up_consent_version, "quote_service_sms_v1");
+  assert.equal(accepted.value.marketing_consent, false);
 });

@@ -2,6 +2,12 @@
 
 The website creates residential accounts through Sweep & Go's authenticated `PUT /api/v1/residential/onboarding` API. The website remains the customer-facing quote UI; Sweep & Go remains the CRM and operational account system.
 
+The instant price remains hidden until the visitor supplies a valid phone and
+email and explicitly agrees to automated messages about the requested quote and
+service follow-up. That consent is versioned and timestamped in D1. It permits
+the abandoned-quote follow-up workflow but is not forwarded to Sweep & Go as
+blanket promotional-marketing consent.
+
 ## Audited OPWP selections
 
 The following selections were verified against OPWP's live Sweep & Go registration-form configuration on August 28, 2026:

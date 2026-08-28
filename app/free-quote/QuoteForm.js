@@ -77,8 +77,7 @@ export default function QuoteForm() {
   const [yardSize,   setYardSize]   = useState(null);   // YARD_TIERS id
   const [coupon,     setCoupon]     = useState("");
   const [phone,      setPhone]      = useState("");
-  const [consent,    setConsent]    = useState(false);
-  const [marketingConsent, setMarketingConsent] = useState(false);
+  const [followupConsent, setFollowupConsent] = useState(false);
   const [selected,   setSelected]   = useState({});     // add-on ids
   const [showExtras, setShowExtras] = useState(false);
   const [showCoupon, setShowCoupon] = useState(false);
@@ -248,7 +247,7 @@ export default function QuoteForm() {
   const yardSizeSelected = frequency === "one_time" || yardSize !== null;
   const phoneReady = phone.replace(/\D/g, "").length >= 10;
   const emailReady = email.trim().includes("@");
-  const canContinue = inArea && consent
+  const canContinue = inArea && followupConsent
     && phoneReady && emailReady
     && (frequency === "one_time" || !notOffered)
     && yardSizeSelected;
@@ -259,7 +258,7 @@ export default function QuoteForm() {
   useEffect(() => {
     if (step !== 1 && step !== 2) return;
     const lifecycleStage = step === 2 ? "details_started" : "quote_viewed";
-    if (!funnelId || !inArea || !phoneReady || !emailReady || leadStageRef.current === lifecycleStage) return;
+    if (!funnelId || !inArea || !phoneReady || !emailReady || !followupConsent || leadStageRef.current === lifecycleStage) return;
     let cancelled = false;
     const capture = async () => {
       try {
@@ -269,6 +268,7 @@ export default function QuoteForm() {
           body: JSON.stringify({
             source: "partial_quote", funnel_id: funnelId, lifecycle_stage: lifecycleStage,
             zip: zipClean, phone, email,
+            follow_up_consent: true,
             dogs, frequency, last_cleaned: lastCleaned, yard_size: yardSize,
             quote_monthly: monthlyTotal,
             selected_addons: Object.keys(selected).filter((key) => selected[key]),
@@ -284,7 +284,7 @@ export default function QuoteForm() {
     };
     capture();
     return () => { cancelled = true; };
-  }, [funnelId, inArea, phoneReady, emailReady, zipClean, phone, email, dogs, frequency, lastCleaned, yardSize, monthlyTotal, selected, coupon, step, partialRetry]);
+  }, [funnelId, inArea, phoneReady, emailReady, followupConsent, zipClean, phone, email, dogs, frequency, lastCleaned, yardSize, monthlyTotal, selected, coupon, step, partialRetry]);
 
   // If the dog count pushes the current frequency past its cap (e.g. Monthly + 2 dogs),
   // fall back to Weekly so the form never sits on a disabled option.
@@ -338,7 +338,8 @@ export default function QuoteForm() {
     last_time_yard_was_thoroughly_cleaned: lastCleaned,
     initial_cleanup_required: ["one_week","two_weeks","three_weeks","one_month","two_months","3_4_months"].includes(lastCleaned) ? 1 : 0,
     coupon:           coupon || undefined,
-    marketing_allowed: marketingConsent ? 1 : 0,
+    // Quote-follow-up consent is not blanket promotional-marketing consent.
+    marketing_allowed: 0,
     terms_open_api:   termsAgreed ? 1 : 0,
     tracking_field:   heardAbout,
     // Dog info
@@ -792,20 +793,13 @@ export default function QuoteForm() {
             <label style={lbl}>Email Address {req}</label>
             <input name="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} onInput={(e) => setEmail(e.currentTarget.value)} type="email" placeholder="you@example.com" style={inp} />
           </div>
-          <div style={{ background: "#f6f8f9", borderRadius: "10px", padding: "11px 13px", marginBottom: "12px", fontSize: "11.5px", color: "#687680", lineHeight: 1.5 }}>
-            We may securely save your phone, email, and ZIP so we can help finish an interrupted quote. This service follow-up does not enroll you in marketing.
-          </div>
           <label style={{ display: "flex", gap: "10px", alignItems: "flex-start", fontSize: "12px", lineHeight: 1.5, color: "#7c8891", marginBottom: "22px", cursor: "pointer" }}>
-            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: "2px", width: "16px", height: "16px", accentColor: "#4F9E3A" }} />
-            <span>I agree to receive transactional service messages about this quote, scheduling, and service at the phone number provided. Message &amp; data rates may apply.</span>
-          </label>
-          <label style={{ display: "flex", gap: "10px", alignItems: "flex-start", fontSize: "12px", lineHeight: 1.5, color: "#7c8891", marginBottom: "22px", cursor: "pointer" }}>
-            <input type="checkbox" checked={marketingConsent} onChange={(e) => setMarketingConsent(e.target.checked)} style={{ marginTop: "2px", width: "16px", height: "16px", accentColor: "#4F9E3A" }} />
-            <span>Optional: I also consent to marketing messages from Ohio Pet Waste Pros. Message frequency may vary; reply STOP to opt out.</span>
+            <input type="checkbox" checked={followupConsent} onChange={(e) => setFollowupConsent(e.target.checked)} style={{ marginTop: "2px", width: "16px", height: "16px", accentColor: "#4F9E3A" }} />
+            <span>I agree to receive automated text messages from Ohio Pet Waste Pros about my requested quote and service follow-up at the number provided. Message frequency varies. Message &amp; data rates may apply. Reply STOP to opt out.</span>
           </label>
 
-          {/* Price panel — revealed only after phone + email are entered */}
-          {inArea && phoneReady && emailReady && (
+          {/* Price panel — revealed after contact details and explicit quote-follow-up consent. */}
+          {inArea && phoneReady && emailReady && followupConsent && (
             <div style={{ background: "#F6F5EF", border: "1.5px solid #e9e6da", borderRadius: "16px", padding: "20px 22px", marginBottom: "22px" }}>
               {frequency === "one_time" ? (
                 <>
@@ -890,7 +884,7 @@ export default function QuoteForm() {
             : !inArea           ? "Enter a ZIP in our service area"
             : !phoneReady       ? "Enter your phone number to continue"
             : !emailReady       ? "Enter your email to continue"
-            : !consent          ? "Check the box to continue"
+            : !followupConsent  ? "Agree to quote follow-up to see your price"
             : !yardSizeSelected ? "Select your yard size to continue"
             : notOffered        ? "Try Weekly or 2×/week"
             :                     "See your quote & sign up →"}

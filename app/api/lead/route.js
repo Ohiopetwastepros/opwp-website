@@ -1,4 +1,4 @@
-import { saveSubmission, upsertPartialQuoteSubmission } from "@/lib/db";
+import { queuePartialQuoteFollowUp, saveSubmission, upsertPartialQuoteSubmission } from "@/lib/db";
 import { queueSubmissionNotificationSafe } from "@/lib/submission-notifications";
 import { protectJsonRequest, verifyTurnstile } from "@/lib/public-api-security";
 import { validateLeadInput } from "@/lib/public-input";
@@ -16,6 +16,7 @@ export async function POST(request) {
   }
 
   const isPartial = validation.value.source === "partial_quote";
+  if (isPartial) validation.value.follow_up_consent_at = new Date().toISOString();
   const saved = isPartial && validation.value.funnel_id
     ? await upsertPartialQuoteSubmission({ body: validation.value, funnelId: validation.value.funnel_id, lifecycleStage: validation.value.lifecycle_stage })
     : await saveSubmission({
@@ -27,5 +28,8 @@ export async function POST(request) {
         lifecycleStage: isPartial ? validation.value.lifecycle_stage : "details_started",
       });
   const notification = await queueSubmissionNotificationSafe({ submissionId: saved.id, type: isPartial ? "partial_quote" : "question", body: validation.value });
-  return Response.json({ ok: true, stored: saved.configured, id: saved.id, notification: notification.status });
+  const smsFollowup = isPartial
+    ? await queuePartialQuoteFollowUp({ submissionId: saved.id, phone: validation.value.phone, consentAt: validation.value.follow_up_consent_at })
+    : null;
+  return Response.json({ ok: true, stored: saved.configured, id: saved.id, notification: notification.status, smsFollowup: smsFollowup?.status || null });
 }
