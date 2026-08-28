@@ -2,43 +2,27 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifyAdminRequest } from "@/lib/admin-auth";
-import { listQuoteFunnel } from "@/lib/db";
+import { listGrowthDesk } from "@/lib/growth-desk";
+import GrowthDeskClient from "./GrowthDeskClient";
+import styles from "./growth-desk.module.css";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Quote Funnel | OPWP", robots: { index: false, follow: false, nocache: true } };
+export const metadata = { title: "YardOps Pipeline | OPWP", robots: { index: false, follow: false, nocache: true } };
 
-const cell = { padding: "10px 12px", borderBottom: "1px solid #e3e8e9", textAlign: "left", verticalAlign: "top", fontSize: 13 };
-
-function followupConsent(row) {
-  try {
-    const payload = JSON.parse(row.payload || "{}");
-    if (!payload.follow_up_consent) return { label: "No", at: "" };
-    return { label: "Yes", at: payload.follow_up_consent_at || payload.follow_up_consent_version || "recorded" };
-  } catch {
-    return { label: "Unknown", at: "" };
-  }
-}
-
-export default async function QuoteFunnelPage() {
+export default async function GrowthDeskPage() {
   const auth = await verifyAdminRequest(await headers());
   if (!auth.authorized) redirect("/admin/login/?next=/admin/quote-funnel/");
-  const funnel = await listQuoteFunnel(300);
-  const rows = funnel.rows;
-  const counts = {
-    open: rows.filter((row) => row.kind === "partial_quote" && row.status === "follow_up_pending").length,
-    converted: rows.filter((row) => row.lifecycle_stage === "converted").length,
-    customers: rows.filter((row) => row.kind === "onboarding" && row.sng_sync_state === "succeeded").length,
-    attention: rows.filter((row) => row.status === "needs_attention" || String(row.notifications || "").includes(":failed")).length,
-  };
-  return <main style={{ maxWidth: 1320, margin: "0 auto", padding: "34px 22px 70px", fontFamily: "system-ui,sans-serif", color: "#17384f" }}>
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}><Link href="/admin/">← Executive cockpit</Link><Link href="/admin/system-health/">System health →</Link></div>
-    <h1 style={{ color: "#1a3c5a", marginBottom: 6 }}>Website quote funnel</h1>
-    <p style={{ color: "#667680", marginTop: 0 }}>Private pre-conversion leads, questions, waitlist requests, and completed Sweep &amp; Go customer creation.</p>
-    <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12, margin: "24px 0" }}>
-      {[["Open partial quotes", counts.open], ["Converted partials", counts.converted], ["SNG customers created", counts.customers], ["Needs attention", counts.attention]].map(([label, value]) => <article key={label} style={{ padding: 18, border: "1px solid #dce4e6", borderRadius: 12, background: "#fff" }}><small style={{ color: "#697b86", fontWeight: 700 }}>{label}</small><strong style={{ display: "block", marginTop: 8, fontSize: 28 }}>{value}</strong></article>)}
-    </section>
-    <div style={{ overflowX: "auto", border: "1px solid #dce4e6", borderRadius: 12, background: "#fff" }}><table style={{ width: "100%", borderCollapse: "collapse" }}><thead><tr>{["Last activity","Stage","Contact","ZIP","Quote follow-up","Recovery deliveries","SNG","Owner email"].map((label) => <th key={label} style={{ ...cell, color: "#5a6b75", fontSize: 11, textTransform: "uppercase" }}>{label}</th>)}</tr></thead><tbody>
-      {rows.length ? rows.map((row) => { const consent = followupConsent(row); return <tr key={row.id}><td style={cell}>{row.last_activity_at || row.created_at}</td><td style={cell}><strong>{row.kind}</strong><br /><small>{row.lifecycle_stage || row.status}</small></td><td style={cell}>{row.name || "Name pending"}<br />{row.email || "—"}<br />{row.phone || "—"}</td><td style={cell}>{row.zip || "—"}</td><td style={cell}>{consent.label}<br /><small>{consent.at}</small></td><td style={cell}>{row.followup_deliveries || "not queued"}</td><td style={cell}>{row.sng_sync_state || "not attempted"}{row.sng_entity_id ? <><br /><small>ID {row.sng_entity_id}</small></> : null}</td><td style={cell}>{row.notifications || "handled by SNG"}</td></tr>; }) : <tr><td style={cell} colSpan={8}>No website funnel activity yet.</td></tr>}
-    </tbody></table></div>
+  const desk = await listGrowthDesk(300);
+  return <main className={`${styles.workspace} opwp-admin-shell`}>
+    <div className={styles.wrap}>
+      <nav className={styles.topLinks}><Link href="/admin/">← Executive cockpit</Link><Link href="/admin/system-health/">System health →</Link></nav>
+      <header className={styles.header}>
+        <div><div className={styles.eyebrow}>OPWP lead operations</div><h1 className={styles.title}>YardOps Pipeline</h1><p className={styles.subtitle}>Turn website interest into clean yards and recurring routes, with every quote, follow-up, next action, note, and Sweep &amp; Go result in one private OPWP workspace.</p></div>
+        <aside className={styles.safety}><strong>Quote-safe by design.</strong><br />Office stages and notes are stored separately. This screen cannot change public pricing, customer consent, the ten-minute recovery schedule, or the onboarding payload.</aside>
+      </header>
+      {desk.configured
+        ? <GrowthDeskClient initialLeads={desk.leads} currentAdmin={auth.email} />
+        : <section className={styles.panel} style={{ marginTop: 24 }}><div className={styles.empty}>YardOps Pipeline storage is not configured in this environment.</div></section>}
+    </div>
   </main>;
 }

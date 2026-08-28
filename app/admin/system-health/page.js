@@ -17,7 +17,7 @@ export default async function SystemHealthPage() {
     <Link href="/admin/">← Executive cockpit</Link>
     <h1 style={{ color: "#1a3c5a", marginBottom: 6 }}>System Health</h1>
     <p style={{ color: "#667680", marginTop: 0 }}>Safe operational metadata only. Generated {health.generatedAt}.</p>
-    <p><Link href="/admin/quote-funnel/">Open website quote funnel →</Link></p>
+    <p><Link href="/admin/quote-funnel/">Open YardOps Pipeline →</Link></p>
     <div style={{ display: "grid", gap: 12 }}>
       {health.rows.map((row) => <section key={row.name} style={{ border: "1px solid #dce4e6", borderRadius: 12, padding: 18, background: "#fff" }}>
         <div style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
