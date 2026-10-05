@@ -63,9 +63,9 @@ export const PRICING = {
     { id: "food_red", name: "Dog Food - Red Bag (40 lb)", price: 59, charge: "product", desc: "High-performance formula for very active dogs." },
   ],
 
-  // Authoritative service-area ZIPs (42). Out-of-area -> waitlist lead, no account.
+  // Authoritative service-area ZIPs (41). Out-of-area -> waitlist lead, no account.
   serviceZips: [
-    "43402", "43403", "43412", "43414", "43416", "43460", "43465", "43504",
+    "43402", "43403", "43412", "43414", "43460", "43465", "43504",
     "43515", "43525", "43528", "43537", "43542", "43547", "43551", "43552",
     "43558", "43560", "43565", "43566", "43571", "43601", "43604", "43605",
     "43606", "43607", "43608", "43609", "43610", "43611", "43612", "43613",
