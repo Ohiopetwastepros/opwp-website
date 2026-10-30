@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TurnstileWidget from "@/components/TurnstileWidget";
+import MonthlyPriceBreakdown from "./MonthlyPriceBreakdown";
 import {
   PRICING, YARD_TIERS, CHARGE_LABEL,
   isInArea, haulAwayPrice, calcLocalQuote,
@@ -843,34 +844,10 @@ export default function QuoteForm() {
                 </>
               ) : (
                 <>
-                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "10px" }}>
-                    <div>
-                      <span style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: "38px", color: "#1A3C5A", lineHeight: 1 }}>
-                        {monthlyTotal != null ? money(monthlyTotal) : "—"}
-                      </span>
-                      <span style={{ fontSize: "15px", color: "#7c8891", fontWeight: 700 }}>/mo</span>
-                    </div>
-                    {base.perVisit != null && (
-                      <div style={{ fontSize: "13px", color: "#7c8891", textAlign: "right" }}>
-                        {money(base.perVisit)}/visit<br />
-                        <span style={{ fontSize: "12px" }}>{base.visits} visits/mo</span>
-                      </div>
-                    )}
-                  </div>
-                  {yardUpcharge > 0 && (
-                    <div style={{ marginTop: "8px", fontSize: "12.5px", color: "#4F9E3A" }}>
-                      Includes {yardTier?.label} yard upcharge (+${yardUpcharge}/mo)
-                    </div>
-                  )}
-                  {yardIsXL && (
-                    <div style={{ marginTop: "8px", fontSize: "12.5px", color: "#7c8891" }}>
-                      Yard upcharge to be confirmed for properties over 3/4 acre.
-                    </div>
-                  )}
-                  {monthlyAddons.length > 0 && (
-                    <div style={{ marginTop: "10px", fontSize: "12.5px", color: "#6f7686", borderTop: "1px dashed #ddd9cc", paddingTop: "10px" }}>
-                      Base {money(baseMonthly)}/mo
-                      {monthlyAddons.map((a) => <span key={a.id}>{" + "}{money(a.price)} {a.name.toLowerCase()}</span>)}
+                  <MonthlyPriceBreakdown {...{ baseMonthly, yardTier, yardUpcharge, monthlyAddons, monthlyTotal, money }} />
+                  {baseMonthly != null && base.visits && (
+                    <div style={{ marginTop: "10px", fontSize: "12.5px", color: "#64717a" }}>
+                      Base service: {money(baseMonthly / base.visits)}/visit ({base.visits} visits/mo), before yard upcharge and extras.
                     </div>
                   )}
                   {base.initialRange && (
@@ -1028,9 +1005,11 @@ export default function QuoteForm() {
       {monthlyTotal != null && frequency !== "one_time" && (
         <div style={{ background: "#f3f9f0", border: "1.5px solid #c8e0be", borderRadius: "12px", padding: "14px 16px", marginBottom: "22px", fontSize: "13.5px", color: "#36424b" }}>
           <strong style={{ color: "#1A3C5A" }}>Your plan: </strong>
-          {PRICING.frequencies.find((f) => f.id === frequency)?.name} · {dogs} dog{dogs > 1 ? "s" : ""}{" "}
-          · <strong>{money(monthlyTotal)}/mo</strong>
-          {base.initialRange && <span> + initial cleanup est. {rngStr(base.initialRange)}</span>}
+          {PRICING.frequencies.find((f) => f.id === frequency)?.name} · {dogs} dog{dogs > 1 ? "s" : ""}
+          <div style={{ marginTop: "14px" }}>
+            <MonthlyPriceBreakdown {...{ baseMonthly, yardTier, yardUpcharge, monthlyAddons, monthlyTotal, money }} compact />
+          </div>
+          {base.initialRange && <div style={{ marginTop: "10px" }}>Plus a one-time initial cleanup, est. {rngStr(base.initialRange)}.</div>}
         </div>
       )}
 
