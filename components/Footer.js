@@ -5,7 +5,7 @@ export default function Footer() {
     <div data-opwp-footer style={{ fontFamily: "var(--font-hanken), sans-serif", background: "#14304A", color: "#aebecd" }}>
       <div
         className="opwp-gfoot"
-        style={{ maxWidth: 1200, margin: "0 auto", padding: "60px 28px 30px", display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1.2fr", gap: 40 }}
+        style={{ maxWidth: 1200, margin: "0 auto", padding: "60px 28px 30px", display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1.2fr", gap: 40, overflowWrap: "anywhere" }}
       >
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
@@ -45,7 +45,8 @@ export default function Footer() {
             <Link href="/about-our-pet-waste-removal-team/" style={{ textDecoration: "none", color: "#aebecd" }}>About Us</Link>
             <Link href="/contact/" style={{ textDecoration: "none", color: "#aebecd" }}>Contact</Link>
             <Link href="/blog/" style={{ textDecoration: "none", color: "#aebecd" }}>Blog</Link>
-            <a href="https://client.sweepandgo.com/login" style={{ textDecoration: "none", color: "#aebecd" }}>Client Login</a>
+            <Link href="/dog-food/account/" style={{ textDecoration: "none", color: "#D7E9F7", fontWeight: 700 }}>Dog Food Sign In</Link>
+            <a href="https://client.sweepandgo.com/login" style={{ textDecoration: "none", color: "#aebecd" }}>Scooping Client Login</a>
             <Link href="/free-quote/" style={{ textDecoration: "none", color: "#8fe06a", fontWeight: 700 }}>Get a Free Quote</Link>
           </div>
         </div>

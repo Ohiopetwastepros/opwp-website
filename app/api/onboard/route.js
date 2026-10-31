@@ -7,6 +7,7 @@ import { protectJsonRequest } from "@/lib/public-api-security";
 import { validateOnboardingInput } from "@/lib/public-input";
 import { queueSubmissionNotificationSafe } from "@/lib/submission-notifications";
 import { publicOnboardingFailure } from "@/lib/sng-onboarding.mjs";
+import { completeInboxHandoff } from "@/lib/lead-handoff";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export async function POST(request) {
 
   const saved = await beginOnboardingSubmission({ body, funnelId: body.funnel_id });
   if (saved.completed) {
+    try { await completeInboxHandoff(getDb(), saved.id); } catch { console.error(JSON.stringify({ event: 'lead_signup_handoff_reconciliation_pending' })); }
     return Response.json({ configured: true, stored: true, ok: true, status: 200, idempotent: true });
   }
   if (!saved.claimed) {
@@ -48,6 +50,9 @@ export async function POST(request) {
 
   await markSubmissionSynced(saved.id, upstream.data, upstream.ok);
   if (upstream.ok) await convertAbandonedQuote({ email: body.email, phone: body.cell_phone_number, funnelId: body.funnel_id });
+  if (upstream.ok) {
+    try { await completeInboxHandoff(getDb(), saved.id); } catch { console.error(JSON.stringify({ event: 'lead_signup_handoff_reconciliation_pending' })); }
+  }
   if (!upstream.ok) await queueSubmissionNotificationSafe({
     submissionId: saved.id,
     type: "onboarding_failed",

@@ -62,10 +62,22 @@ const nextConfig = {
       source: "/:path*",
       headers: [
         { key: "X-Content-Type-Options", value: "nosniff" },
-        { key: "X-Frame-Options", value: "SAMEORIGIN" },
-        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         { key: "Permissions-Policy", value: "camera=(self), geolocation=(self), microphone=()" },
         { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+      ],
+    }, {
+      source: "/field/sw.js",
+      headers: [{key:"Service-Worker-Allowed",value:"/field/"},{key:"Cache-Control",value:"no-cache"}],
+    }, {
+      source: "/field/app/:path*",
+      headers: [{key:"Permissions-Policy",value:"camera=(self), geolocation=(self), microphone=(self)"},{key:"X-Robots-Tag",value:"noindex, nofollow"},{key:"Referrer-Policy",value:"no-referrer"}],
+    }, {
+      // Admin middleware owns these headers so global defaults cannot be
+      // appended to (and weaken) its DENY / no-referrer policies.
+      source: "/:path((?!field/app(?:/|$)|admin(?:/|$)|api/admin(?:/|$)|dog-food/account(?:/|$)|api/dog-food/(?:account|session|order)(?:/|$)).*)",
+      headers: [
+        { key: "X-Frame-Options", value: "SAMEORIGIN" },
+        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       ],
     }];
   },

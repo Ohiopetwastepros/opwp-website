@@ -1,12 +1,9 @@
-# OPWP Repository Instructions
+# Repository requirements
 
-Security is a release requirement for every change in this repository.
-
-- Read `docs/SECURITY_BASELINE.md` before changing authentication, APIs, databases, uploads, payments, webhooks, integrations, or infrastructure.
-- Treat browser input, URL identifiers, headers, cookies, webhook payloads, and third-party responses as untrusted.
-- Enforce authentication, record ownership, organization scope, role permissions, prices, feature access, and payment state on the server.
-- Add abuse controls and bounded inputs to every public, login, upload, or expensive endpoint.
-- Keep secrets out of source and frontend bundles. Use Cloudflare secrets and ignored local environment files.
-- Fail closed when security configuration is absent or invalid.
-- Before handoff, run the production build, dependency audit, relevant security tests, and `git diff --check`.
-- Do not deploy with unresolved critical or high-severity security findings.
+- Preserve source-system ownership, current pricing, authorization, and production behavior.
+- Keep credentials and operational records out of public source and browser assets.
+- Follow `docs/PRIVATE_BUILD_INPUTS.md`; production SQL and inputs remain private and byte-verified.
+- Never substitute synthetic inputs or test schemas for production records.
+- Run the dependency audit, relevant tests, production build, and whitespace checks before handoff.
+- Release through `npm run deploy -- --summary "..."` only after CI and security gates pass. Do not bypass locks or guards.
+- Database migrations require separate authorization and are not part of website deployment.

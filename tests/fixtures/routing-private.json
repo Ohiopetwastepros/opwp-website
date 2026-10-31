@@ -1,0 +1,11 @@
+{
+  "depotAddress": "123 Example Depot Road, Example City, OH 43551",
+  "ownerVerifiedRouteDates": [
+    "2027-09-02",
+    "2027-09-03",
+    "2027-09-04",
+    "2027-09-06"
+  ],
+  "performancePolicy": "Fabricated fixture measurement policy; no actual employee route history.",
+  "profitabilityPolicy": "Fabricated fixture profitability policy; no real staffing history."
+}

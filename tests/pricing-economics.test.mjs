@@ -21,7 +21,7 @@ test("uses loaded labor and fixed costs when the margin floor is higher", () => 
   assert.equal(result.recommendedPrice, 100);
 });
 
-test("applies payroll burden to Tony only and allocates overhead by crew time", () => {
+test("applies payroll burden to primary technician only and allocates overhead by crew time", () => {
   const result = calculateJobPrice({
     technicianWages: [30, 20], jobMinutes: 60, burdenPercent: 12,
     burdenedTechnicianIndex: 0, fixedOverheadPerCrewHour: 10,

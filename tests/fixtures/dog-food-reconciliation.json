@@ -1,0 +1,5 @@
+[
+  {"kind":"reconciliation","id":"synthetic-invoice","message":"Synthetic purchase reconciliation requires review.","sourceTable":"Sales"},
+  {"kind":"reconciliation","id":"synthetic-history","message":"Synthetic inventory history requires review.","sourceTable":"Sales"},
+  {"kind":"reconciliation","id":"synthetic-product","message":"Synthetic product loss requires review.","sourceTable":"Products"}
+]

@@ -1,0 +1,39 @@
+ALTER TABLE dog_food_ops_state ADD COLUMN collector_name TEXT NOT NULL DEFAULT __OPWP_PRIVATE_B021__;
+ALTER TABLE dog_food_ops_state ADD COLUMN collector_phone TEXT;
+ALTER TABLE dog_food_ops_state ADD COLUMN collector_verified_at TEXT;
+ALTER TABLE dog_food_ops_state ADD COLUMN collector_enabled INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE dog_food_ops_state ADD COLUMN weekdays_only INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE dog_food_ops_state ADD COLUMN collector_webhook_id TEXT;
+ALTER TABLE dog_food_ops_state ADD COLUMN collector_reply_mode TEXT NOT NULL DEFAULT 'manual' CHECK(collector_reply_mode IN ('manual','automatic'));
+ALTER TABLE dog_food_ops_alerts ADD COLUMN channel TEXT NOT NULL DEFAULT 'email';
+ALTER TABLE dog_food_ops_alerts ADD COLUMN delivery_status TEXT;
+ALTER TABLE dog_food_ops_alerts ADD COLUMN segments INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE dog_food_collection_items (
+  sale_id TEXT PRIMARY KEY,
+  reference TEXT NOT NULL UNIQUE,
+  customer_name TEXT NOT NULL,
+  sale_date TEXT NOT NULL,
+  balance_cents INTEGER NOT NULL CHECK(balance_cents>=0),
+  status TEXT NOT NULL CHECK(status IN ('open','paid','closed','missing')),
+  recipient TEXT NOT NULL,
+  issued_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  resolved_at TEXT
+);
+CREATE TABLE dog_food_collection_replies (
+  message_id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL UNIQUE,
+  from_phone TEXT NOT NULL, to_phone TEXT NOT NULL,
+  content TEXT NOT NULL, occurred_at TEXT NOT NULL,
+  sale_id TEXT, reference TEXT,
+  amount_cents INTEGER, payment_date TEXT, payment_method TEXT, payment_reference TEXT,
+  status TEXT NOT NULL CHECK(status IN ('queued','processing','recorded','review','resolved','dismissed','ignored')),
+  reason TEXT, receipt_id TEXT, reviewed_by TEXT, reviewed_at TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_dog_food_collection_replies_status ON dog_food_collection_replies(status,created_at);
+CREATE TABLE dog_food_collection_sms_usage (
+  usage_day TEXT PRIMARY KEY, segments INTEGER NOT NULL CHECK(segments>=0)
+);

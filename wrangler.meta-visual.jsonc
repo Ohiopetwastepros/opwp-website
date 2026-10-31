@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "opwp-meta-visual-review",
+  "main": "scripts/meta-visual-worker.mjs",
+  "compatibility_date": "2026-08-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [],
+  "assets": { "binding": "ASSETS", "directory": ".open-next/assets", "run_worker_first": true },
+  "d1_databases": [{ "binding": "DB", "database_name": "opwp-meta-visual-review", "database_id": "c4e19a9c-6725-4301-a57e-c0b2d44b8731" }],
+  "vars": {
+    "APP_ENV": "production",
+    "SITE_ORIGIN": "https://opwp-meta-visual-review.ohiopetwastepros.workers.dev",
+    "WORKER_ORIGIN": "https://opwp-meta-visual-review.ohiopetwastepros.workers.dev",
+    "META_AUTOMATION_ENABLED": "false",
+    "META_TEST_MODE": "false",
+    "EMAIL_SENDING_ENABLED": "false"
+  },
+  "triggers": { "crons": [] },
+  "observability": { "enabled": true }
+}

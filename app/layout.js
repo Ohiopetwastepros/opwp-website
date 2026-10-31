@@ -35,7 +35,16 @@ export const metadata = {
     description:
       "Family-owned pooper scooper service for NW Ohio & SE Michigan. A clean yard without scooping it yourself. Get your exact price with our instant quote.",
     url: site.url,
-    images: ["/assets/photos/hero-craig-driveway.webp"],
+    images: [{
+      url: "/assets/photos/opwp-social-share.webp",
+      width: 1200,
+      height: 630,
+      alt: "Dixie beside an Ohio Pet Waste Pros dog poop removal yard sign",
+    }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/assets/photos/opwp-social-share.webp"],
   },
 };
 

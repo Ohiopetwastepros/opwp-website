@@ -108,6 +108,19 @@
 .panelHead { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 15px; }
 .panelTitle { margin: 0; color: #263f4e; font-size: 12px; font-weight: 900; }
 .panelSub { margin-top: 3px; color: #89969c; font-size: 10px; }
+.collapsiblePanel { padding: 0; overflow: hidden; }
+.collapsibleSummary { display: flex; width: 100%; justify-content: space-between; gap: 18px; align-items: center; padding: 18px; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; list-style: none; text-align: left; }
+.collapsibleSummary:hover { background: #f8fafb; }
+.collapsibleSummary:focus-visible { outline: 2px solid #547c91; outline-offset: -2px; }
+.collapsibleSummary .panelTitle,.collapsibleSummary .panelSub { display: block; }
+.collapseControl { display: inline-flex; gap: 9px; align-items: center; color: #49647b; font-size: 9px; font-weight: 850; white-space: nowrap; }
+.collapseControl i { display: inline-block; font-size: 16px; font-style: normal; line-height: 1; transition: transform .18s ease; }
+.whenOpen { display: none; }
+.collapsibleSummary[aria-expanded="true"] .whenClosed { display: none; }
+.collapsibleSummary[aria-expanded="true"] .whenOpen { display: inline; }
+.collapsibleSummary[aria-expanded="true"] .collapseControl i { transform: rotate(180deg); }
+.collapsibleBody { padding: 16px 18px 18px; border-top: 1px solid #e5eaed; }
+.collapsibleActions { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 .legend { color: #74838b; font-size: 10px; font-weight: 750; }
 .chart { width: 100%; height: 150px; overflow: visible; }
 .axis { display: flex; justify-content: space-between; margin-top: 5px; color: #9ba4a7; font-size: 8px; }
@@ -170,6 +183,7 @@
 .kpiPeriods b { color: #344d5b; font-size: 11px; }
 @media (max-width: 1120px) { .rail { width: 210px; } .workspace { margin-left: 210px; } .wrap { padding: 30px 25px 60px; } .scoreGrid, .valueGrid { grid-template-columns: repeat(2, 1fr); } .executiveHero { grid-template-columns: 1fr; } .twoCol { grid-template-columns: 1fr; } .rangeBar { grid-template-columns: 1fr; align-items: start; } .systemGrid, .kpiGrid { grid-template-columns: repeat(2,1fr); } }
 @media (max-width: 760px) { .rail { position: relative; width: 100%; height: auto; padding: 16px; overflow: visible; } .railBrand { padding-bottom: 14px; } .nav { margin-top: 14px; } .navLink { padding: 10px 8px; } .subnav { padding-left: 35px; } .railFoot { display: none; } .workspace { margin-left: 0; } .wrap { padding: 25px 14px 50px; } .topbar { align-items: flex-start; flex-direction: column; } .scoreGrid, .equalCol, .kpiGrid, .valueGrid, .heroMetrics { grid-template-columns: 1fr; } .rangeForm { flex-wrap: wrap; } .valuePillar { min-height: 250px; } .sectionHead { align-items: flex-start; flex-direction: column; } .sectionNote { text-align: left; } .systemGrid { grid-template-columns: 1fr; } .reviewTableStatus { align-items: flex-start; flex-direction: column; gap: 0; padding-bottom: 7px; } .resultCount { text-align: left; } }
+@media (max-width: 760px) { .collapsibleSummary { align-items: flex-start; padding: 15px; } .collapseControl>span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } .collapsibleBody { padding: 14px 15px 15px; } }
 
 /* Executive workspace visual direction */
 .shell { background: #f7f9fb; color: #10253e; font-family: var(--font-hanken), "Hanken Grotesk", system-ui, sans-serif; }

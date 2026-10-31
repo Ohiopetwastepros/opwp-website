@@ -8,10 +8,10 @@
     "build:cloudflare": "opennextjs-cloudflare build && node scripts/patch-open-next-worker.mjs && node scripts/patch-quote-follow-up-worker.mjs",
     "check:worker-startup": "wrangler check startup",
     "preview": "opennextjs-cloudflare build && node scripts/patch-open-next-worker.mjs && node scripts/patch-quote-follow-up-worker.mjs && opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare build && node scripts/patch-open-next-worker.mjs && node scripts/patch-quote-follow-up-worker.mjs && opennextjs-cloudflare deploy",
+    "deploy": "node scripts/deploy.mjs",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv",
-    "db:migrate:local": "wrangler d1 migrations apply opwp-backend --local",
-    "db:migrate:remote": "wrangler d1 migrations apply opwp-backend --remote",
+    "db:migrate:local": "node scripts/require-private-migrations.mjs && wrangler d1 migrations apply opwp-backend --local",
+    "db:migrate:remote": "node scripts/require-private-migrations.mjs && wrangler d1 migrations apply opwp-backend --remote",
     "check:migrations": "node scripts/check-migrations.mjs",
     "audit:routes": "node scripts/audit-routes.mjs",
     "audit:sng-form": "node scripts/audit-sng-form-config.mjs",
@@ -21,23 +21,36 @@
     "test:http-security": "node scripts/http-security-smoke.mjs",
     "audit:production": "npm audit --omit=dev --audit-level=high",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "deployment:pending": "node scripts/deploy.mjs --pending",
+    "deployment:check": "node scripts/deployment-controller.mjs",
+    "prebuild": "node scripts/prepare-build-inputs.mjs",
+    "prebuild:cloudflare": "node scripts/prepare-build-inputs.mjs",
+    "pretest": "node scripts/prepare-build-inputs.mjs"
   },
   "dependencies": {
-    "@opennextjs/cloudflare": "1.20.2",
+    "@opennextjs/cloudflare": "1.20.13",
     "jose": "6.2.3",
-    "next": "15.5.21",
+    "leaflet": "1.9.4",
+    "next": "15.5.28",
+    "otpauth": "9.5.2",
+    "qrcode": "1.5.4",
     "react": "19.0.0",
     "react-dom": "19.0.0"
   },
   "devDependencies": {
-    "wrangler": "4.127.0"
+    "wrangler": "4.154.0"
   },
   "overrides": {
-    "brace-expansion": "5.0.9",
+    "@node-minify/core": {
+      "glob": "10.5.0"
+    },
+    "brace-expansion": "5.0.12",
     "minimatch": "10.2.5",
     "nanoid": "3.3.18",
     "postcss": "8.5.26",
-    "sharp": "0.35.2"
+    "sharp": "0.35.5",
+    "proxy-addr": "2.0.8",
+    "source-map-js": "1.2.2"
   }
 }

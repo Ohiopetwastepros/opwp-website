@@ -37,3 +37,27 @@ opennext-preview*.log
 *.tsbuildinfo
 next-env.d.ts
 worker-configuration.d.ts
+
+# Private operational build inputs and generated release metadata
+/data/meta-ads-audit-2026-10-06.json
+/data/route-density-audit-2026-10-06.json
+/scripts/dog-food-inventory-rollback.sql
+/lib/dog-food-reconciliation.json
+/migrations/0056_dog_food_inventory_costs.sql
+/lib/deployment-release.json
+/field-demo-runtime/lib/demo-release.json
+/lib/financial-defaults.json
+/lib/routing-private.json
+
+# Immutable production migration archive and private identity configuration
+/migrations/
+/private/
+/lib/staff-private.json
+
+/lib/operational-private.json
+
+# Historical report builders contain private findings; restored by the private manifest.
+/scripts/create-meta-audit-report.py
+/scripts/prepare-meta-audit.py
+
+/lib/bank-private.json

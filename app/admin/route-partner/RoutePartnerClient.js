@@ -5,10 +5,32 @@ import styles from "./route-partner.module.css";
 
 const number = (value) => new Intl.NumberFormat("en-US").format(Number(value) || 0);
 const minutes = (value) => `${Math.round(Number(value) || 0)} min`;
+const miles = value => `${Number(value || 0).toFixed(1)} mi`;
+const duration = value => `${Math.floor(Number(value || 0) / 60)} hr ${Math.round(Number(value || 0) % 60)} min`;
 const longDate = (value) => new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date(`${value}T12:00:00`));
 
 function Status({ value }) {
   return <span className={`${styles.status} ${styles[`status_${value}`] || ""}`}>{String(value || "unknown").replaceAll("_", " ")}</span>;
+}
+
+function RouteOptimization({ plan }) {
+  const route = plan.optimization;
+  if (!route) return <section className={styles.optimization}><strong>Refresh to optimize this route</strong><p>This older draft has not been compared against road-time routing. Refresh before release.</p></section>;
+  return <section className={styles.optimization} aria-label="Route efficiency">
+    <strong>{route.status === "optimized" ? "Road-time route ready" : "Route needs review"}</strong>
+    {route.reason ? <p role="alert">{route.reason}</p> : null}
+    {route.driveMinutes != null ? <>
+      <p>Start and finish: {route.depotAddress}</p>
+      <div className={styles.efficiencyGrid}>
+        <div><span>SNG order</span><b>{minutes(route.baselineDriveMinutes)} driving</b><small>{miles(route.baselineMiles)}</small></div>
+        <div><span>Daily Dispatch order</span><b>{minutes(route.driveMinutes)} driving</b><small>{miles(route.miles)}</small></div>
+        <div><span>Drive time saved</span><b>{minutes(route.savedMinutes)}</b><small>{route.savedMiles >= 0 ? `${miles(route.savedMiles)} fewer` : `${miles(-route.savedMiles)} more for the faster route`}</small></div>
+        <div><span>Estimated route day</span><b>{duration(route.plannedMinutes)}</b><small>{minutes(route.serviceMinutes)} service + driving; add breaks</small></div>
+      </div>
+      <p>{route.explanation}</p>
+    </> : null}
+    {route.excluded?.length ? <details><summary>{route.excluded.length} inactive SNG {route.excluded.length === 1 ? "job excluded" : "jobs excluded"}</summary><ul>{route.excluded.map(job => <li key={job.jobId}>{job.customerName}: {job.status}</li>)}</ul></details> : null}
+  </section>;
 }
 
 export default function RoutePartnerClient({ initialDate, initialDay }) {
@@ -36,6 +58,7 @@ export default function RoutePartnerClient({ initialDate, initialDay }) {
 
   async function loadDate(nextDate) {
     if (!nextDate) return;
+    window.history.replaceState(null, "", `${window.location.pathname}?date=${encodeURIComponent(nextDate)}`);
     setDate(nextDate); setLoading("load"); setError(""); setNotice("");
     try { setDay((await parse(await fetch(`/api/admin/route-partner/?date=${encodeURIComponent(nextDate)}`, { cache: "no-store" }))).day); }
     catch (requestError) { setError(requestError instanceof Error ? requestError.message : "The route day could not be loaded."); }
@@ -87,11 +110,20 @@ export default function RoutePartnerClient({ initialDate, initialDay }) {
   }
 
   return <>
+    <section className={styles.optimization} aria-label="Daily dispatch automation">
+      <strong>Daily preparation at 4:00 AM Eastern</strong>
+      <p>The backend saves the dispatch and optimized route automatically. Applying that order in Sweep &amp; Go still requires the browser publishing step.</p>
+      {day?.automation?.run ? <>
+        <Status value={day.automation.run.status} />
+        <p>{day.automation.run.message}</p>
+        <small>Last attempt: {new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short" }).format(new Date(day.automation.run.completedAt || day.automation.run.startedAt))} Eastern · {day.automation.run.attempts} attempt(s)</small>
+      </> : <p>No scheduled preparation recorded for this date.</p>}
+    </section>
     <section className={styles.control} aria-labelledby="route-control-title">
       <div><span className={styles.sectionLabel}>Today’s control point</span><h2 id="route-control-title">{longDate(date)}</h2><p>{hasPlans ? "Review the route cards below, then release each approved route." : "Choose a service date and import its dispatched work."}</p></div>
       <div className={styles.controls}>
         <label><span>Service date</span><input type="date" value={date} onChange={(event) => loadDate(event.target.value)} disabled={Boolean(loading)} /></label>
-        <button className={styles.primaryButton} type="button" onClick={importDay} disabled={Boolean(loading)}>{loading === "import" ? <><i />Importing…</> : hasPlans ? "Refresh route" : "Import route"}</button>
+        <button className={styles.primaryButton} type="button" onClick={importDay} disabled={Boolean(loading)}>{loading === "import" ? <><i />Optimizing…</> : hasPlans ? "Refresh & optimize" : "Import & optimize"}</button>
         {hasPlans ? <button className={styles.controlSecondary} type="button" onClick={validateCrm} disabled={Boolean(loading)}>{loading === "validate" ? "Checking…" : "Validate CRM"}</button> : null}
       </div>
     </section>
@@ -103,7 +135,7 @@ export default function RoutePartnerClient({ initialDate, initialDay }) {
     <div className={styles.alerts} aria-live="polite">{error ? <div className={styles.error} role="alert">{error}</div> : null}{notice ? <div className={styles.notice}>{notice}</div> : null}</div>
 
     {hasPlans ? <section className={styles.metrics} aria-label="Route totals">
-      <div><span>Routes</span><strong>{number(day.totals?.routes)}</strong></div><div><span>Stops</span><strong>{number(day.totals?.locations)}</strong></div><div><span>Scooping</span><strong>{number(day.totals?.scoopTasks)}</strong></div><div><span>Food</span><strong>{number(day.totals?.foodTasks)}</strong></div><div><span>Released</span><strong>{number(day.totals?.finalized)} <small>/ {number(day.totals?.routes)}</small></strong></div>
+      <div><span>Routes</span><strong>{number(day.totals?.routes)}</strong></div><div><span>Stops</span><strong>{number(day.totals?.locations)}</strong></div><div><span>Service jobs</span><strong>{number(day.totals?.scoopTasks)}</strong></div><div><span>Food</span><strong>{number(day.totals?.foodTasks)}</strong></div><div><span>Released</span><strong>{number(day.totals?.finalized)} <small>/ {number(day.totals?.routes)}</small></strong></div>
     </section> : null}
 
     {!hasPlans ? <section className={styles.empty}>
@@ -111,11 +143,12 @@ export default function RoutePartnerClient({ initialDate, initialDay }) {
       <div><span className={styles.sectionLabel}>Ready when dispatch is ready</span><h2>Build the day’s field route.</h2><p>We’ll read the selected Sweep &amp; Go dispatch, combine matching food deliveries at the same address, and keep food-only stops inside Route Partner.</p></div>
       <button className={styles.primaryButton} type="button" onClick={importDay} disabled={Boolean(loading)}>Import {longDate(date)}</button>
     </section> : <div className={styles.routeList}>{day.plans.map((plan) => <article className={styles.route} key={plan.id}>
-      <header><div><div className={styles.routeMeta}><Status value={plan.status} /><span>Version {plan.version}</span></div><h2>{plan.technicianName || "Unassigned route"}</h2><p>{plan.routeId || "Default route"} · {number(plan.locationCount)} physical stops</p></div><button className={styles.releaseButton} type="button" onClick={() => setConfirmPlan(plan)} disabled={Boolean(loading) || plan.status !== "draft"}>{loading === plan.id ? <><i />Finalizing…</> : plan.status === "finalized" ? "✓ Route released" : plan.status === "draft" ? "Review & release" : "Unavailable"}</button></header>
-      <div className={styles.routeSummary}><span><b>{number(plan.sourceJobCount)}</b> scoop jobs</span><span><b>{number(plan.foodTaskCount)}</b> food deliveries</span><span><b>{minutes(plan.locations.reduce((sum, location) => sum + location.estimatedMinutes, 0))}</b> estimated service</span><span>Field status <b>{plan.field?.status ? String(plan.field.status).replaceAll("_", " ") : "Not assigned"}</b></span></div>
+      <header><div><div className={styles.routeMeta}><Status value={plan.status} /><span>Version {plan.version}</span></div><h2>{plan.technicianName || "Unassigned route"}</h2><p>{plan.routeId || "Default route"} · {number(plan.locationCount)} physical stops</p></div><button className={styles.releaseButton} type="button" onClick={() => setConfirmPlan(plan)} disabled={Boolean(loading) || plan.status !== "draft" || plan.optimization?.status !== "optimized"}>{loading === plan.id ? <><i />Finalizing…</> : plan.status === "finalized" ? "✓ Route released" : plan.status === "draft" ? "Review & release" : "Unavailable"}</button></header>
+      <div className={styles.routeSummary}><span><b>{number(plan.sourceJobCount)}</b> service jobs</span><span><b>{number(plan.foodTaskCount)}</b> food deliveries</span><span><b>{minutes(plan.locations.reduce((sum, location) => sum + location.estimatedMinutes, 0))}</b> estimated service</span><span>Field status <b>{plan.field?.status ? String(plan.field.status).replaceAll("_", " ") : "Not assigned"}</b></span></div>
+      <RouteOptimization plan={plan} />
       {plan.field ? <div className={styles.fieldStrip}><div><span>Technician app</span><strong>{String(plan.field.status).replaceAll("_", " ")}</strong></div><div><span>Truck load</span><strong>{String(plan.field.loadStatus).replaceAll("_", " ")}</strong></div><div><span>Payment check</span><strong>{String(plan.field.paymentStatus).replaceAll("_", " ")}</strong></div><div><span>Mileage</span><strong>{plan.field.startingMileage ?? "—"}{plan.field.endingMileage != null ? ` → ${plan.field.endingMileage}` : ""}</strong></div></div> : null}
       {plan.exceptions?.length ? <section className={styles.exceptions}><header><div><span className={styles.sectionLabel}>Field exceptions</span><h3>{plan.exceptions.filter((item) => item.status === "pending").length} awaiting management</h3></div></header>{plan.exceptions.map((item) => <div className={styles.exceptionRow} key={item.id}><div><strong>{String(item.type).replaceAll("_", " ")}</strong><p>{String(item.reason).replaceAll("_", " ")}{item.inventoryDisposition ? ` · Inventory: ${String(item.inventoryDisposition).replaceAll("_", " ")}` : ""}</p></div><Status value={item.status} />{item.status === "pending" ? <button type="button" onClick={() => { setReviewException(item); setDenialReason(""); }}>Review</button> : null}</div>)}</section> : null}
-      <ol className={styles.locations}>{plan.locations.map((location) => <li key={location.id}><span className={styles.sequence}>{location.sequence}</span><div className={styles.locationBody}><div className={styles.locationHead}><div><strong>{location.customerName || "Service location"}</strong><p>{location.address}</p></div><small>{minutes(location.estimatedMinutes)}</small></div><div className={styles.tasks}>{location.tasks.map((task) => <div className={`${styles.task} ${task.type === "dog_food" ? styles.foodTask : styles.scoopTask}`} key={task.id}><span>{task.type === "dog_food" ? "Food" : "Scoop"}</span><div><strong>{task.type === "dog_food" ? task.productSummary || "Dog food delivery" : task.customerName || "Scooping service"}</strong><small>{task.type === "dog_food" ? task.placementNote || "Placement confirmation required" : `CRM completion: ${task.crmCompletionStatus}`}</small>{task.type === "dog_food" && task.latestProofId ? <a className={styles.proofLink} href={`/api/admin/route-partner/proof/${encodeURIComponent(task.latestProofId)}/`} target="_blank" rel="noreferrer">View delivery proof <span aria-hidden="true">↗</span></a> : null}</div><Status value={task.status} /></div>)}</div></div></li>)}</ol>
+      <ol className={styles.locations}>{plan.locations.map((location) => <li key={location.id}><span className={styles.sequence}>{location.sequence}</span><div className={styles.locationBody}><div className={styles.locationHead}><div><strong>{location.customerName || "Service location"}</strong><p>{location.address}</p></div><small>{minutes(location.estimatedMinutes)}</small></div><div className={styles.tasks}>{location.tasks.map((task) => <div className={`${styles.task} ${task.type === "dog_food" ? styles.foodTask : styles.scoopTask}`} key={task.id}><span>{task.type === "dog_food" ? "Food" : "Service"}</span><div><strong>{task.type === "dog_food" ? task.productSummary || "Dog food delivery" : task.productSummary || task.customerName || "Service"}</strong><small>{task.type === "dog_food" ? task.placementNote || "Placement confirmation required" : `${minutes(task.estimatedMinutes)} | CRM completion: ${task.crmCompletionStatus}`}</small>{task.latestProofId ? <a className={styles.proofLink} href={`/api/admin/route-partner/proof/${encodeURIComponent(task.latestProofId)}/`} target="_blank" rel="noreferrer">View service proof <span aria-hidden="true">↗</span></a> : null}</div><Status value={task.status} /></div>)}</div></div></li>)}</ol>
     </article>)}</div>}
 
     <section className={styles.boundary}><span aria-hidden="true">i</span><div><strong>Safe initial release</strong><p>Route Partner reads the CRM, combines service work, and records management approval. It will not change CRM routing, charge a card, or message a customer in this release.</p></div></section>

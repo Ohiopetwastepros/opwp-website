@@ -10,11 +10,11 @@ export const metadata = {
   robots: { index: true, follow: true },
   openGraph: {
     type: "website",
-    url: "https://ohiopetwastepros.com/free-quote/",
+    url: "https://www.ohiopetwastepros.com/free-quote/",
     siteName: "Ohio Pet Waste Pros",
     title: "Get an Instant Quote | Ohio Pet Waste Pros",
     images: [
-      "https://ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
+      "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
     ],
   },
 };

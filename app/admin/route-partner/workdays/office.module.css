@@ -1,0 +1,170 @@
+.main {
+  max-width: 1250px;
+  margin: auto;
+  padding: 30px;
+  color: #203242;
+}
+.title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+.title span {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: #526b80;
+}
+.title h1 {
+  font-size: 30px;
+  margin: 10px 0;
+}
+.title a,
+.toolbar a {
+  color: #1f4566;
+}
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.main button {
+  border: 0;
+  border-radius: 8px;
+  background: #1f4566;
+  color: white;
+  padding: 11px 15px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  min-height: 42px;
+}
+.main button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.main label {
+  display: block;
+  font-size: 13px;
+  margin: 12px 0;
+  font-weight: 600;
+}
+.main input:not([type="checkbox"]),
+.main select,
+.main textarea {
+  display: block;
+  width: 100%;
+  border: 1px solid #bdcdda;
+  border-radius: 7px;
+  padding: 11px;
+  font: inherit;
+  color: #203242;
+  background: white;
+  margin-top: 7px;
+}
+.main textarea {
+  min-height: 85px;
+}
+.main input[type="checkbox"] {
+  margin-right: 8px;
+  accent-color: #24734a;
+}
+.card {
+  background: #fff;
+  border: 1px solid #d7e2ea;
+  border-radius: 14px;
+  padding: 23px;
+  margin: 20px 0;
+}
+.card h2 {
+  font-size: 22px;
+  margin: 0 0 12px;
+}
+.card p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.card small {
+  display: block;
+  font-size: 12px;
+  color: #587080;
+  line-height: 1.5;
+  margin-top: 14px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+.metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  background: #edf3f8;
+  padding: 15px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.stop {
+  padding: 15px;
+  border: 1px solid #dce5ec;
+  border-radius: 9px;
+  margin: 12px 0;
+}
+.stop a {
+  color: #1f4566;
+  font-size: 12px;
+}
+.stop button {
+  padding: 7px 12px;
+  min-height: 35px;
+  font-size: 12px;
+}
+.banner {
+  padding: 15px 18px;
+  background: #fff6df;
+  border: 1px solid #e3cd99;
+  color: #725319;
+  border-radius: 9px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.notice {
+  background: #eaf6ec;
+  color: #245a3a;
+  padding: 14px;
+  border-radius: 8px;
+}
+.error {
+  background: #fff0ef;
+  color: #9a2929;
+  padding: 14px;
+  border-radius: 8px;
+}
+.card details {
+  padding: 12px 0;
+}
+.card summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+@media (max-width: 760px) {
+  .main {
+    padding: 20px 14px;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .title {
+    align-items: flex-start;
+  }
+  .title h1 {
+    font-size: 25px;
+  }
+  .card {
+    padding: 17px;
+  }
+}

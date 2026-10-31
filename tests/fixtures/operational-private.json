@@ -1,0 +1,19 @@
+{
+  "reviewTracker": {
+    "rows": [
+      [
+        "Example Reviewer",
+        "2024-01-01",
+        "Example Client",
+        5
+      ]
+    ],
+    "defaultDate": "2024-01-01"
+  },
+  "lifecycle": {
+    "customerChanges": [],
+    "churnRows": [],
+    "jobRecordIds": [],
+    "oneTimeRecords": []
+  }
+}

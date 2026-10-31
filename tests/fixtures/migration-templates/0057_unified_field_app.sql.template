@@ -1,0 +1,130 @@
+CREATE TABLE field_service_catalog (
+  organization_id TEXT NOT NULL REFERENCES route_partner_organizations(id),
+  id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  unit_label TEXT NOT NULL,
+  minutes_per_unit REAL NOT NULL CHECK (minutes_per_unit>=0 AND minutes_per_unit<=240),
+  timed INTEGER NOT NULL CHECK (timed IN (0,1)),
+  entry_required INTEGER NOT NULL CHECK (entry_required IN (0,1)),
+  proof_kind TEXT NOT NULL CHECK (proof_kind IN ('gate','service','delivery','none')),
+  active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1)),
+  instructions TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(organization_id,id)
+);
+
+INSERT INTO field_service_catalog(organization_id,id,name,unit_label,minutes_per_unit,timed,entry_required,proof_kind,instructions) VALUES
+('org-opwp','scoop','Yard cleanup','visit',10,1,1,'gate','Check all assigned yard areas and secure the property.'),
+('org-opwp','sanitize','Yard sanitization','visit',5,1,1,'gate','Follow product label and office treatment instructions.'),
+('org-opwp','deodorize','Yard deodorization','visit',4,1,1,'gate','Follow product label and office treatment instructions.'),
+('org-opwp','litter','Kitty litter box service','box',6,1,1,'service','Confirm each assigned box, litter instructions and approved disposal location.'),
+('org-opwp','haul','Waste haul-away','unit',0,0,0,'none','Use the approved disposal location.'),
+('org-opwp','food','Dog food delivery','delivery',4,1,0,'delivery','Place the order exactly as instructed and record delivery proof.');
+
+CREATE TABLE field_workdays (
+  shift_id TEXT PRIMARY KEY REFERENCES route_partner_field_shifts(id),
+  organization_id TEXT NOT NULL REFERENCES route_partner_organizations(id),
+  member_id TEXT NOT NULL REFERENCES route_partner_members(id),
+  revision INTEGER NOT NULL DEFAULT 0,
+  state_json TEXT NOT NULL CHECK (json_valid(state_json)),
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX field_workdays_org ON field_workdays(organization_id,updated_at);
+
+CREATE TABLE field_workday_events (
+  id TEXT PRIMARY KEY,
+  shift_id TEXT NOT NULL REFERENCES field_workdays(shift_id),
+  member_id TEXT NOT NULL REFERENCES route_partner_members(id),
+  expected_revision INTEGER NOT NULL,
+  body_hash TEXT NOT NULL,
+  event_json TEXT NOT NULL CHECK (json_valid(event_json)),
+  next_state TEXT NOT NULL CHECK (json_valid(next_state)),
+  received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(shift_id,expected_revision)
+);
+
+CREATE TRIGGER field_workday_event_commit BEFORE INSERT ON field_workday_events BEGIN SELECT RAISE(ABORT,'FIELD_WORKDAY_CONFLICT') WHERE NOT EXISTS (SELECT 1 FROM field_workdays w JOIN route_partner_field_shifts s ON s.id=w.shift_id JOIN route_partner_route_plans p ON p.id=s.route_plan_id WHERE w.shift_id=NEW.shift_id AND w.member_id=NEW.member_id AND w.revision=NEW.expected_revision AND s.technician_member_id=NEW.member_id AND s.organization_id=w.organization_id AND p.organization_id=w.organization_id AND s.status<>'cancelled' AND p.source_fingerprint=json_extract(w.state_json,'$.sourceFingerprint') AND p.status IN ('finalized','in_progress','completed')); SELECT RAISE(ABORT,'FIELD_WORKDAY_CONFLICT') WHERE json_extract(NEW.event_json,'$.type')='accept_changes' AND EXISTS (SELECT 1 FROM json_each(NEW.event_json,'$.body.changeIds') j LEFT JOIN field_dispatch_changes c ON c.id=j.value AND c.shift_id=NEW.shift_id AND c.status='pending' WHERE c.id IS NULL); UPDATE field_workdays SET state_json=NEW.next_state,revision=revision+1,updated_at=CURRENT_TIMESTAMP WHERE shift_id=NEW.shift_id; UPDATE route_partner_field_shifts SET revision=revision+1 WHERE id=NEW.shift_id; END;
+
+
+CREATE TRIGGER field_workday_legacy_fence BEFORE INSERT ON route_partner_field_commands WHEN EXISTS (SELECT 1 FROM field_workdays WHERE shift_id=NEW.shift_id) BEGIN SELECT RAISE(ABORT,'FIELD_UNIFIED_APP_REQUIRED'); END;
+
+CREATE TABLE field_workday_proofs (
+  id TEXT PRIMARY KEY,
+  shift_id TEXT NOT NULL REFERENCES field_workdays(shift_id),
+  task_id TEXT NOT NULL REFERENCES route_partner_tasks(id),
+  member_id TEXT NOT NULL REFERENCES route_partner_members(id),
+  purpose TEXT NOT NULL CHECK (purpose IN ('gate','service','delivery','observation')),
+  captured_at TEXT NOT NULL,
+  digest TEXT NOT NULL,
+  byte_size INTEGER NOT NULL CHECK (byte_size>0 AND byte_size<=409600),
+  object_key TEXT NOT NULL UNIQUE,
+  uploaded INTEGER NOT NULL DEFAULT 0 CHECK (uploaded IN (0,1)),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX field_proofs_shift ON field_workday_proofs(shift_id,task_id);
+
+CREATE TRIGGER field_workday_photo_cap BEFORE INSERT ON field_workday_proofs BEGIN SELECT RAISE(ABORT,'FIELD_PHOTO_LIMIT') WHERE (SELECT COUNT(*) FROM field_workday_proofs WHERE shift_id=NEW.shift_id)>=240 OR (SELECT COUNT(*) FROM field_workday_proofs WHERE task_id=NEW.task_id)>=8; END;
+
+CREATE TABLE field_dispatch_changes (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL REFERENCES route_partner_organizations(id),
+  shift_id TEXT NOT NULL REFERENCES field_workdays(shift_id),
+  kind TEXT NOT NULL CHECK (kind IN ('add_service','add_visit','reorder','safety','response')),
+  payload TEXT NOT NULL CHECK (json_valid(payload)),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','cancelled')),
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  accepted_at TEXT
+);
+
+CREATE INDEX field_changes_shift ON field_dispatch_changes(shift_id,status);
+
+CREATE TRIGGER field_change_cap BEFORE INSERT ON field_dispatch_changes BEGIN SELECT RAISE(ABORT,'FIELD_CHANGE_LIMIT') WHERE (SELECT COUNT(*) FROM field_dispatch_changes WHERE shift_id=NEW.shift_id AND status='pending')>=40; END;
+
+CREATE TABLE field_workday_messages (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL REFERENCES route_partner_organizations(id),
+  shift_id TEXT NOT NULL REFERENCES field_workdays(shift_id),
+  stop_id TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('on_way','completed')),
+  recipient TEXT NOT NULL,
+  content TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('held','queued','sending','accepted','delivered','failed','uncertain','expired','suppressed')),
+  provider_id TEXT,
+  detail TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX field_messages_status ON field_workday_messages(status,expires_at);
+
+CREATE TABLE field_message_receipts(id TEXT PRIMARY KEY,received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+
+CREATE TABLE field_message_delivery_receipts(provider_id TEXT PRIMARY KEY,status TEXT NOT NULL CHECK(status IN ('delivered','failed')),occurred_at TEXT NOT NULL,received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+
+CREATE TABLE field_message_suppression(phone TEXT PRIMARY KEY,updated_at TEXT NOT NULL,last_event_at TEXT NOT NULL,suppressed INTEGER NOT NULL CHECK(suppressed IN(0,1)));
+
+CREATE TABLE field_property_services (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL REFERENCES route_partner_organizations(id),
+  property_key TEXT NOT NULL,
+  property_name TEXT NOT NULL,
+  service_id TEXT NOT NULL,
+  quantity INTEGER NOT NULL CHECK(quantity BETWEEN 1 AND 50),
+  every_weeks INTEGER NOT NULL CHECK(every_weeks IN (1,2,4)),
+  weekdays TEXT NOT NULL CHECK(json_valid(weekdays)),
+  start_date TEXT NOT NULL,
+  active INTEGER NOT NULL CHECK(active IN (0,1)),
+  instructions TEXT NOT NULL,
+  updated_by TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(organization_id,service_id) REFERENCES field_service_catalog(organization_id,id),
+  UNIQUE(organization_id,property_key,service_id)
+);
+
+CREATE TRIGGER field_property_service_cap BEFORE INSERT ON field_property_services WHEN NOT EXISTS (SELECT 1 FROM field_property_services WHERE organization_id=NEW.organization_id AND property_key=NEW.property_key AND service_id=NEW.service_id) BEGIN SELECT RAISE(ABORT,'FIELD_RECURRING_LIMIT') WHERE (SELECT COUNT(*) FROM field_property_services WHERE organization_id=NEW.organization_id)>=2000 OR (SELECT COUNT(*) FROM field_property_services WHERE organization_id=NEW.organization_id AND property_key=NEW.property_key)>=20; END;
+
+CREATE TRIGGER field_catalog_cap BEFORE INSERT ON field_service_catalog WHEN NOT EXISTS (SELECT 1 FROM field_service_catalog WHERE organization_id=NEW.organization_id AND id=NEW.id) BEGIN SELECT RAISE(ABORT,'FIELD_CATALOG_LIMIT') WHERE (SELECT COUNT(*) FROM field_service_catalog WHERE organization_id=NEW.organization_id)>=60; END;

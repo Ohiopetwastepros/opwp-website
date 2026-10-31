@@ -11,11 +11,14 @@ export const metadata = {
     title: "Residential Dog Poop Removal in Greater Toledo | Ohio Pet Waste Pros",
     description:
       "Weekly, bi-weekly & one-time dog waste removal for homeowners across NW Ohio & SE Michigan.",
-    url: "https://ohiopetwastepros.com/residential/",
+    url: "https://www.ohiopetwastepros.com/residential/",
     siteName: "Ohio Pet Waste Pros",
-    images: ["https://ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png"],
+    images: ["https://www.ohiopetwastepros.com/assets/photos/opwp-social-share.webp"],
   },
-  twitter: { card: "summary_large_image" },
+  twitter: {
+    card: "summary_large_image",
+    images: ["https://www.ohiopetwastepros.com/assets/photos/opwp-social-share.webp"],
+  },
   other: {
     "geo.region": "US-OH",
     "geo.placename": "Holland, Ohio",

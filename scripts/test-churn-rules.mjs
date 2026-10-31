@@ -19,8 +19,8 @@ if (churnReviewStatus("Modification of subscription type", "", "123") !== "Plan 
   throw new Error("A matched replacement must close as Plan Replacement.");
 }
 
-const neverStarted = classifyChurnEligibility({ businessLine: "scooping" });
-if (neverStarted.isChurn || neverStarted.status !== "Needs Validation") throw new Error("Unproven cancellations must be excluded pending validation.");
+const neverStarted = classifyChurnEligibility({ businessLine: "scooping", serviceEvidenceAvailable: true, invoiceEvidenceAvailable: true });
+if (neverStarted.isChurn || neverStarted.status !== "Never Started" || neverStarted.reviewStatus !== "Complete") throw new Error("Unserviced, uninvoiced cancellations must automatically close as Never Started.");
 const serviced = classifyChurnEligibility({ businessLine: "scooping", completedServiceBefore: true });
 if (!serviced.isChurn || serviced.status !== "Confirmed") throw new Error("Completed service must confirm churn eligibility.");
 const planChange = classifyChurnEligibility({ businessLine: "scooping", replacementSubscriptionId: "456" });

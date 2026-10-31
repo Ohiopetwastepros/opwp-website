@@ -1,6 +1,9 @@
+import operationalPrivate from '../lib/operational-private.json' with {type:'json'};
+import {validateBuildInputs} from './prepare-build-inputs.mjs';
 import fs from "node:fs";
 
 const APPLY = process.argv.includes("--apply");
+validateBuildInputs({production:APPLY});
 const BASE_ID = "appcAWPBQB8GmOrcT";
 const SOURCE_TABLES = {
   customers: "tblhi8MGUOsWNmd37",
@@ -21,45 +24,7 @@ const key = process.env.AIRTABLE_API_KEY;
 if (!key) throw new Error("AIRTABLE_API_KEY is not configured in .dev.vars.");
 const headers = { Authorization: `Bearer ${key}`, Accept: "application/json", "Content-Type": "application/json" };
 
-const reviews = [
-  ["Ryan Park"], ["Pat Freeman"], ["Jennifer Widman"], ["Nick Caputo", "", "Nicholas Caputo"],
-  ["Christine Bautista"], ["Crystal Hauser"], ["Maria Ratushinskaya"], ["Kim Kaiser", "", "Kim Keiser"],
-  ["Kyle Anderson"], ["Lisa Johnston"], ["Jason Fairchild"], ["Irene Blue"], ["Ryan Leisure"],
-  ["Robin Decries", "", "Robyn Rohrbacher"], ["Tanya Schermbeck"], ["Tom Nunley", "", "Thomas Nunley"],
-  ["Jenna Blair"], ["Maya Deramus"], ["Cynthia Vandersnick", "", "Cindy Vandersnick"], ["Kathleen Macke"],
-  ["Tyler Fry"], ["Monica Sullivan", "2025-11-20"], ["Burnadette", "", "Burnadette Rinker"],
-  ["Taffy Herbert (Kathy)", "", "Kathy Herbert"], ["Christopher Brown"], ["Debbie Popovich"],
-  ["Brooklyn Green"], ["Cynthia Crawford"], ["Makayla Taylor"], ["Cecilia Richardson", "2025-12-16"],
-  ["Alan Bialy"], ["Brandi Bennington"], ["Gail Eckhart", "2025-12-23"], ["Robin Abele", "2025-12-23"],
-  ["Rachel Adler"], ["Jordan Gregory"], ["Maxwell Sweeb"], ["Carrie Lynne (St Jean?)", "", "Carrie St Jean"],
-  ["Sondra Pigeon"], ["Dennis Kotevski"], ["Missy/Heath Garlick", "", "Mary Garlick"], ["Kristen Doyle"],
-  ["Jeremy Smith"], ["Joe Perkins"], ["Mz Dallas"], ["Kylee Orlando"],
-  ["Michelle Koehn (Grundy)", "", "Michelle Grundy"], ["Barbie Sterling"], ["Lori Bridleman"],
-  ["Nikole Landrum", "", "Karl Nikole Landrum"], ["Joyce Millimen"], ["Tina Allen"], ["Terri Moore"],
-  ["Rick Montgomery"], ["Melanie Burns (Mel)", "", "Melanie Burns"], ["Charylann Leducnoller"],
-  ["Moch", "", "Moch Mora"], ["Charlene Bettencourt", "2026-01-01"], ["Barbara Tipping"],
-  ["Peggy Jones"], ["Patty Pope"], ["Greg Gladieux", "2026-02-01"], ["Danyelle Pierce"],
-  ["Greg Straus"], ["Walter Krueger"], ["Shannon Cousino"], ["Raven Bechtold"],
-  ["Marjorie Kowalewski"], ["Theressie Tillman", "", "Theressie Tilman"], ["Heather Folk"],
-  ["Katie Hertzfeld"], ["Glenda Wiseman"], ["Bill Spindler", "", "", 4], ["Dorina Dickerson"],
-  ["Diana Campbell"], ["Matt Kulwicki"], ["Austin Tyler"], ["Casey Rummel"], ["Allison Berry"],
-  ["Katie Bierwiler"], ["Mark Hargrove"], ["Rebecca Miller"], ["Rachel Johnson"], ["Christina Estrada"],
-  ["Robin Hall"], ["Natasha Wise"], ["Eric Pizza", "2027-03-01"], ["Steve Fahl", "", "Steve Fahle"],
-  ["Alexa Perry"], ["Dan Acheson"], ["Brittany Allen"], ["Jenna Vargyas"], ["Barb Baker", "", "Barbara Richard Baker"],
-  ["Andre Baker"], ["William Neil"], ["Ryan Fry"], ["Charlie Lover"], ["Brian Fowler"],
-  ["Jennifer Gottwald"], ["Medium Rarity...?"], ["Gabrielle Mattimore"], ["Jeff Kasza"], ["Karen Franks"],
-  ["Amanda Hensley", "", "Mandy Hensley"], ["Kendra Louy"], ["Dan Sommers"], ["Pedro Vasquez", "2026-03-15"],
-  ["Trenton Smith", "", "Trent Smith"], ["Bree Reinhart"], ["Geri Buckley"], ["Karena Butcher"],
-  ["Keith Kurtz"], ["Teresa Zielinski"], ["Victor Monroe"], ["Anita DeVaul"],
-  ["Randy Zickenfoose", "", "Randall Zickefoose"], ["Mari Ness"], ["Michael Friess"],
-  ["Stacey Pacholek", "", "Stacy Pacholek"], ["Cindy Smithers"], ["Matthew Collins"], ["Lee Warren"],
-  ["Jessica King"], ["Angela Worley"], ["Bria Bostic"], ["Tatum Grace"], ["Shatara Brown"],
-  ["Ishaney Simmons"], ["Lu Ann", "", "Lu Ann Fouts"], ["Megan Peterson"], ["Melissa Meehan"],
-  ["Danielle Wright"], ["Amanda Wyman"], ["Barbara Seguine"], ["Tori Finch"],
-  ["Jennifer/Jim Hansen", "", "Jim Hansen"], ["Camryn Camposano"], ["Todd Bortz"], ["Claire Whitlatch"],
-  ["Kim McNerny", "", "Kim McNerney"], ["Teresa Scott"],
-  ["Ryan Rothenbuler (reviewed by Amanda Myers)", "", "Ryan Rothenbuhler"],
-].map(([reviewName, reviewDate = "", matchName = "", rating = null]) => ({ reviewName, reviewDate, matchName: matchName || reviewName, rating }));
+const reviews = operationalPrivate.reviewTracker.rows.map(([reviewName, reviewDate = operationalPrivate.reviewTracker.defaultDate, matchName = "", rating = null]) => ({ reviewName, reviewDate, matchName: matchName || reviewName, rating }));
 
 function normalize(value) {
   return String(value ?? "").toLowerCase().replace(/\([^)]*\)/g, " ").replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, "");

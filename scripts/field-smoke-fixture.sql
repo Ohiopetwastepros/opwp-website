@@ -1,3 +1,6 @@
+-- LOCAL QA ONLY: never apply this fixture to a remote database.
+DELETE FROM route_partner_field_commands WHERE shift_id='qa-field-shift';
+DELETE FROM route_partner_field_closeouts WHERE shift_id='qa-field-shift';
 DELETE FROM route_partner_notification_outbox WHERE route_plan_id='qa-field-plan';
 DELETE FROM route_partner_field_proofs WHERE task_id IN ('qa-scoop-task','qa-food-task');
 DELETE FROM route_partner_field_events WHERE route_plan_id='qa-field-plan';

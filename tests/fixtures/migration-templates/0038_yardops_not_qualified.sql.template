@@ -1,0 +1,44 @@
+CREATE TABLE growth_leads_with_not_qualified (
+  submission_id TEXT PRIMARY KEY REFERENCES submissions(id) ON DELETE CASCADE,
+  organization_id TEXT NOT NULL,
+  stage TEXT NOT NULL DEFAULT 'new'
+    CHECK (stage IN ('new','contacted','qualified','quoted','won','lost','not_qualified')),
+  priority TEXT NOT NULL DEFAULT 'normal'
+    CHECK (priority IN ('normal','high','urgent')),
+  owner_email TEXT,
+  next_action TEXT,
+  next_action_at TEXT,
+  version INTEGER NOT NULL DEFAULT 1,
+  updated_by TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  outcome_reason TEXT,
+  outcome_note TEXT,
+  converted_at TEXT,
+  lost_at TEXT,
+  not_qualified_at TEXT
+);
+
+INSERT INTO growth_leads_with_not_qualified (
+  submission_id,organization_id,stage,priority,owner_email,next_action,next_action_at,
+  version,updated_by,created_at,updated_at,outcome_reason,outcome_note,converted_at,lost_at,not_qualified_at
+)
+SELECT
+  submission_id,organization_id,
+  CASE WHEN stage='lost' AND outcome_reason='no_response' THEN 'not_qualified' ELSE stage END,
+  priority,owner_email,
+  CASE WHEN stage='lost' AND outcome_reason='no_response' THEN NULL ELSE next_action END,
+  CASE WHEN stage='lost' AND outcome_reason='no_response' THEN NULL ELSE next_action_at END,
+  version,updated_by,created_at,updated_at,outcome_reason,outcome_note,converted_at,
+  CASE WHEN stage='lost' AND outcome_reason='no_response' THEN NULL ELSE lost_at END,
+  CASE WHEN stage='lost' AND outcome_reason='no_response' THEN COALESCE(lost_at,updated_at) ELSE NULL END
+FROM growth_leads;
+
+DROP TABLE growth_leads;
+ALTER TABLE growth_leads_with_not_qualified RENAME TO growth_leads;
+
+CREATE INDEX idx_growth_leads_work_queue
+  ON growth_leads(organization_id, stage, next_action_at, priority);
+
+CREATE INDEX idx_growth_leads_outcomes
+  ON growth_leads(organization_id, stage, outcome_reason, converted_at, lost_at, not_qualified_at);

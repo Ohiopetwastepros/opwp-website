@@ -10,7 +10,7 @@ export const metadata = {
     type: "website",
     title: "Terms of Service | Ohio Pet Waste Pros",
     description: "The terms that govern our pet waste removal services.",
-    url: "https://ohiopetwastepros.com/terms-of-service/",
+    url: "https://www.ohiopetwastepros.com/terms-of-service/",
     siteName: "Ohio Pet Waste Pros",
   },
 };

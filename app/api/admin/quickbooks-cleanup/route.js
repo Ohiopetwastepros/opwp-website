@@ -40,6 +40,7 @@ export async function GET(request) {
   const entity = url.searchParams.get("entity") || "";
   const reportName = url.searchParams.get("report") || "";
   const accountingMethod = url.searchParams.get("accounting_method") || "Accrual";
+  const download = url.searchParams.get("download") !== "false";
   const requestId = crypto.randomUUID();
 
   try {
@@ -65,7 +66,7 @@ export async function GET(request) {
       status: 200,
       headers: {
         ...responseHeaders,
-        "Content-Disposition": `attachment; filename="${safeExportName(dataset, start, end)}"`,
+        "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${safeExportName(dataset, start, end, entity || reportName)}"`,
       },
     });
   } catch (error) {

@@ -1,0 +1,12 @@
+.page {
+  min-height: 100vh;
+  padding: 32px clamp(18px, 4vw, 58px) 70px;
+  background: #eef3f1;
+  color: #14374a;
+}
+
+@media (max-width: 700px) {
+  .page {
+    padding: 20px 12px 50px;
+  }
+}

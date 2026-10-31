@@ -1,0 +1,197 @@
+PRAGMA foreign_keys=ON;
+
+CREATE TABLE dog_food_sync_outbox (
+  entity_key TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('customer','order','payment','plan','delivery')),
+  entity_id TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, synced_revision INTEGER NOT NULL DEFAULT 0,
+  attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  lease_token TEXT, lease_until TEXT, last_error TEXT, airtable_record_id TEXT,
+  verified_at TEXT, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_food_sync_due ON dog_food_sync_outbox(next_attempt_at,lease_until);
+CREATE TABLE dog_food_workflow_settings (
+  id TEXT PRIMARY KEY CHECK(id='org-opwp'), posting_enabled INTEGER NOT NULL DEFAULT 0,
+  scheduling_enabled INTEGER NOT NULL DEFAULT 0, email_enabled INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO dog_food_workflow_settings(id) VALUES ('org-opwp');
+CREATE TABLE dog_food_workflow_email_budget(usage_day TEXT PRIMARY KEY,attempts INTEGER NOT NULL DEFAULT 0);
+ALTER TABLE dog_food_orders ADD COLUMN requested_delivery_date TEXT;
+ALTER TABLE dog_food_orders ADD COLUMN automation_review TEXT;
+ALTER TABLE dog_food_orders ADD COLUMN checkout_attempted_at TEXT;
+ALTER TABLE dog_food_orders ADD COLUMN renewal_attempted_at TEXT;
+ALTER TABLE dog_food_payments ADD COLUMN refunded_amount_cents INTEGER NOT NULL DEFAULT 0 CHECK(refunded_amount_cents>=0 AND refunded_amount_cents<=amount_cents);
+ALTER TABLE dog_food_payment_events ADD COLUMN lease_token TEXT;
+ALTER TABLE dog_food_payment_events ADD COLUMN lease_until TEXT;
+CREATE UNIQUE INDEX idx_food_one_capture ON dog_food_payments(order_id) WHERE status='captured';
+CREATE TABLE dog_food_delivery_capacity (
+  id TEXT PRIMARY KEY, service_date TEXT NOT NULL, technician_id TEXT NOT NULL, technician_name TEXT NOT NULL,
+  postal_code TEXT NOT NULL, bag_limit INTEGER NOT NULL CHECK(bag_limit BETWEEN 1 AND 100),
+  stop_limit INTEGER NOT NULL CHECK(stop_limit BETWEEN 1 AND 50), route_id TEXT NOT NULL,
+  confirmed_by TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(service_date,technician_id,postal_code)
+);
+CREATE TABLE dog_food_capacity_allocations (
+  order_id TEXT PRIMARY KEY REFERENCES dog_food_orders(id), slot_id TEXT NOT NULL REFERENCES dog_food_delivery_capacity(id),
+  bags INTEGER NOT NULL CHECK(bags BETWEEN 1 AND 100), released_at TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE dog_food_stock_lots (
+  id TEXT PRIMARY KEY, product_id TEXT NOT NULL REFERENCES dog_food_products(id), lot_number TEXT NOT NULL,
+  best_before TEXT NOT NULL, usable_bags INTEGER NOT NULL CHECK(usable_bags>=0), counted_date TEXT NOT NULL,
+  confirmed_by TEXT NOT NULL, UNIQUE(product_id,lot_number,best_before)
+);
+CREATE TABLE dog_food_lot_allocations (
+  order_id TEXT NOT NULL REFERENCES dog_food_orders(id), lot_id TEXT NOT NULL REFERENCES dog_food_stock_lots(id),
+  quantity INTEGER NOT NULL CHECK(quantity>0), consumed_at TEXT, released_at TEXT, PRIMARY KEY(order_id,lot_id)
+);
+CREATE TABLE dog_food_transactional_outbox (
+  event_key TEXT PRIMARY KEY, customer_id TEXT NOT NULL REFERENCES dog_food_customers(id), order_id TEXT REFERENCES dog_food_orders(id),
+  template TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'queued' CHECK(status IN ('queued','sending','sent','failed','review','cancelled')),
+  recipient TEXT, subject TEXT, text_body TEXT, provider_id TEXT, provider_outcome TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0, first_attempt_at TEXT, next_attempt_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  lease_token TEXT, lease_until TEXT, last_error TEXT, sent_at TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TRIGGER food_delivery_completion_guard BEFORE UPDATE OF status ON dog_food_deliveries
+WHEN NEW.status='delivered' AND OLD.status<>'delivered' BEGIN
+  SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM dog_food_orders o JOIN dog_food_payments p ON p.order_id=o.id
+    WHERE o.id=NEW.order_id AND o.deleted_at IS NULL AND o.status NOT IN ('cancelled','refunded') AND p.status='captured')
+    OR NEW.proof_photo_url IS NULL OR NEW.delivered_at IS NULL
+    OR NOT EXISTS(SELECT 1 FROM route_partner_field_proofs p JOIN route_partner_tasks t ON t.id=p.task_id
+      WHERE t.dog_food_delivery_id=NEW.id AND p.organization_id='org-opwp' AND t.organization_id='org-opwp'
+      AND NEW.proof_photo_url='/api/field/photo/'||p.id||'/') THEN RAISE(ABORT,'Paid order and private proof required') END;
+END;
+CREATE TRIGGER food_delivery_no_insert_completed BEFORE INSERT ON dog_food_deliveries WHEN NEW.status='delivered'
+BEGIN SELECT RAISE(ABORT,'Complete an assigned delivery with private proof'); END;
+CREATE TRIGGER food_delivery_completion_immutable BEFORE UPDATE OF status ON dog_food_deliveries WHEN OLD.status='delivered' AND NEW.status<>'delivered'
+BEGIN SELECT RAISE(ABORT,'Completed delivery history is immutable; record an actual return'); END;
+CREATE TRIGGER food_delivery_completed AFTER UPDATE OF status ON dog_food_deliveries
+WHEN NEW.status='delivered' AND OLD.status<>'delivered' BEGIN
+  UPDATE dog_food_orders SET status='fulfilled',updated_at=CURRENT_TIMESTAMP WHERE id=NEW.order_id;
+  UPDATE dog_food_stock_lots SET usable_bags=usable_bags-(SELECT quantity FROM dog_food_lot_allocations a WHERE a.order_id=NEW.order_id AND a.lot_id=dog_food_stock_lots.id)
+    WHERE id IN (SELECT lot_id FROM dog_food_lot_allocations WHERE order_id=NEW.order_id AND consumed_at IS NULL AND released_at IS NULL);
+  UPDATE dog_food_lot_allocations SET consumed_at=CURRENT_TIMESTAMP WHERE order_id=NEW.order_id AND consumed_at IS NULL AND released_at IS NULL;
+  INSERT OR IGNORE INTO dog_food_transactional_outbox(event_key,customer_id,order_id,template)
+    VALUES ('delivered:'||NEW.id,NEW.customer_id,NEW.order_id,'delivered');
+END;
+CREATE TRIGGER food_paid_email AFTER INSERT ON dog_food_payments WHEN NEW.status='captured' BEGIN
+  INSERT OR IGNORE INTO dog_food_transactional_outbox(event_key,customer_id,order_id,template)
+    SELECT 'paid:'||NEW.order_id,customer_id,id,'paid' FROM dog_food_orders WHERE id=NEW.order_id;
+END;
+CREATE TRIGGER food_failed_email AFTER INSERT ON dog_food_payments WHEN NEW.status='failed' BEGIN
+  INSERT OR IGNORE INTO dog_food_transactional_outbox(event_key,customer_id,order_id,template)
+    SELECT 'failed:'||NEW.order_id,customer_id,id,'payment_failed' FROM dog_food_orders WHERE id=NEW.order_id;
+END;
+CREATE TRIGGER food_order_email AFTER INSERT ON dog_food_orders BEGIN
+  INSERT OR IGNORE INTO dog_food_transactional_outbox(event_key,customer_id,order_id,template)
+    VALUES ('ordered:'||NEW.id,NEW.customer_id,NEW.id,'ordered');
+END;
+CREATE TRIGGER food_scheduled_email AFTER UPDATE OF status ON dog_food_orders WHEN NEW.status='scheduled' AND OLD.status<>'scheduled' BEGIN
+  INSERT OR IGNORE INTO dog_food_transactional_outbox(event_key,customer_id,order_id,template)
+    VALUES ('scheduled:'||NEW.id,NEW.customer_id,NEW.id,'scheduled');
+END;
+CREATE TRIGGER food_on_way_email AFTER UPDATE OF status ON dog_food_deliveries WHEN NEW.status='out_for_delivery' AND OLD.status<>'out_for_delivery' BEGIN
+  INSERT OR IGNORE INTO dog_food_transactional_outbox(event_key,customer_id,order_id,template)
+    VALUES ('on_way:'||NEW.id,NEW.customer_id,NEW.order_id,'on_the_way');
+END;
+CREATE TRIGGER food_terminal_order AFTER UPDATE OF status ON dog_food_orders WHEN NEW.status IN ('cancelled','refunded') AND OLD.status<>NEW.status BEGIN
+  UPDATE dog_food_capacity_allocations SET released_at=CURRENT_TIMESTAMP WHERE order_id=NEW.id AND released_at IS NULL;
+  UPDATE dog_food_lot_allocations SET released_at=CURRENT_TIMESTAMP WHERE order_id=NEW.id AND consumed_at IS NULL AND released_at IS NULL;
+  UPDATE dog_food_deliveries SET status='cancelled',updated_at=CURRENT_TIMESTAMP WHERE order_id=NEW.id AND status<>'delivered';
+  UPDATE route_partner_tasks SET status='cancelled',updated_at=CURRENT_TIMESTAMP WHERE dog_food_delivery_id IN
+    (SELECT id FROM dog_food_deliveries WHERE order_id=NEW.id AND status='cancelled') AND status NOT IN ('completed','cancelled');
+  INSERT OR IGNORE INTO dog_food_transactional_outbox(event_key,customer_id,order_id,template)
+    VALUES (NEW.status||':'||NEW.id,NEW.customer_id,NEW.id,NEW.status);
+END;
+CREATE TRIGGER food_deleted_order AFTER UPDATE OF deleted_at ON dog_food_orders WHEN NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL BEGIN
+  UPDATE dog_food_capacity_allocations SET released_at=CURRENT_TIMESTAMP WHERE order_id=NEW.id AND released_at IS NULL;
+  UPDATE dog_food_lot_allocations SET released_at=CURRENT_TIMESTAMP WHERE order_id=NEW.id AND consumed_at IS NULL AND released_at IS NULL;
+  UPDATE dog_food_deliveries SET status='cancelled',updated_at=CURRENT_TIMESTAMP WHERE order_id=NEW.id AND status<>'delivered';
+  UPDATE route_partner_tasks SET status='cancelled',updated_at=CURRENT_TIMESTAMP WHERE dog_food_delivery_id IN
+    (SELECT id FROM dog_food_deliveries WHERE order_id=NEW.id AND status='cancelled') AND status NOT IN ('completed','cancelled');
+  UPDATE dog_food_transactional_outbox SET status='cancelled' WHERE order_id=NEW.id AND status IN ('queued','failed');
+END;
+CREATE TRIGGER food_deleted_customer AFTER UPDATE OF deleted_at ON dog_food_customers WHEN NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL BEGIN
+  UPDATE dog_food_orders SET deleted_at=NEW.deleted_at,automation_review='Customer archived; paid funds retained for office reconciliation' WHERE customer_id=NEW.id AND deleted_at IS NULL;
+  UPDATE dog_food_subscriptions SET status='paused',updated_at=CURRENT_TIMESTAMP WHERE customer_id=NEW.id AND status='active';
+END;
+
+CREATE TRIGGER sync_dog_food_customers_insert AFTER INSERT ON dog_food_customers BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('customer:'||NEW.id,'customer',NEW.id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_customers_update AFTER UPDATE ON dog_food_customers BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('customer:'||NEW.id,'customer',NEW.id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_addresses_insert AFTER INSERT ON dog_food_addresses BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('customer:'||NEW.customer_id,'customer',NEW.customer_id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_addresses_update AFTER UPDATE ON dog_food_addresses BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('customer:'||NEW.customer_id,'customer',NEW.customer_id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_accounts_insert AFTER INSERT ON dog_food_accounts BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('customer:'||NEW.customer_id,'customer',NEW.customer_id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_accounts_update AFTER UPDATE ON dog_food_accounts BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('customer:'||NEW.customer_id,'customer',NEW.customer_id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_orders_insert AFTER INSERT ON dog_food_orders BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('order:'||NEW.id,'order',NEW.id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_orders_update AFTER UPDATE ON dog_food_orders BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('order:'||NEW.id,'order',NEW.id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_order_items_insert AFTER INSERT ON dog_food_order_items BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('order:'||NEW.order_id,'order',NEW.order_id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_order_items_update AFTER UPDATE ON dog_food_order_items BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('order:'||NEW.order_id,'order',NEW.order_id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_payments_insert AFTER INSERT ON dog_food_payments BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('payment:'||NEW.id,'payment',NEW.id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_payments_update AFTER UPDATE ON dog_food_payments BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('payment:'||NEW.id,'payment',NEW.id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_subscriptions_insert AFTER INSERT ON dog_food_subscriptions BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('plan:'||NEW.id,'plan',NEW.id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_subscriptions_update AFTER UPDATE ON dog_food_subscriptions BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('plan:'||NEW.id,'plan',NEW.id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_subscription_items_insert AFTER INSERT ON dog_food_subscription_items BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('plan:'||NEW.subscription_id,'plan',NEW.subscription_id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_subscription_items_update AFTER UPDATE ON dog_food_subscription_items BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('plan:'||NEW.subscription_id,'plan',NEW.subscription_id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_deliveries_insert AFTER INSERT ON dog_food_deliveries BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('delivery:'||NEW.id,'delivery',NEW.id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_dog_food_deliveries_update AFTER UPDATE ON dog_food_deliveries BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('delivery:'||NEW.id,'delivery',NEW.id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_food_payment_order AFTER UPDATE OF status,refunded_amount_cents ON dog_food_payments BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('order:'||NEW.order_id,'order',NEW.order_id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER sync_food_delivery_order AFTER UPDATE ON dog_food_deliveries BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES ('order:'||NEW.order_id,'order',NEW.order_id)
+    ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;

@@ -1,0 +1,65 @@
+CREATE TABLE IF NOT EXISTS financial_management_settings (
+  id TEXT PRIMARY KEY,
+  books_status TEXT NOT NULL DEFAULT 'rectifying'
+    CHECK (books_status IN ('verified', 'rectifying', 'provisional')),
+  verified_cash_balance REAL,
+  verified_cash_as_of TEXT,
+  owner_monthly_pay REAL NOT NULL DEFAULT __OPWP_FINANCIAL_owner_monthly_pay__,
+  minimum_monthly_retained_cash REAL NOT NULL DEFAULT __OPWP_FINANCIAL_minimum_monthly_retained_cash__,
+  protected_cash_floor REAL NOT NULL DEFAULT __OPWP_FINANCIAL_protected_cash_floor__,
+  monthly_tax_reserve REAL NOT NULL DEFAULT __OPWP_FINANCIAL_monthly_tax_reserve__,
+  payroll_burden_percent REAL NOT NULL DEFAULT __OPWP_FINANCIAL_payroll_burden_percent__,
+  tony_current_rate REAL NOT NULL DEFAULT __OPWP_FINANCIAL_tony_current_rate__,
+  tony_current_weekly_hours REAL NOT NULL DEFAULT __OPWP_FINANCIAL_tony_current_weekly_hours__,
+  tony_target_rate REAL NOT NULL DEFAULT __OPWP_FINANCIAL_tony_target_rate__,
+  tony_target_weekly_hours REAL NOT NULL DEFAULT __OPWP_FINANCIAL_tony_target_weekly_hours__,
+  bria_current_rate REAL NOT NULL DEFAULT __OPWP_FINANCIAL_bria_current_rate__,
+  bria_current_weekly_hours REAL NOT NULL DEFAULT __OPWP_FINANCIAL_bria_current_weekly_hours__,
+  bria_target_weekly_hours REAL NOT NULL DEFAULT __OPWP_FINANCIAL_bria_target_weekly_hours__,
+  truck_purchase_price REAL NOT NULL DEFAULT __OPWP_FINANCIAL_truck_purchase_price__,
+  truck_down_payment REAL NOT NULL DEFAULT __OPWP_FINANCIAL_truck_down_payment__,
+  truck_apr_percent REAL NOT NULL DEFAULT __OPWP_FINANCIAL_truck_apr_percent__,
+  truck_term_months INTEGER NOT NULL DEFAULT __OPWP_FINANCIAL_truck_term_months__,
+  truck_monthly_insurance REAL NOT NULL DEFAULT __OPWP_FINANCIAL_truck_monthly_insurance__,
+  truck_monthly_maintenance REAL NOT NULL DEFAULT __OPWP_FINANCIAL_truck_monthly_maintenance__,
+  notes TEXT,
+  updated_by TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT OR IGNORE INTO financial_management_settings
+  (id, books_status, verified_cash_balance, verified_cash_as_of, notes)
+VALUES
+  ('primary', 'rectifying', __OPWP_FINANCIAL_verified_cash_balance__, __OPWP_PRIVATE_B001__, __OPWP_PRIVATE_B002__);
+
+CREATE TABLE IF NOT EXISTS financial_management_audit (
+  id TEXT PRIMARY KEY,
+  settings_id TEXT NOT NULL REFERENCES financial_management_settings(id),
+  actor_email TEXT,
+  prior_values TEXT,
+  next_values TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_financial_management_audit_created
+  ON financial_management_audit(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS financial_daily_snapshots (
+  id TEXT PRIMARY KEY,
+  snapshot_date TEXT NOT NULL UNIQUE,
+  source_status TEXT NOT NULL,
+  books_status TEXT NOT NULL,
+  qbo_cash REAL,
+  verified_cash REAL,
+  revenue_mtd REAL,
+  expenses_mtd REAL,
+  net_income_mtd REAL,
+  accounts_receivable REAL,
+  current_liabilities REAL,
+  payload TEXT NOT NULL DEFAULT '{}',
+  captured_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_financial_daily_snapshots_date
+  ON financial_daily_snapshots(snapshot_date DESC);

@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS route_invoice_history (
+  invoice_id TEXT PRIMARY KEY,
+  invoice_number TEXT NOT NULL,
+  client_id TEXT NOT NULL,
+  client_name TEXT NOT NULL,
+  invoice_date TEXT NOT NULL,
+  invoice_type TEXT NOT NULL,
+  status TEXT NOT NULL,
+  subtotal REAL NOT NULL,
+  items TEXT NOT NULL CHECK(json_valid(items)),
+  source_sha256 TEXT NOT NULL,
+  imported_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_route_invoice_history_date ON route_invoice_history(invoice_date);
+CREATE INDEX IF NOT EXISTS idx_route_invoice_history_client ON route_invoice_history(client_name);

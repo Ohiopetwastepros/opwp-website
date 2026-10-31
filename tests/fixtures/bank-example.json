@@ -1,0 +1,16 @@
+{
+  "accounts": [
+    {
+      "key": "operations",
+      "mask": "1111",
+      "label": "Example General Operations",
+      "namePattern": "general operations"
+    },
+    {
+      "key": "fuel",
+      "mask": "2222",
+      "label": "Example Fuel Account",
+      "namePattern": "fuel"
+    }
+  ]
+}

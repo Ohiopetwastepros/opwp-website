@@ -20,6 +20,7 @@ jobs:
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
       TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
       TURNSTILE_HOSTNAMES: localhost,127.0.0.1
+      SMOKE_ORIGIN: http://localhost:3000
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -27,6 +28,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: node scripts/prepare-build-inputs.mjs --synthetic
       - run: npm run audit:production
       - run: npm run check:migrations
       - run: npm run audit:routes

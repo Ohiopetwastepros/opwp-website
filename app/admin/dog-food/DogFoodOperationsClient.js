@@ -15,7 +15,7 @@ function Status({ value }) {
 }
 
 async function operation(body) {
-  const response = await fetch("/api/admin/dog-food/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const response = await fetch("/api/admin/dog-food/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({...body,commandId:crypto.randomUUID()}) });
   const data = await response.json();
   if (!response.ok || !data.ok) throw new Error(data.error || "The operation could not be completed.");
   return data.result;

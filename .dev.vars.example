@@ -8,6 +8,7 @@ ADMIN_DEV_BYPASS="true"
 ADMIN_USERNAME="owner"
 ADMIN_PASSWORD="use-a-strong-local-development-password"
 ADMIN_SESSION_SECRET=""
+ADMIN_MFA_ENCRYPTION_KEY=""
 FIELD_AUTH_SECRET=""
 PUBLIC_API_DEV_BYPASS="false"
 APP_ENV="development"
@@ -33,6 +34,7 @@ EMAIL_FROM_NAME="Owner | Ohio Pet Waste Pros"
 
 # Stripe test keys first. Store live values with Wrangler secrets, never here.
 STRIPE_SECRET_KEY=""
+DOG_FOOD_TEST_CHECKOUT="false"
 STRIPE_WEBHOOK_SECRET=""
 
 NEXT_PUBLIC_AIRTABLE_OPS_URL="https://airtable.com/appcAWPBQB8GmOrcT/tblhi8MGUOsWNmd37/viw5yCUbwl2GWnXff?blocks=hide"
@@ -56,7 +58,7 @@ GOOGLE_MAPS_BROWSER_KEY=""
 # QuickBooks Online production OAuth. Store real values with Wrangler secrets.
 QB_CLIENT_ID=""
 QB_CLIENT_SECRET=""
-QB_REDIRECT_URI="https://opwp-website.ohiopetwastepros.workers.dev/api/quickbooks/callback"
+QB_REDIRECT_URI="https://www.ohiopetwastepros.com/api/quickbooks/callback"
 # Generate 32 random bytes and base64 encode them. Never rotate after connecting
 # unless the QuickBooks connection is re-authorized.
 QB_TOKEN_ENCRYPTION_KEY=""
@@ -95,3 +97,21 @@ FINANCIAL_OS_SYNC_TOKEN=""
 # endpoint documentation are available.
 WARREN_API_URL=""
 WARREN_API_TOKEN=""
+
+# Meta automation stays off until a consent-enabled form and end-to-end test are approved.
+META_AUTOMATION_ENABLED="false"
+META_ALLOWED_PAGE_IDS=""
+META_AUTOMATION_APPROVAL_ID=""
+META_CADENCE_APPROVAL_ID=""
+# JSON keyed by form ID: {"FORM_ID":{"pageId":"PAGE_ID","consentField":"sms_consent","disclosure":"Exact approved disclosure","version":"reviewed-v1"}}
+META_APPROVED_SMS_FORMS="{}"
+META_TEST_MODE="false"
+META_TEST_APPROVAL_ID=""
+META_TEST_RECIPIENTS=""
+META_TEST_FORM_IDS=""
+
+# Unified field notices: disabled until verified sender/preferences and dedicated
+# API-generated Quo webhook are configured. API SMS uses metered credits.
+FIELD_NOTIFICATIONS_ENABLED="false"
+FIELD_SMS_DAILY_LIMIT="100"
+FIELD_QUO_WEBHOOK_SIGNING_KEY=""

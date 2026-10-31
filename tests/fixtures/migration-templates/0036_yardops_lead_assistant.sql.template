@@ -1,0 +1,169 @@
+CREATE TABLE IF NOT EXISTS lead_conversations (
+  id TEXT PRIMARY KEY,
+  submission_id TEXT NOT NULL UNIQUE REFERENCES submissions(id) ON DELETE CASCADE,
+  organization_id TEXT NOT NULL,
+  channel TEXT NOT NULL DEFAULT 'website'
+    CHECK (channel IN ('website','quo_sms','facebook_lead','messenger','manual')),
+  external_thread_id TEXT,
+  status TEXT NOT NULL DEFAULT 'open'
+    CHECK (status IN ('open','waiting','resolved','deleted')),
+  automation_mode TEXT NOT NULL DEFAULT 'suggest'
+    CHECK (automation_mode IN ('paused','suggest','approved')),
+  unread_count INTEGER NOT NULL DEFAULT 0 CHECK (unread_count >= 0),
+  last_inbound_at TEXT,
+  last_outbound_at TEXT,
+  deleted_at TEXT,
+  deletion_reason TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_lead_conversations_queue
+  ON lead_conversations(organization_id, status, last_inbound_at DESC, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS lead_messages (
+  id TEXT PRIMARY KEY,
+  conversation_id TEXT NOT NULL REFERENCES lead_conversations(id) ON DELETE CASCADE,
+  organization_id TEXT NOT NULL,
+  direction TEXT NOT NULL CHECK (direction IN ('inbound','outbound','internal')),
+  channel TEXT NOT NULL CHECK (channel IN ('website','quo_sms','facebook_lead','messenger','manual')),
+  provider_message_id TEXT,
+  body TEXT NOT NULL CHECK (length(body) BETWEEN 1 AND 4000),
+  delivery_status TEXT NOT NULL DEFAULT 'recorded'
+    CHECK (delivery_status IN ('recorded','queued','sending','sent','delivered','failed','cancelled')),
+  automated INTEGER NOT NULL DEFAULT 0 CHECK (automated IN (0,1)),
+  answer_key TEXT,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lead_messages_provider
+  ON lead_messages(channel, provider_message_id) WHERE provider_message_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_lead_messages_timeline
+  ON lead_messages(organization_id, conversation_id, created_at);
+
+CREATE TABLE IF NOT EXISTS lead_answer_library (
+  answer_key TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL,
+  category TEXT NOT NULL,
+  question TEXT NOT NULL,
+  answer_template TEXT NOT NULL,
+  keywords TEXT NOT NULL DEFAULT '[]',
+  response_mode TEXT NOT NULL DEFAULT 'static'
+    CHECK (response_mode IN ('static','pricing','service_day','handoff')),
+  approval_status TEXT NOT NULL DEFAULT 'approved'
+    CHECK (approval_status IN ('draft','approved','retired')),
+  auto_send_allowed INTEGER NOT NULL DEFAULT 0 CHECK (auto_send_allowed IN (0,1)),
+  version INTEGER NOT NULL DEFAULT 1,
+  updated_by TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_lead_answer_library_active
+  ON lead_answer_library(organization_id, approval_status, category);
+
+CREATE TABLE IF NOT EXISTS lead_automation_settings (
+  organization_id TEXT PRIMARY KEY,
+  assistant_enabled INTEGER NOT NULL DEFAULT 0 CHECK (assistant_enabled IN (0,1)),
+  quiet_hours_enabled INTEGER NOT NULL DEFAULT 1 CHECK (quiet_hours_enabled IN (0,1)),
+  quiet_hours_start TEXT NOT NULL DEFAULT '20:00',
+  quiet_hours_end TEXT NOT NULL DEFAULT '08:00',
+  time_zone TEXT NOT NULL DEFAULT 'America/New_York',
+  max_follow_up_touches INTEGER NOT NULL DEFAULT 3 CHECK (max_follow_up_touches BETWEEN 0 AND 6),
+  human_review_required INTEGER NOT NULL DEFAULT 1 CHECK (human_review_required IN (0,1)),
+  updated_by TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS lead_follow_up_jobs (
+  id TEXT PRIMARY KEY,
+  submission_id TEXT NOT NULL REFERENCES submissions(id) ON DELETE CASCADE,
+  conversation_id TEXT NOT NULL REFERENCES lead_conversations(id) ON DELETE CASCADE,
+  organization_id TEXT NOT NULL,
+  sequence_step INTEGER NOT NULL CHECK (sequence_step BETWEEN 1 AND 6),
+  due_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued'
+    CHECK (status IN ('queued','sending','sent','cancelled','failed')),
+  message_body TEXT NOT NULL CHECK (length(message_body) BETWEEN 1 AND 1000),
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count BETWEEN 0 AND 5),
+  provider_message_id TEXT,
+  error_message TEXT,
+  sent_at TEXT,
+  cancelled_at TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(conversation_id, sequence_step)
+);
+
+CREATE INDEX IF NOT EXISTS idx_lead_follow_up_due
+  ON lead_follow_up_jobs(organization_id, status, due_at);
+
+CREATE TABLE IF NOT EXISTS lead_airtable_sync (
+  submission_id TEXT PRIMARY KEY REFERENCES submissions(id) ON DELETE CASCADE,
+  organization_id TEXT NOT NULL,
+  airtable_record_id TEXT,
+  status TEXT NOT NULL DEFAULT 'queued'
+    CHECK (status IN ('queued','syncing','synced','failed')),
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count BETWEEN 0 AND 10),
+  next_attempt_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  payload_hash TEXT,
+  error_message TEXT,
+  synced_at TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_lead_airtable_due
+  ON lead_airtable_sync(organization_id, status, next_attempt_at);
+
+CREATE TABLE IF NOT EXISTS lead_suppressions (
+  organization_id TEXT NOT NULL,
+  phone_hash TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  source TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(organization_id, phone_hash)
+);
+
+CREATE TABLE IF NOT EXISTS lead_webhook_events (
+  provider TEXT NOT NULL,
+  event_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'received'
+    CHECK (status IN ('received','processed','ignored','failed')),
+  error_message TEXT,
+  received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  processed_at TEXT,
+  PRIMARY KEY(provider, event_id)
+);
+
+INSERT OR IGNORE INTO lead_automation_settings
+  (organization_id, assistant_enabled, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, time_zone,
+   max_follow_up_touches, human_review_required, updated_by)
+VALUES ('org-opwp', 0, 1, '20:00', '08:00', 'America/New_York', 3, 1, 'system');
+
+INSERT OR IGNORE INTO lead_answer_library
+  (answer_key,organization_id,category,question,answer_template,keywords,response_mode,auto_send_allowed,updated_by)
+VALUES
+  ('pricing','org-opwp','Quote','How much does service cost?','I can help with that. Your exact OPWP quote is based on the number of dogs, cleanup frequency, yard size, and current yard condition. I will use the quote already attached to your request rather than guessing.','["price","pricing","cost","how much","quote"]','pricing',1,'system'),
+  ('service_day','org-opwp','Scheduling','What day would you service my yard?','Service days are route-based. I can check the current route options for your ZIP and frequency; the final day is confirmed during signup.','["day","schedule","when","service date","come out"]','service_day',1,'system'),
+  ('how_it_works','org-opwp','Service','How does the service work?','Ohio Pet Waste Pros visits on your scheduled route day, removes pet waste from the agreed service area, and secures the gate before leaving. You do not need to be home as long as we can safely access the yard.','["how does it work","home","visit","what do you do"]','static',1,'system'),
+  ('gate_access','org-opwp','Service','Do I need to leave my gate open?','You do not need to leave the gate open. We just need reliable access on service day, and we secure the gate when the cleanup is complete. Please tell us about any lock or special access instructions.','["gate","locked","access","key"]','static',1,'system'),
+  ('weather','org-opwp','Scheduling','Do you work in bad weather?','We work through normal Ohio weather when it is safe to do so. Severe conditions or unsafe yard access can shift a visit, and we will communicate any service change.','["weather","rain","snow","storm","winter"]','static',1,'system'),
+  ('dogs_outside','org-opwp','Safety','Can my dogs be outside during service?','For everyone’s safety, please keep dogs inside unless OPWP has specifically approved another arrangement for your account.','["dog outside","dogs outside","pet outside","friendly dog"]','static',1,'system'),
+  ('commercial','org-opwp','Handoff','Do you service apartments, HOAs, or commercial properties?',__OPWP_PRIVATE_B024__,'["commercial","apartment","hoa","property manager","community","park"]','handoff',0,'system'),
+  ('human_help','org-opwp','Handoff','Can I talk with someone?',__OPWP_PRIVATE_B025__,__OPWP_PRIVATE_B026__,'handoff',1,'system');
+
+INSERT OR IGNORE INTO lead_conversations
+  (id,submission_id,organization_id,channel,status,automation_mode)
+SELECT lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-a' || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6))),
+       id,'org-opwp','website','open','suggest'
+FROM submissions
+WHERE kind IN ('partial_quote','question','waitlist','onboarding');
+
+INSERT OR IGNORE INTO lead_airtable_sync (submission_id,organization_id,status)
+SELECT id,'org-opwp','queued'
+FROM submissions
+WHERE kind IN ('partial_quote','question','waitlist','onboarding');

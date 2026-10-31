@@ -10,7 +10,7 @@ export const metadata = {
     type: "website",
     title: "Privacy Policy | Ohio Pet Waste Pros",
     description: "How we collect, use, and protect your personal information.",
-    url: "https://ohiopetwastepros.com/privacy-policy/",
+    url: "https://www.ohiopetwastepros.com/privacy-policy/",
     siteName: "Ohio Pet Waste Pros",
   },
 };

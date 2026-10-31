@@ -11,13 +11,13 @@ export const metadata = {
   robots: { index: true, follow: true },
   openGraph: {
     type: "article",
-    url: "https://ohiopetwastepros.com/about-our-pet-waste-removal-team/",
+    url: "https://www.ohiopetwastepros.com/about-our-pet-waste-removal-team/",
     siteName: "Ohio Pet Waste Pros",
     title: "About Ohio Pet Waste Pros | Family-Owned in NW Ohio",
     description:
       "A family-owned, eco-friendly dog waste removal team serving Greater Toledo & SE Michigan.",
     images: [
-      "https://ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
+      "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
     ],
   },
 };

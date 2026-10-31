@@ -1,0 +1,37 @@
+CREATE TABLE IF NOT EXISTS admin_mfa_accounts (
+  email TEXT PRIMARY KEY,
+  secret_cipher TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  last_counter INTEGER NOT NULL DEFAULT -1,
+  enabled_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS admin_mfa_challenges (
+  token_hash TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK(kind IN ('enroll','verify','reset')),
+  secret_cipher TEXT,
+  auth_version INTEGER NOT NULL,
+  credential_tag TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  used_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS admin_mfa_challenge_expiry ON admin_mfa_challenges(expires_at);
+CREATE TABLE IF NOT EXISTS admin_mfa_sessions (
+  token_hash TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  auth_version INTEGER NOT NULL,
+  credential_tag TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  trusted INTEGER NOT NULL DEFAULT 0,
+  device_label TEXT NOT NULL,
+  revoked_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS admin_mfa_sessions_account ON admin_mfa_sessions(email,expires_at);
+CREATE TABLE IF NOT EXISTS admin_mfa_recovery_codes (
+  code_hash TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  auth_version INTEGER NOT NULL,
+  used_at INTEGER
+);

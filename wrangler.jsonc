@@ -1,10 +1,24 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "opwp-website",
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-08-28",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
   "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "ohiopetwastepros.com",
+      "zone_name": "ohiopetwastepros.com",
+      "custom_domain": true
+    },
+    {
+      "pattern": "www.ohiopetwastepros.com",
+      "zone_name": "ohiopetwastepros.com",
+      "custom_domain": true
+    }
+  ],
   "assets": {
     "binding": "ASSETS",
     "directory": ".open-next/assets"
@@ -25,18 +39,28 @@
   ],
   "vars": {
     "APP_ENV": "production",
-    "SITE_ORIGIN": "https://ohiopetwastepros.com",
-    "WORKER_ORIGIN": "https://opwp-website.ohiopetwastepros.workers.dev",
-    "TURNSTILE_HOSTNAMES": "ohiopetwastepros.com,www.ohiopetwastepros.com,opwp-website.ohiopetwastepros.workers.dev",
+    "DISPATCH_AUTOMATION_ENABLED": "false",
+    "ROUTE_ROAD_CALCULATIONS_ENABLED": "false",
+    "SITE_ORIGIN": "https://www.ohiopetwastepros.com",
+    "WORKER_ORIGIN": "https://www.ohiopetwastepros.com",
+    "TURNSTILE_HOSTNAMES": "ohiopetwastepros.com,www.ohiopetwastepros.com",
     "OWNER_NOTIFICATION_EMAIL": "Craig@ohiopetwastepros.com",
     "EMAIL_FROM": "Craig@ohiopetwastepros.com",
     "EMAIL_FROM_NAME": "Craig | Ohio Pet Waste Pros",
     "EMAIL_PROVIDER": "resend",
-    "EMAIL_SENDING_ENABLED": "false",
+    "EMAIL_SENDING_ENABLED": "true",
     "RESEND_API_BASE_URL": "https://api.resend.com",
     "SMS_PROVIDER": "quo",
+    "FIELD_NOTIFICATIONS_ENABLED": "false",
+    "FIELD_SMS_DAILY_LIMIT": "100",
     "QUO_API_BASE_URL": "https://api.openphone.com",
-    "QUO_FROM_NUMBER": "+14192622371"
+    "QUO_FROM_NUMBER": "+14192622371",
+    "AIRTABLE_BASE_ID": "appcAWPBQB8GmOrcT",
+    "AIRTABLE_FAILED_PAYMENTS_TABLE_ID": "tbln6XXZzoubixUC8",
+    "AIRTABLE_LEADS_TABLE_ID": "tblCrdvGKkGobRWxL",
+    "META_GRAPH_API_VERSION": "v26.0",
+    "META_AUTOMATION_ENABLED": "false",
+    "META_TEST_MODE": "false"
   },
   "observability": {
     "enabled": true,

@@ -1,0 +1,10 @@
+import { verifyAdminRequest } from '@/lib/admin-auth';
+import { getDb } from '@/lib/db';
+import { getRuntimeEnv } from '@/lib/cloudflare';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { geocodeAddress } from '@/lib/geoapify';
+import { densityHandlers } from '@/lib/live-density-store.mjs';
+export const dynamic='force-dynamic';
+const handlers=densityHandlers({verifyAdminRequest,getDb,getEnv:getRuntimeEnv,checkRateLimit,geocode:geocodeAddress});
+export const GET=handlers.GET;
+export const POST=handlers.POST;

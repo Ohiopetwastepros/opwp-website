@@ -1,0 +1,32 @@
+{
+  "baseId": "appc40e3mlfOt2HoA",
+  "tableId": "tblEPfSqB2StlDXDU",
+  "fields": {
+    "Stable ID": "fldoZwhqi7mHUmwY2",
+    "Kind": "fldN6mo3ke2ZV30yW",
+    "Website Customer ID": "fldob66r8CIk0s0oG",
+    "Website Order ID": "fldVcxJql25IJNjPk",
+    "State": "fldZg5zyEmwJWy80K",
+    "Order Number": "fldIX7CZ6gEn5VdVk",
+    "Delivery Preference": "fldrWMzjOzE9MYGyP",
+    "Requested Date": "fldqkU3XP7tabIwj1",
+    "Scheduled Date": "fldEkHC8zj4HrZlcm",
+    "Next Charge Date": "fldXSRPwRklRCQZ1Q",
+    "Next Delivery Date": "fldPe4XTEAj7Mi2kz",
+    "Provider": "fldCA2ze0Rp29yP0R",
+    "Provider Reference": "fldaZcMYHauZCyh1z",
+    "Proof Status": "fldZREIIsEc63GEI8",
+    "Updated At": "fldWlV3bczCRKYOcA",
+    "Customer": "fldPYnXS2fwNExK5H",
+    "Food Items": "fld7u0aV5ERFcUTtW",
+    "Delivery Address": "fld1SW4SpseEYWccd",
+    "Review Note": "fldKQ9mXJW4XzeG0K",
+    "Subtotal": "fldZt63j6N1x4AjyX",
+    "Delivery Fee": "fld10WWBuxN4rzDbA",
+    "Tax": "fldvxEjmvGyRDSEuV",
+    "Total": "fldQFupCyeTwbKsVo",
+    "Amount": "fldpYKUXhLPWDGaZI"
+  },
+  "saleLineId": "fldO0l4TCtK3eJq4V",
+  "saleStockDate": "fldIsuDE9oeEV6D9e"
+}

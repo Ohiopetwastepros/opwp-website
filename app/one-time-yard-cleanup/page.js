@@ -12,10 +12,10 @@ export const metadata = {
     title: "One-Time & Spring Yard Cleanup | Ohio Pet Waste Pros",
     description:
       "A thorough one-time dog waste reset for built-up yards across Greater Toledo & SE Michigan.",
-    url: "https://ohiopetwastepros.com/one-time-yard-cleanup/",
+    url: "https://www.ohiopetwastepros.com/one-time-yard-cleanup/",
     siteName: "Ohio Pet Waste Pros",
     images: [
-      "https://ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
+      "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
     ],
   },
   twitter: { card: "summary_large_image" },

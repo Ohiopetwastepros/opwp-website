@@ -29,9 +29,12 @@ main { display: block; padding-top: 104px; }
 body:has(.opwp-admin-shell) [data-opwp-header],
 body:has(.opwp-admin-shell) [data-opwp-footer],
 body:has(.opwp-field-shell) [data-opwp-header],
-body:has(.opwp-field-shell) [data-opwp-footer] { display: none !important; }
+body:has(.opwp-field-shell) [data-opwp-footer],
+body:has(.opwp-food-account-shell) [data-opwp-header],
+body:has(.opwp-food-account-shell) [data-opwp-footer] { display: none !important; }
 body:has(.opwp-admin-shell) > main,
-body:has(.opwp-field-shell) > main { padding-top: 0 !important; }
+body:has(.opwp-field-shell) > main,
+body:has(.opwp-food-account-shell) > main { padding-top: 0 !important; }
 @media (max-width: 1000px) { main { padding-top: 96px; } }
 
 /* ---------- Reveal-on-scroll (matches source motion classes) ---------- */
@@ -71,6 +74,229 @@ a, button { transition: background-color .22s ease, color .22s ease, box-shadow 
   .opwp-g4, .opwp-g5 { grid-template-columns: repeat(2, 1fr) !important; }
   .opwp-g3, .opwp-g2, .opwp-gsplit { grid-template-columns: 1fr !important; }
   .opwp-gfoot { grid-template-columns: repeat(2, 1fr) !important; }
+  .opwp-blog-comparison { grid-template-columns: 1fr !important; }
   .opwp-padbig { padding-top: 46px !important; padding-bottom: 46px !important; }
   .opwp-padhero { padding-top: 38px !important; padding-bottom: 46px !important; }
+}
+
+/* ---------- Blog reading experience ---------- */
+.opwp-blog-hero {
+  color: #fff;
+  background:
+    radial-gradient(circle at 82% 18%, rgba(79, 158, 58, .22), transparent 26%),
+    linear-gradient(145deg, #214c70, #153550 62%, #102b42);
+}
+
+.opwp-blog-feature {
+  display: grid;
+  grid-template-columns: 1.1fr .9fr;
+  align-items: stretch;
+  background: #f5f4ee;
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+.opwp-blog-feature img {
+  width: 100%;
+  height: 100%;
+  min-height: 390px;
+  object-fit: cover;
+}
+
+.opwp-blog-feature-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 46px;
+}
+
+.opwp-blog-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  color: #658461;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.opwp-blog-feature h2 {
+  font-size: clamp(28px, 3.2vw, 38px);
+  line-height: 1.08;
+  letter-spacing: -.025em;
+  margin: 0 0 16px;
+}
+
+.opwp-blog-feature p {
+  color: #53606a;
+  font-size: 16px;
+  line-height: 1.65;
+  margin: 0 0 22px;
+}
+
+.opwp-blog-read { color: #1f4566; font-weight: 800; }
+
+.opwp-blog-feature:hover .opwp-blog-read,
+.opwp-blog-row a:hover h4 { color: #397c2e; }
+
+.opwp-blog-topics {
+  border-top: 1px solid #e2e6e1;
+  border-bottom: 1px solid #e2e6e1;
+  background: #fff;
+}
+
+.opwp-blog-topics > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-x: auto;
+  padding-top: 17px !important;
+  padding-bottom: 17px !important;
+  scrollbar-width: thin;
+}
+
+.opwp-blog-topics span {
+  color: #293943;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  margin-right: 7px;
+}
+
+.opwp-blog-topics a {
+  color: #52616b;
+  background: #f3f5f1;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 10px 14px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.opwp-blog-topics a:hover { background: #e7efe2; color: #2f6825; }
+
+.opwp-blog-directory-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 28px;
+  padding-bottom: 28px;
+  border-bottom: 2px solid #1c2a33;
+}
+
+.opwp-blog-directory-heading h2 {
+  font-size: 34px;
+  line-height: 1.1;
+  letter-spacing: -.025em;
+  margin: 0;
+}
+
+.opwp-blog-directory-heading p {
+  max-width: 390px;
+  color: #62707a;
+  font-size: 15px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.opwp-blog-topic-section {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 42px;
+  padding-top: 52px;
+  scroll-margin-top: 130px;
+}
+
+.opwp-blog-topic-label h3 {
+  font-size: 20px;
+  line-height: 1.2;
+  margin: 0 0 5px;
+}
+
+.opwp-blog-topic-label span { color: #78848c; font-size: 13.5px; }
+
+.opwp-blog-row { border-top: 1px solid #dfe4df; }
+.opwp-blog-row:last-child { border-bottom: 1px solid #dfe4df; }
+
+.opwp-blog-row a {
+  display: grid;
+  grid-template-columns: 170px 1fr 34px;
+  align-items: center;
+  gap: 25px;
+  padding: 22px 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.opwp-blog-row img {
+  width: 170px;
+  height: 110px;
+  border-radius: 11px;
+  object-fit: cover;
+}
+
+.opwp-blog-row time {
+  display: block;
+  color: #6d7a82;
+  font-size: 12.5px;
+  margin-bottom: 5px;
+}
+
+.opwp-blog-row h4 {
+  font-size: 21px;
+  line-height: 1.2;
+  letter-spacing: -.01em;
+  margin: 0 0 7px;
+  transition: color .2s ease;
+}
+
+.opwp-blog-row p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: #5d6972;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.opwp-blog-arrow {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: #1f4566;
+  background: #eef2ed;
+  border-radius: 50%;
+  font-size: 18px;
+}
+
+.opwp-blog-cta {
+  color: #fff;
+  background: #14304a;
+  padding: 66px 28px;
+  text-align: center;
+}
+
+.opwp-blog-cta > div { max-width: 760px; margin: 0 auto; }
+.opwp-blog-cta p { color: #9fd586; font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; margin: 0 0 9px; }
+.opwp-blog-cta h2 { font-size: clamp(30px, 4vw, 42px); line-height: 1.1; margin: 0 0 24px; }
+.opwp-blog-cta a { display: inline-block; color: #fff; background: #4f9e3a; border-radius: 11px; padding: 15px 28px; font-weight: 800; text-decoration: none; }
+
+@media (max-width: 768px) {
+  .opwp-blog-feature { grid-template-columns: 1fr; }
+  .opwp-blog-feature img { height: 250px; min-height: 0; }
+  .opwp-blog-feature-copy { padding: 28px 24px 31px; }
+  .opwp-blog-directory-heading { display: block; }
+  .opwp-blog-directory-heading p { margin-top: 12px; }
+  .opwp-blog-topic-section { grid-template-columns: 1fr; gap: 15px; padding-top: 42px; }
+  .opwp-blog-row a { grid-template-columns: 105px 1fr; gap: 16px; }
+  .opwp-blog-row img { width: 105px; height: 92px; }
+  .opwp-blog-row h4 { font-size: 17px; margin-bottom: 0; }
+  .opwp-blog-row p, .opwp-blog-arrow { display: none; }
 }

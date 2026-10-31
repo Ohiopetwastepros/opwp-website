@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Management sign in | OPWP", robots: { index: false, follow: false, nocache: true } };
 
 function safeNext(value) {
-  return typeof value === "string" && value.startsWith("/admin") && !value.startsWith("//") ? value : "/admin/route-partner/";
+  return typeof value === "string" && (value === "/admin" || value.startsWith("/admin/")) && !value.includes("\\") ? value : "/admin/";
 }
 
 export default async function LoginPage({ searchParams }) {

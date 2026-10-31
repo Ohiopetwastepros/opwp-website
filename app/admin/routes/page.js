@@ -3,40 +3,34 @@ import { redirect } from "next/navigation";
 import { verifyAdminRequest } from "@/lib/admin-auth";
 import { getDb } from "@/lib/db";
 import { getActiveSubscriptionRouteSummary } from "@/lib/route-intelligence";
+import AdminSectionShell from "../AdminSectionShell";
 import RouteAnalysisClient from "./RouteAnalysisClient";
 import OnboardingRouteTool from "./OnboardingRouteTool";
-import OfficeAccessManager from "./OfficeAccessManager";
+import nav from "../admin-navigation.module.css";
 import styles from "./routes.module.css";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Route Intelligence | OPWP Executive Cockpit", robots: { index: false, follow: false, nocache: true } };
+export const metadata = { title: "Route Planning | OPWP Operations", robots: { index: false, follow: false, nocache: true } };
 
-export default async function RoutesPage() {
+export default async function RoutesPage({ searchParams }) {
   const auth = await verifyAdminRequest(await headers());
   if (!auth.authorized) redirect("/");
+  const params = await searchParams;
+  if (params?.manage === "office-access") redirect("/admin/office-access/");
   const db = getDb();
   let source = null;
-  try { source = db ? await getActiveSubscriptionRouteSummary(db) : null; } catch { source = null; }
+  try { source = db ? await getActiveSubscriptionRouteSummary(db) : null; } catch {}
 
   return (
-    <main className={`${styles.shell} opwp-admin-shell`}>
-      <aside className={styles.rail}>
-        <a className={styles.brand} href="/admin/"><span>O</span><div><strong>OPWP</strong><small>Operating Group</small></div></a>
-        <nav aria-label="Route navigation">
-          <a href="/admin/">Executive overview</a>
-          <a href="/admin/?view=operations">Route operations</a>
-          <a className={styles.active} href="/admin/routes/">Route intelligence</a>
-          <a href="/admin/route-partner/">Route Partner</a>
-          <a href="/admin/dog-food/">Extreme Dog Fuel</a>
-          <a href="/admin/?view=systems">Systems &amp; controls</a>
-        </nav>
-        <div className={styles.railFoot}><span />Protected executive access</div>
-      </aside>
-      <div className={styles.workspace}>
-        <header className={styles.header}>
-          <div><div className={styles.eyebrow}>Active subscriptions + road-time planning</div><h1>Route intelligence</h1><p>Protect fixed service commitments, increase route density, and expose the shortest practical path from one paid stop to the next.</p></div>
-          <div className={styles.identity}>Signed in as<br/><strong>{auth.email}</strong></div>
-        </header>
+    <AdminSectionShell section="planning" title="Route planning & assignments" description="Plan customer placement, stop order, and future route capacity." email={auth.email}>
+        <section className={nav.notice}><strong>Routing &amp; CRM workspace</strong>Use these tools to plan and assign work. Modeled revenue per hour is a planning estimate. Review completed service revenue and allocated costs in <a href="/admin/financials/routes/">Route profitability</a>.<div className={nav.shortcuts}><a href="#customer-assignment">Customer assignments</a><a href="#route-analysis">Road-time plan</a><a href="/admin/route-partner/">Daily dispatch</a><a id="office-access" href="/admin/office-access/">Office access</a></div></section>
+        <div id="customer-assignment"><OnboardingRouteTool /></div>
+        <section className={nav.notice} aria-label="Route data accuracy">
+          <strong>Route data accuracy: {source?.accuracyAudit?.status === 'verified' ? 'Roster verified' : 'Not fully verified'}</strong>
+          <p>{source?.accuracyAudit?.reason || (source?.accuracyAudit?.status === 'verified' ? 'Sweep & Go, Airtable, and the stored planning roster agree. Daily dispatch exceptions and stop order require separate dispatch evidence.' : 'The automatic comparison has missing evidence or differences. Review current Sweep & Go assignments before acting on a route proposal.')}</p>
+          {source?.accuracyAudit?.capturedAt && <p>Last check: {source.accuracyAudit.capturedAt}. Findings: {source.accuracyAudit.counts?.issues ?? 'Source unavailable'}.</p>}
+          {source?.accuracyAudit?.issues?.length > 0 && <details><summary>View differences and missing evidence</summary><ul>{source.accuracyAudit.issues.slice(0, 100).map((issue, index) => <li key={index}>Client {issue.clientId || 'source'}: {issue.code.replaceAll('_', ' ')} {issue.field && `(${issue.field})`}{issue.expected && ` — expected ${issue.expected}`}{issue.actual && `; found ${issue.actual}`}</li>)}</ul></details>}
+        </section>
         {!source ? <div className={styles.error}>The protected active-subscription snapshot is not available. The hourly data refresh will retry automatically.</div> : (
           <>
             <section className={styles.guardrails}>
@@ -48,12 +42,9 @@ export default async function RoutesPage() {
                 <div><span>04</span><strong>Owner approval is required</strong><p>No service day or technician assignment is ever pushed back automatically.</p></div>
               </div>
             </section>
-            <OnboardingRouteTool />
-            <div id="office-access"><OfficeAccessManager /></div>
             <RouteAnalysisClient initialSummary={source} />
           </>
         )}
-      </div>
-    </main>
+    </AdminSectionShell>
   );
 }

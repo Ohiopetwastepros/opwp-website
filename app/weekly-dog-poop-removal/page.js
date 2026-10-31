@@ -11,13 +11,14 @@ export const metadata = {
     title: "Weekly Dog Poop Removal | Ohio Pet Waste Pros",
     description:
       "A dependable once-a-week pooper scooper visit across Greater Toledo & SE Michigan.",
-    url: "https://ohiopetwastepros.com/weekly-dog-poop-removal/",
+    url: "https://www.ohiopetwastepros.com/weekly-dog-poop-removal/",
     siteName: "Ohio Pet Waste Pros",
-    images: [
-      "https://ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
-    ],
+    images: ["https://www.ohiopetwastepros.com/assets/photos/opwp-social-share.webp"],
   },
-  twitter: { card: "summary_large_image" },
+  twitter: {
+    card: "summary_large_image",
+    images: ["https://www.ohiopetwastepros.com/assets/photos/opwp-social-share.webp"],
+  },
   other: {
     "geo.region": "US-OH",
     "geo.placename": "Holland, Ohio",

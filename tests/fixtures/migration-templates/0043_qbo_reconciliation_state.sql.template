@@ -1,0 +1,9 @@
+CREATE TABLE qbo_reconciliation_state (
+  id TEXT PRIMARY KEY CHECK(id='primary'),
+  realm_id TEXT,
+  last_checked_at TEXT,
+  next_check_at TEXT,
+  last_error TEXT,
+  lease_token TEXT,
+  lease_until TEXT
+);

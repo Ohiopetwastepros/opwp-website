@@ -1,0 +1,21 @@
+ALTER TABLE growth_leads ADD COLUMN outcome_reason TEXT;
+ALTER TABLE growth_leads ADD COLUMN outcome_note TEXT;
+ALTER TABLE growth_leads ADD COLUMN converted_at TEXT;
+ALTER TABLE growth_leads ADD COLUMN lost_at TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_growth_leads_outcomes
+  ON growth_leads(organization_id, stage, outcome_reason, converted_at, lost_at);
+
+INSERT OR IGNORE INTO lead_answer_library
+  (answer_key,organization_id,category,question,answer_template,keywords,response_mode,auto_send_allowed,updated_by)
+VALUES
+  ('arrival_window','org-opwp','Scheduling','What time will you arrive?','Our stops follow the most efficient route for the day, so we cannot guarantee an exact arrival time. Your technician sends an on-the-way text, and we can provide a rough window when the route is underway.','["what time","arrival time","time frame","timeframe","when will you arrive","when are you coming"]','static',1,'system'),
+  ('home_required','org-opwp','Service','Do I need to be home?','You do not need to be home. As long as we can safely access the cleanup area and any gate instructions are current, your technician can complete service and will send an on-the-way text.','["need to be home","have to be home","someone home","will be home","do i need to be there"]','static',1,'system'),
+  ('weekly_or_biweekly','org-opwp','Quote','Do you offer weekly and biweekly service?','Yes. OPWP offers route-based weekly and biweekly service in eligible areas. I will use the dogs, yard, frequency, and condition already attached to your request to give the correct price.','["weekly or biweekly","every other week","every couple weeks","biweekly price","weekly price"]','pricing',1,'system'),
+  ('one_time_cleanup','org-opwp','Quote','Can I schedule a one-time cleanup?','Yes. One-time cleanup pricing depends on the number of dogs, yard size, and how long it has been since the yard was thoroughly cleaned. Share those details and we can confirm the price before scheduling.','["one time","onetime","single cleanup","just once","extra pickup"]','handoff',0,'system'),
+  ('initial_cleanup','org-opwp','Quote','Is the first or initial cleanup priced differently?','An initial cleanup may be different from the recurring rate because it reflects the current yard condition. OPWP confirms that scope before service and keeps the recurring monthly quote separate.','["initial cleanup","first cleanup","first visit","weeks of waste","yard condition"]','handoff',0,'system'),
+  ('billing_timing','org-opwp','Billing','When am I billed?',__OPWP_PRIVATE_B027__,'["when billed","billing date","charged","payment due","first of the month","invoice"]','handoff',0,'system'),
+  ('terms_and_start','org-opwp','Onboarding','What do I need to do before service starts?','After your service details are confirmed, OPWP sends the terms of service for acceptance. Your first cleanup and recurring route day are confirmed during setup.','["start service","get started","before you come","terms of service","accept terms","sign up"]','static',1,'system'),
+  ('route_day_flexibility','org-opwp','Scheduling','Can I choose any service day?','Service days are based on the route serving your area. Tell us the day you prefer and we will confirm the closest available option for your ZIP and frequency.','["choose a day","specific day","friday service","monday service","change service day"]','service_day',1,'system'),
+  ('service_area','org-opwp','Service area','Do you service my neighborhood?','Send your ZIP code and OPWP will check the current route. Availability and the final service day are confirmed from the active route map rather than guessed.','["service my area","service area","my zip","my neighborhood","come to"]','service_day',1,'system'),
+  ('payment_options','org-opwp','Billing','What payment methods do you accept?','OPWP will confirm the available payment method during setup. Any check, third-party payee, or special billing arrangement needs review before it is promised.','["pay by check","payment method","payee","credit card","how do i pay"]','handoff',0,'system');

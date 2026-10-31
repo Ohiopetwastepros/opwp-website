@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import styles from "./routes.module.css";
 
 const number = (value, digits = 0) => new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(Number(value) || 0);
-const money = (value) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value) || 0);
-const hours = (minutes) => `${number((Number(minutes) || 0) / 60, 1)} hr`;
+const money = (value) => value === null || value === undefined ? "Pending" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value) || 0);
+const hours = (minutes) => minutes === null || minutes === undefined ? "Pending" : `${number((Number(minutes) || 0) / 60, 1)} hr`;
 
 export default function RouteAnalysisClient({ initialSummary }) {
   const [summary, setSummary] = useState(initialSummary);
@@ -19,9 +19,9 @@ export default function RouteAnalysisClient({ initialSummary }) {
     service: result.service + Number(route.serviceMinutes || 0),
   }), { miles: 0, drive: 0, service: 0 }), [plan]);
 
-  const transition = plan?.officeTransitionScenario;
-  const density = plan?.selectiveDayScenario;
-  const mondayTests = plan?.mondayMoveTests ?? [];
+  const transition = plan?.status === "complete" ? plan.officeTransitionScenario : null;
+  const density = plan?.status === "complete" ? plan.selectiveDayScenario : null;
+  const mondayTests = plan?.status === "complete" ? plan.mondayMoveTests ?? [] : [];
   const transitionTechnicians = useMemo(() => {
     const technicians = new Map();
     for (const route of transition?.routes ?? []) {
@@ -56,7 +56,7 @@ export default function RouteAnalysisClient({ initialSummary }) {
     </section>
 
     <section className={styles.results}>
-      <div className={styles.resultHead}><div><div className={styles.eyebrow}>Subscription coverage</div><h2>The weekly operating footprint</h2><p>Captured {summary?.sourceSnapshotAt ? new Date(summary.sourceSnapshotAt).toLocaleString() : "from the latest protected snapshot"}.</p></div><span className={`${styles.status} ${summary?.geocodedCustomers === summary?.activeCustomers ? styles.complete : ""}`}>{summary?.geocodedCustomers === summary?.activeCustomers ? "street-ready" : "building coordinates"}</span></div>
+      <div className={styles.resultHead}><div><div className={styles.eyebrow}>Subscription coverage</div><h2>The weekly operating footprint</h2><p>Captured {summary?.sourceSnapshotAt ? new Date(summary.sourceSnapshotAt).toLocaleString("en-US", { timeZone: "America/New_York" }) : "from the latest protected snapshot"}.</p></div><span className={`${styles.status} ${summary?.geocodedCustomers === summary?.activeCustomers ? styles.complete : ""}`}>{summary?.geocodedCustomers === summary?.activeCustomers ? "street-ready" : "building coordinates"}</span></div>
       <div className={styles.summaryGrid}>
         <div><span>Active customers</span><strong>{number(summary?.activeCustomers)}</strong></div>
         <div><span>Weekly equivalent</span><strong>{number(summary?.weeklyEquivalentVisits, 1)}</strong></div>
@@ -82,18 +82,21 @@ export default function RouteAnalysisClient({ initialSummary }) {
     {loading ? <section className={styles.loading}><div className={styles.loadingMark}><i /></div><div><strong>Updating the route book</strong><p>Reusing street coordinates and calculating road-time sequences without changing any customer commitments.</p></div></section> : null}
 
     {plan ? <section className={styles.results}>
-      <div className={styles.resultHead}><div><div className={styles.eyebrow}>Road-time model · week of {plan.planningWeekStart ? new Date(`${plan.planningWeekStart}T12:00:00`).toLocaleDateString() : "current"}</div><h2>Shortest current-week sequence by day and technician</h2><p>Weekly work is always included. Biweekly A/B and monthly cohorts are anchored from the latest completed service date; Tony&apos;s drive time and mileage include travel from and back to his Perrysburg depot.</p></div><span className={`${styles.status} ${plan.status === "complete" ? styles.complete : ""}`}>{plan.status}</span></div>
-      <div className={styles.summaryGrid}><div><span>Route sectors</span><strong>{number(plan.routes?.length)}</strong></div><div><span>Road miles</span><strong>{number(totals.miles, 1)}</strong></div><div><span>Drive time</span><strong>{hours(totals.drive)}</strong></div><div><span>Service time</span><strong>{hours(totals.service)}</strong></div><div><span>Snapshot</span><strong className={styles.smallStrong}>{plan.sourceSnapshotAt ? new Date(plan.sourceSnapshotAt).toLocaleDateString() : "Current"}</strong></div></div>
+      <div className={styles.resultHead}><div><div className={styles.eyebrow}>Road-time model · week of {plan.planningWeekStart ? new Date(`${plan.planningWeekStart}T12:00:00Z`).toLocaleDateString("en-US", { timeZone: "America/New_York" }) : "current"}</div><h2>Shortest current-week sequence by day and technician</h2><p>Weekly work is always included. Biweekly A/B and monthly cohorts are anchored from the latest completed service date; Tony&apos;s drive time and mileage include travel from and back to his Perrysburg depot.</p></div><span className={`${styles.status} ${plan.status === "complete" ? styles.complete : ""}`}>{plan.status}</span></div>
+      <div className={styles.summaryGrid}><div><span>Route sectors</span><strong>{number(plan.routes?.length)}</strong></div><div><span>Road miles</span><strong>{number(totals.miles, 1)}</strong></div><div><span>Drive time</span><strong>{hours(totals.drive)}</strong></div><div><span>Service time</span><strong>{hours(totals.service)}</strong></div><div><span>Snapshot</span><strong className={styles.smallStrong}>{plan.sourceSnapshotAt ? new Date(plan.sourceSnapshotAt).toLocaleDateString("en-US", { timeZone: "America/New_York" }) : "Current"}</strong></div></div>
       <div className={styles.routeGrid}>{(plan.routes ?? []).map((route) => <article className={styles.routeCard} key={`${route.technicianId}-${route.routeId}`}>
         <header><div><span>{route.routeId}</span><h3>{route.technicianName || "Unassigned"}</h3></div><b>{number(route.distanceMiles, 1)} mi</b></header>
-        <div className={styles.routeStats}><div><span>Stops</span><strong>{number(route.stopCount)}</strong></div><div><span>Drive</span><strong>{hours(route.driveMinutes)}</strong></div><div><span>Revenue</span><strong>{money(route.routeRevenue)}</strong></div><div><span>Revenue / hr</span><strong className={Number(route.revenuePerPlannedHour) >= 100 ? "" : styles.belowTarget}>{money(route.revenuePerPlannedHour)}</strong></div></div>
+        <div className={styles.routeStats}><div><span>Stops</span><strong>{number(route.stopCount)}</strong></div><div><span>Drive</span><strong>{hours(route.driveMinutes)}</strong></div><div><span>Planned revenue</span><strong>{money(route.routeRevenue)}</strong></div><div><span>Planned revenue / hr</span><strong className={Number(route.revenuePerPlannedHour) >= 100 ? "" : styles.belowTarget}>{money(route.routeStatus === "complete" ? route.revenuePerPlannedHour : null)}</strong></div></div>
         <ol className={styles.stopList}>{(route.stopSequence ?? []).map((stop) => <li key={`${stop.sequence}-${stop.customer}`}><span>{stop.sequence}</span><div><strong>{stop.customer}</strong><small>{stop.address}</small></div>{stop.fixedDays ? <b>fixed</b> : null}</li>)}</ol>
       </article>)}</div>
       <div className={styles.disclosure}><strong>Interpretation:</strong> Road-time sequencing optimizes this week's cadence-eligible customers already assigned to that day and technician. Revenue/hour uses recurring revenue per scheduled visit against service plus road time, with a $100/hour target. {number(plan.cadenceAnchoredCustomers)}/{number(plan.cadenceCustomerCount)} biweekly/monthly accounts are date-anchored; {number(plan.unanchoredCadenceCustomers?.length)} are included pending a completed-date anchor. This does not change SNG.</div>
     </section> : <section className={styles.loading}><div className={styles.loadingMark}>→</div><div><strong>The route plan is being assembled automatically</strong><p>{number(summary?.activeCustomers - summary?.geocodedCustomers)} addresses remain to be street-matched. The hourly recovery job will continue until the road-time model is complete.</p></div></section>}
 
+    {plan && plan.status !== "complete" ? <div className={styles.error}>Road-time coverage is incomplete. Staffing projections, team hourly rates, and day-move conclusions are withheld until every modeled route has complete travel time.</div> : null}
+
+    <details className={styles.planningDrawer}><summary>Planning scenarios &amp; proposed changes<span>Modeled estimates; review the snapshot date before acting. Historical profitability is in Financials.</span></summary>
     {transition ? <section className={styles.candidates}>
-      <div className={styles.candidateHead}><div><div className={styles.eyebrow}>Current staffing scenario</div><h2>Tony full-time + Craig relief</h2></div><p>Tony is the sole regular route owner Monday through Friday. Craig provides Monday-only relief when needed, and Bria is excluded from future route ownership.</p></div>
+      <div className={styles.candidateHead}><div><div className={styles.eyebrow}>Staffing scenario</div><h2>Tony full-time + Craig relief</h2></div><p>Tony is the sole regular route owner Monday through Friday. Craig provides Monday-only relief when needed, and Bria is excluded from future route ownership.</p></div>
       <div className={styles.summaryGrid}>
         <div><span>Modeled customers moved</span><strong>{number(transition.changedCustomers)}</strong></div>
         <div><span>Current fragmented miles</span><strong>{number(transition.currentTotals?.miles, 1)}</strong></div>
@@ -109,7 +112,7 @@ export default function RouteAnalysisClient({ initialSummary }) {
           return <article className={styles.scenarioCard} key={row.technician}><span>Future field book</span><h3>{row.technician}</h3><strong>{hours(row.minutes)}</strong><p>{number(row.stops)} stops · {number(row.miles, 1)} road miles · {money(row.revenuePerHour)}/hour{isTony ? ` · ${number(operationalHours, 1)} operational hours to the 40-hour guarantee · ${number(hoursBeforeCutoff, 1)} hours remain to the 45-hour cutoff.` : "."}</p></article>;
         })}
       </div>
-      <div className={styles.tableWrap}><table className={styles.routeTable}><thead><tr><th>Day</th><th>Modeled owner</th><th>Stops</th><th>Miles</th><th>Field time</th><th>Revenue</th><th>Revenue / hour</th></tr></thead><tbody>{(transition.routes ?? []).map((route) => <tr key={`transition-${route.technicianName}-${route.routeId}`}><td><strong>{route.routeId}</strong></td><td>{route.technicianName}</td><td>{number(route.stopCount)}</td><td>{number(route.distanceMiles, 1)}</td><td>{hours(route.plannedMinutes)}</td><td>{money(route.routeRevenue)}</td><td><span className={Number(route.revenuePerPlannedHour) >= 100 ? styles.gain : styles.warningRate}>{money(route.revenuePerPlannedHour)}</span></td></tr>)}</tbody></table></div>
+      <div className={styles.tableWrap}><table className={styles.routeTable}><thead><tr><th>Day</th><th>Modeled owner</th><th>Stops</th><th>Miles</th><th>Field time</th><th>Revenue</th><th>Revenue / hour</th></tr></thead><tbody>{(transition.routes ?? []).map((route) => <tr key={`transition-${route.technicianName}-${route.routeId}`}><td><strong>{route.routeId}</strong></td><td>{route.technicianName}</td><td>{number(route.stopCount)}</td><td>{number(route.distanceMiles, 1)}</td><td>{hours(route.plannedMinutes)}</td><td>{money(route.routeRevenue)}</td><td><span className={Number(route.revenuePerPlannedHour) >= 100 ? styles.gain : styles.warningRate}>{money(route.routeStatus === "complete" ? route.revenuePerPlannedHour : null)}</span></td></tr>)}</tbody></table></div>
       <div className={styles.disclosure}><strong>Staffing rule:</strong> Tony is guaranteed at least {number(transition.staffingGuarantee?.minimumPaidHours || 40)} paid hours each week, and {number(transition.staffingGuarantee?.weeklyHoursCutoff || 45)} hours is the management cutoff. Tony&apos;s modeled road time includes both depot legs. The model reserves {number(transition.staffingGuarantee?.paidOperationalHoursToMinimum, 1)} hours beyond route time for approved operational work and retains {number(transition.staffingGuarantee?.hoursBeforeCutoff, 1)} hours below the cutoff for breaks, delays, overflow, and one-time jobs. “Customers moved” means modeled technician ownership only; no customer day changes and no SNG/Airtable updates occur.</div>
     </section> : null}
 
@@ -137,5 +140,6 @@ export default function RouteAnalysisClient({ initialSummary }) {
       <div className={styles.candidateHead}><div><div className={styles.eyebrow}>Approval queue</div><h2>Flexible-day density opportunities</h2></div><p>Twice-weekly customers are excluded. These are screening candidates based on nearby customers; approve only after checking customer preference and full-route impact.</p></div>
       <div className={styles.tableWrap}><table className={styles.routeTable}><thead><tr><th>Customer</th><th>Area</th><th>Current</th><th>Consider</th><th>Current neighbor</th><th>Proposed neighbor</th><th>Proximity gain</th></tr></thead><tbody>{plan.recommendations.map((item) => <tr key={item.customerId}><td><strong>{item.customer}</strong></td><td>{item.region}</td><td>{item.currentDay}</td><td><b>{item.suggestedDay}</b></td><td>{item.currentNearestCustomer}<small>{number(item.currentNearestMiles, 2)} mi</small></td><td>{item.suggestedNearestCustomer}<small>{number(item.suggestedNearestMiles, 2)} mi</small></td><td><span className={styles.gain}>{number(item.proximityMilesSaved, 2)} mi</span></td></tr>)}</tbody></table></div>
     </section> : null}
+    </details>
   </>;
 }

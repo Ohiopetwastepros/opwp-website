@@ -1,0 +1,56 @@
+CREATE TABLE IF NOT EXISTS failed_payment_sms (
+  id TEXT PRIMARY KEY,
+  invoice_id TEXT NOT NULL UNIQUE,
+  source_event_id TEXT NOT NULL,
+  client_ref TEXT,
+  client_name TEXT,
+  recipient TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'awaiting_approval'
+    CHECK (status IN ('awaiting_approval','sending','sent','failed','cancelled')),
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  sending_at TEXT,
+  sent_at TEXT,
+  failed_at TEXT,
+  cancelled_at TEXT,
+  actioned_at TEXT,
+  actioned_by TEXT,
+  provider_message_id TEXT,
+  error_message TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (source_event_id) REFERENCES sng_events(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_failed_payment_sms_status
+  ON failed_payment_sms(status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_failed_payment_sms_client
+  ON failed_payment_sms(client_ref, status, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS failed_payment_sms_usage (
+  usage_day TEXT PRIMARY KEY,
+  send_count INTEGER NOT NULL DEFAULT 0 CHECK (send_count BETWEEN 0 AND 50),
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT OR IGNORE INTO failed_payment_sms
+  (id,invoice_id,source_event_id,client_ref,client_name,recipient,status,next_attempt_at,failed_at,error_message,created_at,updated_at)
+SELECT
+  lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(2))) || '-' ||
+    lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(6))),
+  CAST(json_extract(payload,'$.data.invoice_id') AS TEXT),
+  id,
+  CAST(json_extract(payload,'$.data.client') AS TEXT),
+  COALESCE(json_extract(payload,'$.data.client_name'),customer_name),
+  COALESCE(json_extract(payload,'$.data.cell_phone'),phone,''),
+  CASE WHEN length(COALESCE(json_extract(payload,'$.data.cell_phone'),phone,''))>=10 THEN 'awaiting_approval' ELSE 'failed' END,
+  CURRENT_TIMESTAMP,
+  CASE WHEN length(COALESCE(json_extract(payload,'$.data.cell_phone'),phone,''))<10 THEN CURRENT_TIMESTAMP END,
+  CASE WHEN length(COALESCE(json_extract(payload,'$.data.cell_phone'),phone,''))<10 THEN 'SNG declined payment did not include a valid customer phone number.' END,
+  received_at,
+  CURRENT_TIMESTAMP
+FROM sng_events
+WHERE event_type='client:client_payment_declined'
+  AND received_at>=datetime('now','-14 days')
+  AND json_extract(payload,'$.data.invoice_id') IS NOT NULL;

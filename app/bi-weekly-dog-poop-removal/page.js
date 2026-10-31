@@ -9,9 +9,9 @@ export const metadata = {
     type: "website",
     title: "Bi-Weekly Dog Poop Removal | Ohio Pet Waste Pros",
     description: "Every-other-week pooper scooper service for lighter-use yards across Greater Toledo & SE Michigan.",
-    url: "https://ohiopetwastepros.com/bi-weekly-dog-poop-removal/",
+    url: "https://www.ohiopetwastepros.com/bi-weekly-dog-poop-removal/",
     siteName: "Ohio Pet Waste Pros",
-    images: ["https://ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png"],
+    images: ["https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png"],
   },
   twitter: { card: "summary_large_image" },
   other: {

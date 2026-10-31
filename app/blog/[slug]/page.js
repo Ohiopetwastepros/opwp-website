@@ -53,16 +53,31 @@ export default async function Page({ params }) {
     image: [`${site.url}${p.image}`],
     articleSection: p.category,
     ...(iso ? { datePublished: iso, dateModified: iso } : {}),
-    author: { "@type": "Organization", name: "Ohio Pet Waste Pros" },
+    author: {
+      "@type": "Organization",
+      name: "Ohio Pet Waste Pros",
+      url: `${site.url}/about-our-pet-waste-removal-team/`,
+    },
     publisher: {
       "@type": "Organization",
       name: "Ohio Pet Waste Pros",
       logo: {
         "@type": "ImageObject",
-        url: "https://ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
+        url: "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
       },
     },
+    isAccessibleForFree: true,
     url,
+  };
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: `${site.url}/` },
+      { "@type": "ListItem", position: 2, name: "Blog", item: `${site.url}/blog/` },
+      { "@type": "ListItem", position: 3, name: p.title, item: url },
+    ],
   };
 
   return (
@@ -70,6 +85,10 @@ export default async function Page({ params }) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
       {/* ARTICLE HERO */}
@@ -118,6 +137,7 @@ export default async function Page({ params }) {
             width: "100%",
             height: "380px",
             objectFit: "cover",
+            objectPosition: p.imagePosition || "center",
             borderRadius: "18px",
             marginBottom: "34px",
             display: "block",
@@ -126,11 +146,97 @@ export default async function Page({ params }) {
         <p style={{ fontSize: "19px", lineHeight: 1.6, color: "#2b3942", fontWeight: 600, margin: "0 0 26px" }}>
           {p.excerpt}
         </p>
-        {p.paragraphs.map((para, i) => (
-          <p key={i} style={{ fontSize: "17px", lineHeight: 1.72, color: "#3d4954", margin: "0 0 22px" }}>
-            {para}
-          </p>
-        ))}
+        {p.quickAnswer && (
+          <div
+            style={{
+              background: "#EEF6EA",
+              border: "1px solid #CFE5C6",
+              borderRadius: "16px",
+              padding: "22px 24px",
+              margin: "0 0 30px",
+            }}
+          >
+            <div style={{ color: "#2F6825", fontSize: "13px", fontWeight: 800, letterSpacing: ".07em", textTransform: "uppercase", marginBottom: "7px" }}>
+              The short answer
+            </div>
+            <p style={{ fontSize: "17px", lineHeight: 1.65, color: "#294424", margin: 0 }}>
+              {p.quickAnswer}
+            </p>
+          </div>
+        )}
+        {p.comparison && (
+          <div
+            className="opwp-blog-comparison"
+            aria-label="Comparison of dog poop and lawn fertilizer"
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", margin: "0 0 38px" }}
+          >
+            {p.comparison.map((item) => {
+              const safe = item.tone === "safe";
+              return (
+                <div
+                  key={item.label}
+                  style={{
+                    border: `1px solid ${safe ? "#CFE5C6" : "#F0CDC4"}`,
+                    background: safe ? "#F4F9F1" : "#FFF6F3",
+                    borderRadius: "16px",
+                    padding: "22px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "13px" }}>
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        display: "grid",
+                        placeItems: "center",
+                        width: "30px",
+                        height: "30px",
+                        borderRadius: "50%",
+                        background: safe ? "#4F9E3A" : "#C75B45",
+                        color: "#fff",
+                        fontWeight: 900,
+                      }}
+                    >
+                      {safe ? "✓" : "×"}
+                    </span>
+                    <h2 style={{ fontSize: "20px", lineHeight: 1.2, margin: 0 }}>{item.label}</h2>
+                  </div>
+                  <ul style={{ paddingLeft: "20px", margin: 0, color: "#3d4954" }}>
+                    {item.items.map((text) => (
+                      <li key={text} style={{ fontSize: "15.5px", lineHeight: 1.55, marginBottom: "8px" }}>{text}</li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {p.sections
+          ? p.sections.map((section) => (
+              <section key={section.title} style={{ margin: "0 0 34px" }}>
+                <h2 style={{ fontSize: "26px", lineHeight: 1.18, color: "#1C2A33", margin: "0 0 14px" }}>
+                  {section.title}
+                </h2>
+                {section.paragraphs?.map((para) => (
+                  <p key={para} style={{ fontSize: "17px", lineHeight: 1.72, color: "#3d4954", margin: "0 0 17px" }}>
+                    {para}
+                  </p>
+                ))}
+                {section.bullets && (
+                  <ul style={{ paddingLeft: "22px", margin: 0, color: "#3d4954" }}>
+                    {section.bullets.map((bullet) => (
+                      <li key={bullet} style={{ fontSize: "17px", lineHeight: 1.65, marginBottom: "10px", paddingLeft: "4px" }}>
+                        {bullet}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            ))
+          : p.paragraphs.map((para, i) => (
+              <p key={i} style={{ fontSize: "17px", lineHeight: 1.72, color: "#3d4954", margin: "0 0 22px" }}>
+                {para}
+              </p>
+            ))}
         {p.tip && (
           <div
             style={{
@@ -159,6 +265,20 @@ export default async function Page({ params }) {
               {p.source.label}
             </a>
           </p>
+        )}
+        {p.sources && (
+          <div style={{ margin: "2px 0 8px" }}>
+            <div style={{ fontSize: "15px", color: "#6b7680", marginBottom: "7px" }}>Sources and further reading:</div>
+            <ul style={{ margin: 0, paddingLeft: "20px" }}>
+              {p.sources.map((source) => (
+                <li key={source.href} style={{ color: "#6b7680", marginBottom: "6px" }}>
+                  <a href={source.href} target="_blank" rel="noopener" style={{ color: "#4F9E3A", fontWeight: 700, textDecoration: "none" }}>
+                    {source.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </article>
 

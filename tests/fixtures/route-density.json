@@ -1,0 +1,9 @@
+{
+  "asOf":"2026-01-01",
+  "scope":{"rosterRecords":12,"activeRecords":12,"trustedGeocodes":10,"needsGeocodeReview":2,"geoCacheThrough":"2026-01-01","correctedZipCount":0,"currentBroadPinCoverage":0},
+  "zips":[],
+  "clusters":[{"id":"synthetic-pocket","center":[41.5,-83.5],"customers":4,"primaryDays":["Monday"],"weeklyVisits":4,"mrr":null,"sharedWithEarlier":0,"twoMiles":4,"multiDog":0,"displayName":"Synthetic pocket","mainDay":"Monday"}],
+  "sectors":[],
+  "lastClosedWeek":[],
+  "map":{"tag":"svg","attrs":{"viewBox":"0 0 10 10"},"children":[{"tag":"circle","attrs":{"cx":"5","cy":"5","r":"2"},"children":[]}]}
+}

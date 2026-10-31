@@ -1,0 +1,56 @@
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE dog_food_accounts (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+  customer_id TEXT NOT NULL UNIQUE REFERENCES dog_food_customers(id),
+  password_hash TEXT NOT NULL,
+  auth_version INTEGER NOT NULL DEFAULT 1,
+  verified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE dog_food_account_tokens (
+  token_hash TEXT PRIMARY KEY,
+  email TEXT NOT NULL COLLATE NOCASE,
+  kind TEXT NOT NULL CHECK(kind IN ('verify','reset','activate')),
+  temporary_password_hash TEXT,
+  auth_version INTEGER,
+  expires_at INTEGER NOT NULL,
+  used_at INTEGER,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_food_account_token_expiry ON dog_food_account_tokens(expires_at);
+CREATE TABLE dog_food_account_sessions (
+  token_hash TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES dog_food_accounts(id),
+  auth_version INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  revoked_at INTEGER
+);
+CREATE INDEX idx_food_account_sessions ON dog_food_account_sessions(account_id,expires_at);
+CREATE TABLE dog_food_portal_commands (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES dog_food_accounts(id),
+  payload_hash TEXT NOT NULL,
+  order_id TEXT NOT NULL REFERENCES dog_food_orders(id),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE dog_food_orders ADD COLUMN portal_account_id TEXT REFERENCES dog_food_accounts(id);
+ALTER TABLE dog_food_orders ADD COLUMN billing_consent_at TEXT;
+ALTER TABLE dog_food_orders ADD COLUMN delivery_cadence TEXT NOT NULL DEFAULT 'fixed_day';
+ALTER TABLE dog_food_orders ADD COLUMN requested_month_day INTEGER;
+ALTER TABLE dog_food_orders ADD COLUMN requested_service_week INTEGER;
+ALTER TABLE dog_food_subscriptions ADD COLUMN delivery_cadence TEXT NOT NULL DEFAULT 'fixed_day';
+ALTER TABLE dog_food_subscriptions ADD COLUMN service_week INTEGER;
+ALTER TABLE dog_food_subscriptions ADD COLUMN service_weekday INTEGER;
+ALTER TABLE dog_food_subscriptions ADD COLUMN billing_lease_token TEXT;
+ALTER TABLE dog_food_subscriptions ADD COLUMN billing_lease_until TEXT;
+CREATE TABLE dog_food_portal_audit (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES dog_food_accounts(id),
+  action TEXT NOT NULL,
+  entity_id TEXT,
+  details TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

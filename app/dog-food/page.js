@@ -15,7 +15,7 @@ export const metadata = {
     title: "Extreme Dog Fuel, delivered by Ohio Pet Waste Pros",
     description:
       "Personalized formula recommendations and convenient local dog food delivery across Greater Toledo.",
-    url: "https://ohiopetwastepros.com/dog-food/",
+    url: "https://www.ohiopetwastepros.com/dog-food/",
     siteName: "Ohio Pet Waste Pros",
     images: ["/assets/edf/30-20.png"],
   },
@@ -80,7 +80,6 @@ export default function DogFoodPage() {
       />
 
       <section className={styles.hero}>
-        <div className={styles.heroGlow} />
         <div className={styles.heroInner}>
           <div className={styles.brandLockup}>
             <div className={styles.brandCardOpwp}>
@@ -96,10 +95,20 @@ export default function DogFoodPage() {
           <div className={styles.eyebrow}>Premium nutrition • dependable local delivery</div>
           <h1>The right fuel for every dog.<br />Delivered on your route.</h1>
           <p className={styles.heroCopy}>
-            Tell us about each dog, get a personalized Extreme Dog Fuel recommendation,
-            and choose free recurring delivery or a faster on-demand option.
+            Find the right Extreme Dog Fuel formula for your dog, then choose
+            a one-time order or monthly delivery.
           </p>
-          <a className={styles.heroCta} href="#order-tool">Find My Dogs&apos; Food</a>
+          <div className={styles.heroActions}>
+            <div>
+              <a className={styles.heroCta} href="#order-tool">Find My Dog&apos;s Food <span aria-hidden="true">→</span></a>
+              <span>No account needed to get started</span>
+            </div>
+            <div>
+              <a className={styles.accountCta} href="/dog-food/account/">Dog Food Sign In <span aria-hidden="true">→</span></a>
+              <span>Order again or manage your deliveries</span>
+            </div>
+          </div>
+          <p className={styles.accountEntry}>Your dog-food account is separate from your scooping account.</p>
 
           <div className={styles.heroProof}>
             <span><strong>Four</strong> targeted blends</span>
@@ -117,9 +126,9 @@ export default function DogFoodPage() {
 
       <section className={styles.toolSection} id="order-tool">
         <div className={styles.sectionHeading}>
-          <span>Dog Food Finder & Order</span>
-          <h2>Build your delivery in a few simple steps.</h2>
-          <p>One household, up to ten dogs, and one easy recurring order.</p>
+          <span>Start with your dog—not a signup form</span>
+          <h2>Find their food. Then make delivery easy.</h2>
+          <p>Answer a few nutrition questions, see your formula match, then create your account and order. One-time or monthly—you choose.</p>
         </div>
         <DogFoodOrderTool paymentConfigured={stripeConfigured()} />
       </section>

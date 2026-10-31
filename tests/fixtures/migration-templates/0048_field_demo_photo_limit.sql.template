@@ -1,0 +1,2 @@
+DROP TRIGGER IF EXISTS field_demo_photo_cap;
+CREATE TRIGGER field_demo_photo_cap BEFORE INSERT ON field_demo_photos BEGIN SELECT RAISE(ABORT,'DEMO_PHOTO_LIMIT') WHERE (SELECT COUNT(*) FROM field_demo_photos WHERE session_id=NEW.session_id)>=24; END;

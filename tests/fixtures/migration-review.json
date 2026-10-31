@@ -1,0 +1,3900 @@
+{
+  "version": 1,
+  "scope": "All 60 public test templates; every complete SQL statement, including trigger bodies and structured literals.",
+  "original_production_migrations_changed": false,
+  "original_production_migrations_executed": false,
+  "templates": [
+    {
+      "file": "0001_backend.sql.template",
+      "sha256": "01dc07cd3a59dae4a44a2a73d2ce7da751da55ee17c08f5671bd1d65b1c5d543",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0002_sng_events.sql.template",
+      "sha256": "fd098861d0b258965cfdcd19944ffc0853d40f09b79e1e977b5a9c56faf5a38e",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0003_quickbooks.sql.template",
+      "sha256": "5094322cf031ce8e2349df3895db5df5a0962a43f6962831d2fedb174a3a8f41",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0004_quickbooks_lifecycle.sql.template",
+      "sha256": "4645a24ad7d31abf26ebbb597b4eebdc0a3b9bcdf30cb75a3a39b48d381f56e3",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0005_quickbooks_metadata_cache.sql.template",
+      "sha256": "d09358a570c48cdf3bd69a73ab9a34e4fd03de01b599336ee1f3dc1112388b76",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": [
+            "empty JSON schema default",
+            "empty JSON schema default",
+            "empty JSON schema default",
+            "empty JSON schema default",
+            "empty JSON schema default"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "0006_sng_processing_errors.sql.template",
+      "sha256": "6c7d59598b76ea8a95b81efbffe6024ed7d0bd5cbf756a39469b954d3f39977d",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0007_dog_food_foundation.sql.template",
+      "sha256": "d2c2229824dfef10a9385c0da4e85f4adfb4ec0456496b1e317cd35d6aa1cea5",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "PRAGMA",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 8,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 11,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 12,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 13,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 14,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 15,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 15,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 16,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 17,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 18,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 19,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 20,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 21,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 22,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 23,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 24,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 7,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 25,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 26,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 27,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 8,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 28,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 29,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 30,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 31,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 32,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 7,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 33,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 34,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 35,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 10,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 36,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 37,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 38,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 39,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 40,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 7,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 41,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 42,
+          "kind": "INSERT",
+          "classification": "reviewed public product/service catalog, application settings, or structural organization identifiers",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 43,
+          "kind": "INSERT",
+          "classification": "reviewed public product/service catalog, application settings, or structural organization identifiers",
+          "quoted_literals_reviewed": 56,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0008_dog_food_follow_ups.sql.template",
+      "sha256": "1ac6c578581220636be8adf7864ec93e1b2b7338aec5d59aead57d0f28dbf089",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 7,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0009_sng_invoice_ledger.sql.template",
+      "sha256": "d58836fc3f701cbaaafda71cc037bcdaeadd072eccb5ba464a50e41b32219a6e",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0010_subscription_daily_truth.sql.template",
+      "sha256": "ab7ffd7f76af7bdb1146e76aa34313f895380ee82eaf0554a1dd0df1c118cb68",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0011_system_sync_runs.sql.template",
+      "sha256": "d799233e62eef0c3500e3e74a7d486c4f10d9a9c40423389d03623b988a048e2",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0012_subscription_cancellation_ledger.sql.template",
+      "sha256": "de65ff8e4c821aa8e8a593bebc4261dfb8f72ba4080d732022be62122733ac25",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0013_subscription_status_reviews.sql.template",
+      "sha256": "a2fc9379504ae45e8cbf9d16bb68f48d4a7cf8b7563371c0265c869ee8acc741",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0014_churn_analytics.sql.template",
+      "sha256": "263c1d335dbb8c39e077fea3ea87fbdef9f4916994d34368278ff1f49248cad2",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0015_subscription_pauses.sql.template",
+      "sha256": "f8719584c94d4290f1b1dbe7df2d02d541151eaaccb46e91a33bf8007a957718",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0016_route_intelligence.sql.template",
+      "sha256": "cd50ffa3d7f38103d4de375104d0aca27ffa1f3df5e302bdef1ff3ebb69e3ec8",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0017_churn_eligibility.sql.template",
+      "sha256": "0f8eefb4f6e1d9cdd814ec5bbd7b41e3c43aa025d7744353d7a7bb01293804cd",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0018_airtable_cockpit_snapshot.sql.template",
+      "sha256": "5585c36f4a71bc36ce5029b1573a7a4b6cef693cc3130ec2db896ca0835c8aed",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0019_active_route_planning.sql.template",
+      "sha256": "d1dc4c9c34842a1812fa059b6746d3d85f7d5f95ec8d758786cd372a3fbbd8cc",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0020_route_partner_foundation.sql.template",
+      "sha256": "503b89f29b07f9f1597923f9ca67b5847f455585c549bf3232aadf3cc5a2827c",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "PRAGMA",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 6,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 8,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 8,
+          "encoded_literals_reviewed": [
+            "empty JSON schema default"
+          ]
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 10,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 17,
+          "encoded_literals_reviewed": [
+            "empty JSON schema default"
+          ]
+        },
+        {
+          "ordinal": 11,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 12,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 13,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": [
+            "empty JSON schema default"
+          ]
+        },
+        {
+          "ordinal": 14,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 15,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 16,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 13,
+          "encoded_literals_reviewed": [
+            "empty JSON schema default",
+            "empty JSON schema default",
+            "empty JSON schema default"
+          ]
+        },
+        {
+          "ordinal": 17,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 11,
+          "encoded_literals_reviewed": [
+            "empty JSON schema default"
+          ]
+        },
+        {
+          "ordinal": 18,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 19,
+          "kind": "INSERT",
+          "classification": "reviewed public product/service catalog, application settings, or structural organization identifiers",
+          "quoted_literals_reviewed": 6,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 20,
+          "kind": "INSERT",
+          "classification": "reviewed public product/service catalog, application settings, or structural organization identifiers",
+          "quoted_literals_reviewed": 6,
+          "encoded_literals_reviewed": [
+            "decoded application capability flags"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "0021_admin_login_security.sql.template",
+      "sha256": "344ce5a28d28da0fd0d4511c474f5505ba10c3a0831b8208edfbc8bcdba7f91d",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0022_onboarding_route_assignments.sql.template",
+      "sha256": "51def15714df2e2078b69770e0318b481a7d0f4d76353c2283c57c37b1f799c1",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0022_technician_field_app.sql.template",
+      "sha256": "77f619843febadb62b64a32d835fa5952175a87fa6638bbc6e33b227fde49c45",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "PRAGMA",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 7,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 11,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 12,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 13,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 14,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 8,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 15,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 16,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": [
+            "empty JSON schema default"
+          ]
+        },
+        {
+          "ordinal": 17,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0023_field_proof_fallback.sql.template",
+      "sha256": "28d449c37c7e1c48d39538e90d2a75997608298a24106c5cd07d11aceca031fb",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0024_dog_food_price_59.sql.template",
+      "sha256": "25b0de548f3081e862edff745da17180480f18342ab38cdea3dd81ef7b93fe43",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "UPDATE",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "UPDATE",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 7,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "UPDATE",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "UPDATE",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "UPDATE",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0025_dog_food_stripe.sql.template",
+      "sha256": "44bb9c198a1a3e978434201b439315c9b67c6803651c574f107fe56f2aa8d60a",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "PRAGMA",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 11,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 12,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 13,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 14,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 15,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 16,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 17,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 18,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 19,
+          "kind": "UPDATE",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 20,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 21,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0026_dog_food_payment_setup.sql.template",
+      "sha256": "c14ef4ca644d5c53a0a115d7017648a1a7c716b2aa8e9a33267ecfc3e68f7633",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "PRAGMA",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0027_financial_management.sql.template",
+      "sha256": "6edd8cbd4876a2cb332b5fb92b06c6d29f902004e1e99902972fc17ca0a6b2ab",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "financial and payroll values supplied only through private bindings",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "INSERT",
+          "classification": "financial and payroll values supplied only through private bindings",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "financial and payroll values supplied only through private bindings",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "financial and payroll values supplied only through private bindings",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "financial and payroll values supplied only through private bindings",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": [
+            "empty JSON schema default"
+          ]
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "financial and payroll values supplied only through private bindings",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0028_api_rate_limits.sql.template",
+      "sha256": "6ba95b6672fc13c5f63e24db3689c119b593a2b0309844287e3f0790187b3e20",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0029_platform_owner_access.sql.template",
+      "sha256": "446b3eeed2d39e0e8a72d0d87e3ed50539e084e8573232ed6898485a73397f80",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "UPDATE",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0030_production_hardening.sql.template",
+      "sha256": "eb49c479ef1f717a18ba1845b0ed0819ecbbd680adbd5c157c16ad3e1ec8341a",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "INSERT",
+          "classification": "staff identities and provider associations supplied only through private bindings",
+          "quoted_literals_reviewed": 6,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 8,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "INSERT",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "DROP",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 9,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 11,
+          "kind": "INSERT",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 12,
+          "kind": "DROP",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 13,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 14,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0031_quote_funnel_notifications.sql.template",
+      "sha256": "c6aa6172175258b43f701188ff4564af573e8768ddc902a55038761f4fd21b14",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "UPDATE",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 13,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 11,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0032_quote_follow_up_sms.sql.template",
+      "sha256": "b631b7e0ea3180decdd7c314ee6c25f92d89c947519b20357935411c2652179a",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 9,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0033_quote_recovery_channels.sql.template",
+      "sha256": "2ca4ef9d638e38bd30eb7882c9b2151e1d4b1f20ea9e6625d5f286c5b44ce4b6",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 9,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "INSERT",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0034_growth_desk.sql.template",
+      "sha256": "858d020b2859e6807eb9a260c3b84fdbb671b6e6a4e518f235632c4c43803af3",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 11,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0035_failed_payment_sms.sql.template",
+      "sha256": "69be50b1f6637057b1fca41bbcf548670dd885fde5bd8311632ff33dc17e32da",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 6,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "INSERT",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 22,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0036_yardops_lead_assistant.sql.template",
+      "sha256": "65042e7f4d68c5a6e54e47ab6c6efdab6af01fa584bf06ba64eb868b8d5f3354",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 15,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 16,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 10,
+          "encoded_literals_reviewed": [
+            "empty JSON schema default"
+          ]
+        },
+        {
+          "ordinal": 7,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 6,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 11,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 12,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 13,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 14,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 15,
+          "kind": "INSERT",
+          "classification": "reviewed public product/service catalog, application settings, or structural organization identifiers",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 16,
+          "kind": "INSERT",
+          "classification": "reviewed public product/service catalog, application settings, or structural organization identifiers",
+          "quoted_literals_reviewed": 61,
+          "encoded_literals_reviewed": [
+            "decoded public answer keyword list",
+            "decoded public answer keyword list",
+            "decoded public answer keyword list",
+            "decoded public answer keyword list",
+            "decoded public answer keyword list",
+            "decoded public answer keyword list",
+            "decoded public answer keyword list"
+          ]
+        },
+        {
+          "ordinal": 17,
+          "kind": "INSERT",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 12,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 18,
+          "kind": "INSERT",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 6,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0037_yardops_analytics.sql.template",
+      "sha256": "73dc4094456714cea884a62c5b8da417a967f31a149b02f312f5353e50ba9c28",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "INSERT",
+          "classification": "reviewed public product/service catalog, application settings, or structural organization identifiers",
+          "quoted_literals_reviewed": 79,
+          "encoded_literals_reviewed": [
+            "decoded public answer keyword list",
+            "decoded public answer keyword list",
+            "decoded public answer keyword list",
+            "decoded public answer keyword list",
+            "decoded public answer keyword list",
+            "decoded public answer keyword list",
+            "decoded public answer keyword list",
+            "decoded public answer keyword list",
+            "decoded public answer keyword list",
+            "decoded public answer keyword list"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "0038_yardops_not_qualified.sql.template",
+      "sha256": "34847f1328360c40039a23f5fe7f2f0f2c26d5d5c3107c51f5787c39a3a8b34a",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 12,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "INSERT",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 11,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "DROP",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0039_quo_intake_review.sql.template",
+      "sha256": "30547ed6a5bac4ebb2dcaa5abeea2c3b4159cfbbcb23c409dcc5ce7dd5227496",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "INSERT",
+          "classification": "historical operational details supplied only through private bindings; CI values fabricated",
+          "quoted_literals_reviewed": 6,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "UPDATE",
+          "classification": "historical operational details supplied only through private bindings; CI values fabricated",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "UPDATE",
+          "classification": "historical operational details supplied only through private bindings; CI values fabricated",
+          "quoted_literals_reviewed": 6,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "UPDATE",
+          "classification": "historical operational details supplied only through private bindings; CI values fabricated",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "UPDATE",
+          "classification": "historical operational details supplied only through private bindings; CI values fabricated",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "INSERT",
+          "classification": "historical operational details supplied only through private bindings; CI values fabricated",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "UPDATE",
+          "classification": "historical operational details supplied only through private bindings; CI values fabricated",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0040_meta_confirmation.sql.template",
+      "sha256": "3c84e6328ae26f4c18e93015384aa6d03fc2e1c3edcd42db69ab0713a7c2e7c8",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": [
+            "empty JSON schema default"
+          ]
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 12,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": [
+            "empty JSON schema default"
+          ]
+        },
+        {
+          "ordinal": 11,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 12,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 13,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 14,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 15,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 7,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 16,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 7,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 17,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 18,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 6,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 19,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0041_admin_mfa.sql.template",
+      "sha256": "53a29898751ffaf0ed9153a5dcb36667ac5af61aef0a22c4add7721f8ef0778e",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0042_bank_reconciliation.sql.template",
+      "sha256": "33e8d07ba8e74c585624db91e3be83a0a16a4e5d7c683b78f76cd48fff5150e0",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 11,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0043_qbo_reconciliation_state.sql.template",
+      "sha256": "29db16c88daf71020c3cfb0a93c888f9512d10d956b542ab7b0ae645e0586049",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0044_route_invoice_history.sql.template",
+      "sha256": "2c01ee1074a924579f3045a9bf49b03ab78b3b2a213705c1f2399f7c40d2b1ca",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0045_failed_payment_reconciliation.sql.template",
+      "sha256": "2a610448b90e17bfa5ce6c8965747510674b0143bbc7b9d614c02a288b0cd25b",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0046_field_workday.sql.template",
+      "sha256": "5d7b8a725caa4cdddd7be50a62c82662fd8cd3649564ad7bcde7ff4694da5fa9",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 11,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 12,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 6,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 13,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0047_field_mobile_demo.sql.template",
+      "sha256": "40da7c559c6c51b485d7a31d697a12ee91f5c6280f78a8a1744a25eead93ea25",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0048_field_demo_photo_limit.sql.template",
+      "sha256": "1941b22a20087819e4fd2b5eb533d4421ce405917529b1805acca11cde6bc245",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "DROP",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0049_dog_food_operations.sql.template",
+      "sha256": "ca754bbb6bb4be8f65f26f3ac9362bf010c0f7d38d9b596840f01884b08d66c6",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "INSERT",
+          "classification": "reviewed public product/service catalog, application settings, or structural organization identifiers",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 11,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0050_dog_food_collections.sql.template",
+      "sha256": "ee06fe981f28835682c5ca147ce8b6bb5d87b4bb08e9c8186a59727ff244d04e",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 11,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 12,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 7,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 13,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 14,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0051_dog_food_customer_portal.sql.template",
+      "sha256": "e66fb76f999ce912e59abafa9c1eba356db2d9feee5db10ab8212870728d6084",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "PRAGMA",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 11,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 12,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 13,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 14,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 15,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 16,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 17,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 18,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": [
+            "empty JSON schema default"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "0052_dog_food_workflow.sql.template",
+      "sha256": "85ff7ead204c702f7fef7734f7ffe531cdc01e2c3bb123111218276263feb832",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "PRAGMA",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "INSERT",
+          "classification": "reviewed public product/service catalog, application settings, or structural organization identifiers",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 11,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 12,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 13,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 14,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 15,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 16,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 17,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 18,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 19,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 7,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 20,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 10,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 21,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 22,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 23,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 24,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 25,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 26,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 27,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 28,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 29,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 9,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 30,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 9,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 31,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 32,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 33,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 34,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 35,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 36,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 37,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 38,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 39,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 40,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 41,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 42,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 43,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 44,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 45,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 46,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 47,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 48,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 49,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 50,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 51,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0053_dog_food_delivery_choices.sql.template",
+      "sha256": "ad8e687cf71428eafd1f7d56fb939dce7e06fd3110170a82634b067f96a7d6b7",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "PRAGMA",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "UPDATE",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 11,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 12,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 6,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 13,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 10,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 14,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 15,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 16,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 17,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 18,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 19,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 20,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0054_dog_food_sales_review.sql.template",
+      "sha256": "5e55569e6827957d43ce13da40243489021a7185fc179412cdd8d79bdbff36f4",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "INSERT",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 11,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 12,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "INSERT",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 13,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0055_dog_food_experience.sql.template",
+      "sha256": "05732362010842ddbf84090fb94aeae3d2280e3e896e9726dc3db4cc75e736a8",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "UPDATE",
+          "classification": "reviewed structural data transformation; no literal customer, staff, or provider records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "DROP",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 11,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 15,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 12,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 13,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 14,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 15,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 3,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 16,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0056_dog_food_inventory_costs.sql.template",
+      "sha256": "e6cb33c4136d03f09ed98a386e0d0213f3e17d28feb19a317b025ac30de624c0",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "fabricated inventory fixture; original applied migration private and immutable",
+          "quoted_literals_reviewed": 9,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "fabricated inventory fixture; original applied migration private and immutable",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "fabricated inventory fixture; original applied migration private and immutable",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "fabricated inventory fixture; original applied migration private and immutable",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "INSERT",
+          "classification": "fabricated inventory fixture; original applied migration private and immutable",
+          "quoted_literals_reviewed": 7,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "INSERT",
+          "classification": "fabricated inventory fixture; original applied migration private and immutable",
+          "quoted_literals_reviewed": 9,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "ALTER",
+          "classification": "fabricated inventory fixture; original applied migration private and immutable",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "ALTER",
+          "classification": "fabricated inventory fixture; original applied migration private and immutable",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "ALTER",
+          "classification": "fabricated inventory fixture; original applied migration private and immutable",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "ALTER",
+          "classification": "fabricated inventory fixture; original applied migration private and immutable",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 11,
+          "kind": "ALTER",
+          "classification": "fabricated inventory fixture; original applied migration private and immutable",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 12,
+          "kind": "ALTER",
+          "classification": "fabricated inventory fixture; original applied migration private and immutable",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 13,
+          "kind": "ALTER",
+          "classification": "fabricated inventory fixture; original applied migration private and immutable",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 14,
+          "kind": "CREATE",
+          "classification": "fabricated inventory fixture; original applied migration private and immutable",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 15,
+          "kind": "CREATE",
+          "classification": "fabricated inventory fixture; original applied migration private and immutable",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 16,
+          "kind": "INSERT",
+          "classification": "fabricated inventory fixture; original applied migration private and immutable",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": [
+            "decoded fabricated inventory audit"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "0057_unified_field_app.sql.template",
+      "sha256": "184486263eb8310d4db60922c211695004f4cb97b96dec43105a9640eac27f59",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "INSERT",
+          "classification": "reviewed public product/service catalog, application settings, or structural organization identifiers",
+          "quoted_literals_reviewed": 36,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 4,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 5,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 6,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 11,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 7,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 8,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 4,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 9,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 10,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 11,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 9,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 12,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 13,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 14,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 11,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 15,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 16,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 17,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 2,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 18,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 19,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 20,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 21,
+          "kind": "CREATE",
+          "classification": "schema trigger operating on NEW and OLD records; no embedded operational records",
+          "quoted_literals_reviewed": 1,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0058_routing_provider_controls.sql.template",
+      "sha256": "f05c6508f82735ec99f3fe5c36c6747e00ff5e0ade89f74d5645746887e19fa8",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 2,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        },
+        {
+          "ordinal": 3,
+          "kind": "CREATE",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    },
+    {
+      "file": "0059_routing_provider_pacing.sql.template",
+      "sha256": "f9900fbeb818c49b9acf2f295c931e57aff601f5ddfc3798b6cbaa00871e0bd4",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "ALTER",
+          "classification": "reviewed schema definition or index; confidential financial defaults are placeholders",
+          "quoted_literals_reviewed": 0,
+          "encoded_literals_reviewed": []
+        }
+      ]
+    }
+  ]
+}

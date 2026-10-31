@@ -1,0 +1,55 @@
+ALTER TABLE dog_food_pickups ADD COLUMN stage TEXT NOT NULL DEFAULT 'preparing' CHECK(stage IN ('preparing','ready','arranged'));
+ALTER TABLE dog_food_pickups ADD COLUMN arrangement_note TEXT;
+
+UPDATE dog_food_pickups SET stage='arranged' WHERE status='ready';
+DROP TRIGGER food_pickup_ready;
+CREATE TABLE dog_food_pickup_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, order_id TEXT NOT NULL REFERENCES dog_food_orders(id),
+  stage TEXT NOT NULL, occurred_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  instructions TEXT
+);
+CREATE TRIGGER food_pickup_preparing AFTER INSERT ON dog_food_pickups BEGIN
+  INSERT INTO dog_food_pickup_events(order_id,stage) VALUES (NEW.order_id,'preparing');
+END;
+CREATE TRIGGER food_pickup_stage_event AFTER UPDATE OF stage,arrangement_note ON dog_food_pickups
+WHEN NEW.stage<>OLD.stage OR NEW.arrangement_note IS NOT OLD.arrangement_note BEGIN
+  INSERT INTO dog_food_pickup_events(order_id,stage,instructions) VALUES (NEW.order_id,NEW.stage,CASE WHEN NEW.stage='arranged' THEN NEW.arrangement_note END);
+END;
+CREATE TRIGGER food_pickup_status_event AFTER UPDATE OF status ON dog_food_pickups WHEN NEW.status<>OLD.status BEGIN
+  INSERT INTO dog_food_pickup_events(order_id,stage) VALUES (NEW.order_id,NEW.status);
+END;
+CREATE TRIGGER food_pickup_arranged_guard BEFORE UPDATE OF status ON dog_food_pickups
+WHEN NEW.status='collected' AND OLD.status<>'collected' AND OLD.stage<>'arranged' BEGIN
+  SELECT RAISE(ABORT,'Agree the pickup arrangement before recording handoff');
+END;
+CREATE TRIGGER food_pickup_staff_ready AFTER UPDATE OF stage ON dog_food_pickups
+WHEN NEW.stage='ready' AND OLD.stage<>NEW.stage BEGIN
+  INSERT OR IGNORE INTO dog_food_transactional_outbox(event_key,customer_id,order_id,template)
+    SELECT 'pickup_ready:'||id,customer_id,id,'pickup_ready' FROM dog_food_orders WHERE id=NEW.order_id;
+END;
+CREATE TABLE dog_food_plan_requests (
+  id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES dog_food_accounts(id),
+  customer_id TEXT NOT NULL REFERENCES dog_food_customers(id), subscription_id TEXT REFERENCES dog_food_subscriptions(id),
+  request_type TEXT NOT NULL CHECK(request_type IN ('formula','quantity','delivery','pause','resume','skip','cancel','other')),
+  details TEXT NOT NULL, payload_hash TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','clarification','approved','rejected','applied')),
+  office_note TEXT NOT NULL DEFAULT '', effective_date TEXT, source_reference TEXT, reviewed_by TEXT,
+  revision INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_food_plan_requests_customer ON dog_food_plan_requests(customer_id,created_at);
+CREATE TABLE dog_food_plan_request_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT NOT NULL REFERENCES dog_food_plan_requests(id),
+  status TEXT NOT NULL, note TEXT NOT NULL, actor TEXT NOT NULL, occurred_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TRIGGER food_plan_request_bound BEFORE INSERT ON dog_food_plan_requests
+WHEN (SELECT COUNT(*) FROM dog_food_plan_requests WHERE customer_id=NEW.customer_id AND status IN ('pending','clarification','approved'))>=10 BEGIN
+  SELECT RAISE(ABORT,'Too many open plan requests');
+END;
+
+
+CREATE TABLE dog_food_direct_sale_links (
+  sale_id TEXT PRIMARY KEY, customer_id TEXT NOT NULL REFERENCES dog_food_customers(id),
+  recorded_by TEXT NOT NULL, fulfillment_method TEXT NOT NULL DEFAULT 'delivery' CHECK(fulfillment_method IN ('delivery','pickup')), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_food_direct_sale_customer ON dog_food_direct_sale_links(customer_id);

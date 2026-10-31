@@ -1,0 +1,41 @@
+INSERT INTO growth_leads (submission_id,organization_id,stage,priority,outcome_reason,outcome_note,not_qualified_at,updated_by)
+SELECT s.id,'org-opwp','not_qualified','normal','not_a_lead',
+  CASE WHEN s.id=__OPWP_PRIVATE_B032__
+    THEN __OPWP_PRIVATE_B033__
+    ELSE __OPWP_PRIVATE_B034__ END,
+  CURRENT_TIMESTAMP,__OPWP_PRIVATE_B035__
+FROM submissions s
+WHERE s.source='quo' AND s.status='new' AND s.id IN (
+  __OPWP_PRIVATE_B032__,
+  __OPWP_PRIVATE_B037__,
+  __OPWP_PRIVATE_B038__
+) AND NOT EXISTS (SELECT 1 FROM growth_leads g WHERE g.submission_id=s.id);
+
+UPDATE lead_conversations SET status='resolved',automation_mode='paused',unread_count=0,updated_at=CURRENT_TIMESTAMP
+WHERE organization_id='org-opwp' AND submission_id IN (
+  SELECT submission_id FROM growth_leads WHERE organization_id='org-opwp' AND outcome_reason='not_a_lead' AND updated_by=__OPWP_PRIVATE_B035__
+);
+
+UPDATE lead_follow_up_jobs SET status='cancelled',cancelled_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+WHERE organization_id='org-opwp' AND status IN ('queued','failed') AND submission_id IN (
+  SELECT submission_id FROM growth_leads WHERE organization_id='org-opwp' AND outcome_reason='not_a_lead' AND updated_by=__OPWP_PRIVATE_B035__
+);
+UPDATE quote_follow_ups SET status='cancelled',cancelled_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+WHERE status IN ('queued','failed') AND submission_id IN (
+  SELECT submission_id FROM growth_leads WHERE organization_id='org-opwp' AND outcome_reason='not_a_lead' AND updated_by=__OPWP_PRIVATE_B035__
+);
+UPDATE quote_follow_up_deliveries SET status='cancelled',cancelled_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+WHERE status IN ('queued','failed') AND submission_id IN (
+  SELECT submission_id FROM growth_leads WHERE organization_id='org-opwp' AND outcome_reason='not_a_lead' AND updated_by=__OPWP_PRIVATE_B035__
+);
+
+INSERT INTO growth_lead_events (id,submission_id,organization_id,event_type,summary,details,actor_email)
+SELECT __OPWP_PRIVATE_B041__||submission_id,submission_id,organization_id,'system',
+  __OPWP_PRIVATE_B043__,json_object('reason',outcome_reason,'note',outcome_note),__OPWP_PRIVATE_B035__
+FROM growth_leads WHERE organization_id='org-opwp' AND outcome_reason='not_a_lead' AND updated_by=__OPWP_PRIVATE_B035__
+ON CONFLICT(id) DO NOTHING;
+
+UPDATE lead_airtable_sync SET status='queued',attempt_count=0,error_message=NULL,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+WHERE organization_id='org-opwp' AND submission_id IN (
+  SELECT submission_id FROM growth_leads WHERE organization_id='org-opwp' AND outcome_reason='not_a_lead' AND updated_by=__OPWP_PRIVATE_B035__
+);

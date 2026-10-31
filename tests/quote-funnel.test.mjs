@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildCustomerQuoteFollowUpEmail, buildSubmissionNotification, escapeEmailHtml, normalizeFunnelId, normalizeFunnelStage, PARTIAL_QUOTE_FOLLOW_UP_DELAY_MINUTES } from "../lib/quote-funnel.mjs";
+import { buildCustomerQuoteFollowUpEmail, buildCustomerQuoteFollowUpSms, buildSubmissionNotification, escapeEmailHtml, normalizeFunnelId, normalizeFunnelStage, PARTIAL_QUOTE_FOLLOW_UP_DELAY_MINUTES } from "../lib/quote-funnel.mjs";
 import {
   OPWP_SNG_FORM_OPTIONS,
   normalizeHowHeard,
@@ -86,6 +86,17 @@ test("owner notification escapes untrusted lead content", () => {
   assert.equal(escapeEmailHtml('"<&'), "&quot;&lt;&amp;");
 });
 
+test("partial quote owner email contains the saved quote context", () => {
+  const content = buildSubmissionNotification({
+    type: "partial_quote",
+    submissionId: "quote-id",
+    body: { email: "person@example.com", phone: "4195550100", zip: "43604", quote_context: { dogs: 2, frequency: "once_a_week", yard_size: "medium", quote_monthly: 90 } },
+  });
+  assert.equal(content.subject, "New website quote lead");
+  assert.match(content.text, /Quoted monthly: 90/);
+  assert.match(content.text, /Submission ID: quote-id/);
+});
+
 test("partial quote follow-up requires explicit scoped consent", () => {
   const partial = {
     source: "partial_quote",
@@ -106,12 +117,17 @@ test("partial quote customer follow-up waits ten minutes", () => {
   assert.equal(PARTIAL_QUOTE_FOLLOW_UP_DELAY_MINUTES, 10);
 });
 
-test("partial quote customer email identifies Craig and invites a direct reply", () => {
+test("partial quote customer email identifies relief technician and invites a direct reply", () => {
   const content = buildCustomerQuoteFollowUpEmail();
   assert.match(content.subject, /Ohio Pet Waste Pros quote/i);
   assert.match(content.text, /This is Craig with Ohio Pet Waste Pros/);
   assert.match(content.text, /reply directly to this email/i);
   assert.match(content.text, /\(419\) 262-2371/);
+});
+
+test("partial quote customer text stays concise and preserves the required opt-out", () => {
+  const content = buildCustomerQuoteFollowUpSms();
+  assert.equal(content, "Hello, this is Craig with Ohio Pet Waste Pros. I saw that you filled out a quote form on our website. Did you have any questions about our service, or would you like help getting signed up?\n\nText STOP to unsubscribe.");
 });
 
 test("no-card onboarding requires a question but still validates for account creation", () => {

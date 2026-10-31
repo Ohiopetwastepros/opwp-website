@@ -61,6 +61,7 @@ export default function Header({ active }) {
   return (
     <div
       data-opwp-header
+      data-opwp-section={section}
       style={{
         fontFamily: "var(--font-hanken), sans-serif",
         position: "fixed",
@@ -142,13 +143,13 @@ export default function Header({ active }) {
               <Link href="/about-our-pet-waste-removal-team/" style={{ ...NAV_LINK, color: c("about") }}>About</Link>
               <Link href="/blog/" style={{ ...NAV_LINK, color: c("blog") }}>Blog</Link>
               <Link href="/contact/" style={{ ...NAV_LINK, color: c("contact") }}>Contact</Link>
-              <a href="https://client.sweepandgo.com/login" style={{ textDecoration: "none", color: "#D7E9F7", fontWeight: 600 }}>Client Login</a>
+              <a href="https://client.sweepandgo.com/login" style={{ textDecoration: "none", color: "#D7E9F7", fontWeight: 600 }}>{section === "dogfood" ? "Scooping Login" : "Client Login"}</a>
             </div>
           </nav>
 
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <a className="opwp-phone" href="tel:419-262-2371" style={{ textDecoration: "none", color: "#fff", fontFamily: "var(--font-bricolage)", fontWeight: 700, fontSize: 16, whiteSpace: "nowrap" }}>419-262-2371</a>
-            <Link href="/free-quote/" prefetch={false} className="hov-cta opwp-cta" style={{ background: "#397D2D", color: "#fff", textDecoration: "none", padding: "12px 22px", borderRadius: 99, fontWeight: 800, fontSize: 15, whiteSpace: "nowrap", boxShadow: "0 8px 18px -8px rgba(57,125,45,.7)" }}>Get My Price</Link>
+            <Link href={section === "dogfood" ? "/dog-food/account/" : "/free-quote/"} prefetch={false} className={section === "dogfood" ? "opwp-food-signin opwp-cta" : "hov-cta opwp-cta"} style={{ background: section === "dogfood" ? "#D7E9F7" : "#397D2D", color: section === "dogfood" ? "#14304A" : "#fff", textDecoration: "none", padding: "12px 22px", borderRadius: 99, fontWeight: 800, fontSize: 15, whiteSpace: "nowrap", boxShadow: section === "dogfood" ? "none" : "0 8px 18px -8px rgba(57,125,45,.7)" }}>{section === "dogfood" ? "Dog Food Sign In" : "Get My Price"}</Link>
             <button
               className="opwp-burger"
               onClick={() => setOpen((v) => !v)}
@@ -192,7 +193,8 @@ export default function Header({ active }) {
             <Link href="/about-our-pet-waste-removal-team/" onClick={close} style={mItem}>About</Link>
             <Link href="/blog/" onClick={close} style={mItem}>Blog</Link>
             <Link href="/contact/" onClick={close} style={mItem}>Contact</Link>
-            <a href="https://client.sweepandgo.com/login" style={{ ...mItem }}>Client Login</a>
+            <Link href="/dog-food/account/" onClick={close} style={mItem}>Dog Food Sign In</Link>
+            <a href="https://client.sweepandgo.com/login" style={{ ...mItem }}>Scooping Client Login</a>
 
             <Link href="/free-quote/" prefetch={false} onClick={close} style={{ textAlign: "center", background: "#397D2D", color: "#fff", textDecoration: "none", padding: "14px", borderRadius: 12, fontWeight: 800, margin: "14px 0 4px" }}>Get My Free Quote</Link>
 
@@ -213,6 +215,7 @@ export default function Header({ active }) {
       </header>
 
       <style>{`
+        [data-opwp-header] .opwp-food-signin:hover { background: #edf5fb !important; }
         @media (max-width: 1000px) {
           [data-opwp-header] .opwp-desk-nav { display: none !important; }
           [data-opwp-header] .opwp-phone { display: none !important; }
@@ -221,11 +224,25 @@ export default function Header({ active }) {
         @media (min-width: 1001px) {
           [data-opwp-header] .opwp-mobile-menu { display: none !important; }
         }
+        @media (max-width: 1280px) {
+          [data-opwp-header][data-opwp-section="dogfood"] .opwp-desk-nav,
+          [data-opwp-header][data-opwp-section="dogfood"] .opwp-phone { display: none !important; }
+          [data-opwp-header][data-opwp-section="dogfood"] .opwp-burger { display: flex !important; }
+          [data-opwp-header][data-opwp-section="dogfood"] .opwp-mobile-menu { display: flex !important; }
+        }
         @media (max-width: 600px) {
           [data-opwp-header] .opwp-cta { padding: 10px 16px !important; font-size: 14px !important; }
         }
         @media (max-width: 420px) {
           [data-opwp-header] .opwp-wordmark { display: none !important; }
+        }
+        @media (max-width: 360px) {
+          [data-opwp-header][data-opwp-section="dogfood"] .opwp-bar { padding: 12px; }
+          [data-opwp-header][data-opwp-section="dogfood"] .opwp-bar > div { gap: 8px !important; }
+          [data-opwp-header][data-opwp-section="dogfood"] .opwp-bar > div > a { flex-shrink: 0; }
+          [data-opwp-header][data-opwp-section="dogfood"] .opwp-bar > div > a img { width: 42px !important; height: 42px !important; }
+          [data-opwp-header][data-opwp-section="dogfood"] .opwp-bar > div > div { gap: 8px !important; }
+          [data-opwp-header] .opwp-food-signin { padding: 10px 12px !important; }
         }
       `}</style>
     </div>

@@ -1,0 +1,242 @@
+{
+  "baseId": "appc40e3mlfOt2HoA",
+  "tables": {
+    "Deliveries": {
+      "id": "tblkphHkGNisP7UJ6",
+      "fields": {
+        "Delivery ID": "fldu5KiQMdxv36DG3",
+        "Subscription": "fldIappzitC65Eay4",
+        "Quantity": "fldeFT8FB4dNaHfdG",
+        "Scheduled Delivery Date": "flddTTgn0WXvNISHT",
+        "Matched Scoop Visit Date": "fldC0FcqCUlS4Mn4w",
+        "Delivery Status": "fldZb0g3EmoIHjcWN",
+        "Proof of Delivery": "fldPFJCLCUG6q69ok"
+      }
+    },
+    "Products": {
+      "id": "tblR7qUUiVhQvZuHr",
+      "fields": {
+        "Product Name": "fld7szlXJlBFk7e9b",
+        "Formula Code": "fldV60DDbdFGi7c64",
+        "Bag Weight": "fldFjUN0I37F6WOL5",
+        "DC Cost": "fldnkhOSrIsIPVfJf",
+        "Dealer Price": "fldp19IYf9la06MwW",
+        "Retail Price": "fldrN1sZucnKjZLl3",
+        "Bags Per Pallet": "fldNg0ldWKD7dspEX",
+        "Active Status": "fldy0ga9sKOwXGJ9g",
+        "Product Description": "fldCmo5rcHAHNRSzp",
+        "Ingredients": "fldnVGqOWOCsuyGLu",
+        "Product Tier": "fldbS64X12TnUn4bq",
+        "Product Image": "fldk5kgMU9OVGXXNC",
+        "Subscriptions": "fldHgH5T5n55viBfq",
+        "Inventory": "fldHkCjubJ52C69VR",
+        "Sales": "fld23qp419gaNEzlX",
+        "Restock Log": "fldyDBGNNQZFoUppf",
+        "Starting Count": "fldU2bN4cbAMvJafo",
+        "Reorder Point": "fld1lFTNI9la7kYtj",
+        "Bags Sold": "fldi0zJWyxvZzWHUH",
+        "Bags Received": "fldc5yNFfmVRlSaYx",
+        "On Hand": "fldnneZdr8pSx8bnW",
+        "Reorder Status": "fld4SM9ZoAioPGDSG",
+        "Protein %": "fld5nAour2eZELvnh",
+        "Fat %": "fld8YRBSavuxPzR82",
+        "Sales Entry (Intake)": "fldrGTFOly8TCNCS2",
+        "Website Product ID": "fldRj7t4QHTZZUuVO",
+        "Inventory Baseline Date": "fldIJHD6X5VnxDYVC",
+        "Inventory Confirmed": "fldjvIgKR4tLqs05q",
+        "Usable Stock (Website)": "fldi6cRgXmx2iNC6V",
+        "Reserved Stock (Website)": "fldcCTPog3bC9GIoY",
+        "Waste Bags (Website)": "fldMTVh1c91Czr8AJ",
+        "Stock Count Date (Website)": "fld18mQAIxJhdDpzK",
+        "Stock Verified (Website)": "fld0XbWhhoHBId3A6",
+        "Stock Value (Website)": "fldsOuMUrxkSvsK1E"
+      }
+    },
+    "Subscriptions": {
+      "id": "tblAXBVAMlcwoWM8J",
+      "fields": {
+        "Subscription ID": "flduB43cZkJ67MbDq",
+        "Customer": "fld2eLOgeWlNpShkq",
+        "Product": "fldBU8pIC2o7tbOK5",
+        "Quantity Per Delivery": "fld0wJmfEwsjdJEky",
+        "Delivery Frequency": "fldz1at96A1Kgmpd9",
+        "Subscription Start Date": "fldgOWoeavxF7gUOj",
+        "Next Billing Date": "fldikyA7NKpHdyGI5",
+        "Next Delivery Date": "fld4y2hmvx8ACUFnf",
+        "Payment Status": "fld3WYFDhC4JVeFpH",
+        "Subscription Status": "fldL5szoaPOwRySrH",
+        "Special Instructions": "fldwU5kedcKvoefGr",
+        "Auto-Renewal": "fldLg7wDJTVLj1CTc",
+        "Deliveries": "fldQI3wFIoSrjcwvU",
+        "Route Partner": "fldtARtfdNHGmQQOD",
+        "Distribution Center": "fldOURtGaGjhJJkxA",
+        "Monthly Bag Equivalent": "fldFoEXW6ush9iQFM",
+        "Frequency Weeks": "fldV37KUQaN0FkCYQ"
+      }
+    },
+    "Customers": {
+      "id": "tbl9WHrBHdS2GBuQF",
+      "fields": {
+        "Customer Name": "fldDQ30UqHU00N7IY",
+        "Email": "fld5ERntQwdOf76ft",
+        "Phone": "fld1t9kupLakA7pV8",
+        "Service Address": "fldA1Ht0cW7TSYTcR",
+        "City": "fldTYEXNLeDjjozot",
+        "State": "fldesJhUJyjxI3yXb",
+        "Zip Code": "fldTk6mLVgAS3WM8n",
+        "Channel": "fldQxGicvhtFnhxuP",
+        "Route Partner": "fldZvOHcNYrNQjaJT",
+        "Assigned Distribution Center": "fldunfnFF0z84g3m5",
+        "Service Frequency": "fldXZ8Xd7bGlzFRY4",
+        "Next Scoop Visit Date": "fldmIx4mHjc2zjJMt",
+        "Delivery Type": "fldimhjSlXTZUCBVf",
+        "Dog Count": "fldO6swHzohVsOVcF",
+        "Customer Status": "fldJkqR5tFG8XvUdA",
+        "Notes": "fldZcJn5JNN5sEBc1",
+        "Subscriptions": "fldVtDpd2iZ7B296O",
+        "Monthly Bag Demand": "fldWe9yuFIfC2sQjS",
+        "Active Subscriptions": "fldzkTg8gho4bzcbC",
+        "Delivery Eligible": "fldq0EqbuWhUEEa8K",
+        "Area/Route Zone": "fldgyOOexCElHpZ8O",
+        "Route Day": "fldQmwjq7Vz5s2bNl",
+        "Bag Delivery Map": "fldUjdcFd4SG1kW2C",
+        "Website Customer ID": "flddfwCd6liVNtTZZ",
+        "Record Status": "fld8D6tDwdljZDGy1"
+      }
+    },
+    "Sales": {
+      "id": "tblpEYQ3qpfcKLmdo",
+      "fields": {
+        "Sold To": "fldSg5ZoweCOV0zQk",
+        "Sale Date": "fldJ6bBr9Asw5g3Uu",
+        "Product": "fldfthpSQLQL7zSCP",
+        "Bag Quantity": "fldubLnB6zsg82NLe",
+        "Amount Collected": "fldm19NsZRvqezwMn",
+        "Payment Method": "fldMlZH2VLQON8kIm",
+        "Payment Status": "fldYW9IxlTJdfIeZ0",
+        "Customer Type": "fld9VTx1hTv34QpOw",
+        "Distribution Center": "fldBTMcPqCub8I7Vv",
+        "Notes": "fldtLZ3roTZ11eYK0",
+        "Price Per Bag": "fldteJ3iBMsDXwe8p",
+        "Created By": "fld7HuoiUwKOW5NBP",
+        "SNG Job ID": "fldv8vN0PwhXV8gmr",
+        "Source": "fldR1II1PKzFEtwlG",
+        "Bags # (inventory)": "fldvpI3kGe7Mwh2rn",
+        "Sale Total": "fldMjFSrqaslZLgec",
+        "Payments Received": "fldD3Xn8SzHckvFWU",
+        "Payment Reference": "fldX2jea0bi8wEF0C",
+        "Responsible Person": "fldiaab8DMyBDyGXK",
+        "Responsible Email": "flddtIOLkIhkq627M",
+        "Responsible Phone": "fldeZbV3w2T7Zo2Vt",
+        "Next Follow-up": "fldhGnqc7QhVEIV9M",
+        "Website Order ID": "flddOh8FCd6RsE7up",
+        "Website Line ID": "fldO0l4TCtK3eJq4V",
+        "Website Order State": "fldb9UjbxVEp1DWrb",
+        "Stock Movement Date (Website)": "fldIsuDE9oeEV6D9e",
+        "Stock Movement At (Website)": "fldsbOV0msN2DOlKY",
+        "Collected Total (Website)": "flduha7sR5qZXriRP",
+        "Outstanding Balance (Website)": "flduttxogohuTRQWU",
+        "Fulfillment Status": "fldWBLpT3DcCDhnK0",
+        "Record Status": "fldyM6aaLhZhoudRq"
+      }
+    },
+    "Restock Log": {
+      "id": "tblSukxI3MLPPATQP",
+      "fields": {
+        "Date Received": "fldUzNlDX30Qu0tv7",
+        "Product": "fldJAqOOtYd1neRdd",
+        "Bags Received": "fldfbvxasiN7eK1ud",
+        "Supplier": "fld5S1fwpJj88Xcrv",
+        "Cost Per Bag": "fldfGlYf9y29IC9NR",
+        "Notes": "fldalSpfilDaEgvRP",
+        "Purchase Order ID": "fldgfezd0uwPEBuvl",
+        "Record Status": "fld3ltIRnCOjD4qML",
+        "Stock Location ID": "fldVD7Agzydd6pI0S",
+        "Lot Number": "fldk2MrdjdKtnwt6Z",
+        "Best Before": "fldawOdnUE6cA5UUg"
+      }
+    },
+    "Bag Delivery Map": {
+      "id": "tblpqa1bcR9HR7XBD",
+      "fields": {
+        "Subscription Item ID": "fldQdDJ7kLzeX2cin",
+        "Sold To": "fldfwd0gZLp0RdoLg",
+        "Product": "fldKo4QruDWzSMcQO",
+        "Bags Per Delivery": "fldZpexcw1v5c4XJF",
+        "Active": "fldmgvFjZJn2100qV",
+        "Customer": "fldBDO1JwzDs7auTo"
+      }
+    },
+    "Stock Locations": {
+      "id": "tbl20PGOd1m2XTT2x",
+      "fields": {
+        "Location ID": "fldwuXZg0Da3GXWDm",
+        "Location Name": "fldXZx64OIMyeIcU7",
+        "Location Type": "fldQZLTDHaHtV057x",
+        "Record Status": "fldWu5mNgWFuYFvU1"
+      }
+    },
+    "Purchase Orders": {
+      "id": "tblNbtYrer3mWLiLd",
+      "fields": {
+        "PO Number": "fldgvjbLG3RydKs4Y",
+        "Supplier": "fldkRei3GQ2sYfmxE",
+        "Order Date": "fldLoU3kalHop90Ht",
+        "Expected Date": "fldYINC6JUmebm0VQ",
+        "PO Status": "fld9y8RAUcQneLPNr",
+        "Freight Cost": "fldgkVZ5DJU6707VV",
+        "Amount Paid": "fldixd5CEmwfvKb8i",
+        "Payment Reference": "fldyLmaiMPLXBYppj",
+        "Stock Location ID": "fldNhGuUsDXxlWgyv",
+        "Notes": "fldAWvcQcU7SmqtwE",
+        "Website PO ID": "fld2IX9Nxu0XS3jlK",
+        "Record Status": "fldEmB9q5FU5clt7l"
+      }
+    },
+    "Inventory Adjustments": {
+      "id": "tblcJj3WOBoRHRHFV",
+      "fields": {
+        "Adjustment ID": "fldBqWhy5dAgPYdGs",
+        "Product": "fldCS0kgQZUsn66d9",
+        "Stock Location ID": "fldATSnHF6yR0pzLA",
+        "Movement Type": "fldUYqmAIk5o3mmrs",
+        "Quantity Change": "fldVxtxdoTKzvIOBp",
+        "Counted Quantity": "fldvoR8bkAjvnq0er",
+        "Counted At (Website)": "fldaxGt87EofJm3br",
+        "Movement Date": "fldngqlZ9eFPFGePg",
+        "Cost Per Bag": "fldwjldAMCMZ8Q22M",
+        "Lot Number": "fldtMfVLFOMNTk6CW",
+        "Best Before": "fldygob9hR4bu8tdV",
+        "Reason": "fldrf9MbVeS846IoI",
+        "Record Status": "fldCQfBzwX96yDP1Z"
+      }
+    },
+    "Purchase Order Lines": {
+      "id": "tblyxoyDldHingRFR",
+      "fields": {
+        "Line ID": "fldoQZXDk1GiwspsL",
+        "Purchase Order": "fldXJk84yqWbfEIN0",
+        "Product": "fldDBh7uLcItlottx",
+        "Ordered Quantity": "fldbDrfVnLv8hUOyz",
+        "Received Quantity": "fldEzLWDOIea3oFKF",
+        "Cost Per Bag": "fldQwQ9AKzZwVy3Zi",
+        "Received Date": "fldU8o5G94gv80jhz",
+        "Lot Number": "fldPT3MFRkZWHWOCU",
+        "Best Before": "fldNVsoVZrz4W3LvP",
+        "Record Status": "fldeSXwi2stVUYiaw"
+      }
+    },
+    "Payment Receipts": {
+      "id": "tblAlzVzZtsCRq0tK",
+      "fields": {
+        "Receipt Reference": "fldyanSwSOnwImMwl",
+        "Sale": "flduWrVWA5m6SuTFE",
+        "Amount": "fld4Eb0RH5j5Luxo5",
+        "Payment Date": "fldafKJjnkFyp30R8",
+        "Method": "fldkv47AaIvI24b78",
+        "Notes": "fldR2xLNMxaGxtRXd",
+        "Record Status": "fldumYxP4C3ncVAX4"
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "opwp-field-demo",
+  "main": "tmp/field-demo-deploy/.open-next/worker.js",
+  "compatibility_date": "2026-10-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "vars": {"FIELD_SANDBOX_ONLY":"true"},
+  "preview_urls": false,
+  "assets": {"directory": "tmp/field-demo-deploy/.open-next/assets", "binding": "ASSETS"},
+  "d1_databases": [{"binding":"DB","database_name":"opwp-field-demo","database_id":"bf395b7d-7a77-4bc8-9cb3-674d4c862ce8","migrations_dir":"tmp/field-demo-deploy/demo-migrations"}],
+  "observability": {"enabled":true,"head_sampling_rate":0.1},
+  "limits": {"cpu_ms":1000}
+}

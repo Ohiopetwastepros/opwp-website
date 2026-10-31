@@ -15,6 +15,17 @@
 .formError { display: flex; gap: 10px; align-items: center; padding: 13px 14px; border: 1px solid #efc5bb; border-radius: 10px; background: #fff3f0; color: #8a3d2d; font-size: 13px; }.formError span { display: grid; place-items: center; flex: 0 0 auto; width: 21px; height: 21px; border-radius: 50%; background: #a94c38; color: #fff; font-weight: 900; }
 .support { margin-top: 28px; color: #8a989d; font-size: 12px; text-align: center; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.form .check { display:flex; align-items:flex-start; gap:12px; line-height:1.5; }
+.form .check input { width:20px; height:20px; flex:0 0 20px; margin-top:2px; }
+.form p { margin:0; line-height:1.6; color:#496370; }
+.form h3 { margin:0; font-size:23px; }
+.form .secondary { background:transparent; color:#19516b; box-shadow:none; height:auto; min-height:38px; justify-content:center; }
+.qr { max-width:100%; height:auto; border-radius:12px; }
+.setupKey { display:block; overflow-wrap:anywhere; padding:12px 0; }
+.recoveryCodes { padding:16px; background:#eaf0ed; border-radius:10px; overflow-x:auto; font-size:13px; line-height:1.8; }
+.form select { min-height:48px; border:1px solid #cbd8d6; border-radius:10px; padding:10px; width:100%; background:white; color:#102f41; }
+.securityPage { max-width:760px; margin:40px auto; padding:24px; color:#102f41; }
+.securityPage li { padding:12px; margin:12px 0; background:#eef3ef; border-radius:10px; overflow-wrap:anywhere; }
 @media (max-width: 900px) { .page { grid-template-columns: 1fr; }.story { min-height: auto; padding: 24px; }.storyBody { padding: 64px 0 54px; }.story h1 { font-size: clamp(42px, 10vw, 64px); }.storyBody > p { font-size: 16px; }.storyFoot { display: none; }.access { padding: 56px 24px 64px; }.accessInner { max-width: 560px; } }
 @media (max-width: 520px) { .brandMark { width: 43px; height: 43px; border-radius: 12px; }.storyBody { padding: 48px 0 36px; }.signalRow { display: none; }.access { padding: 42px 20px 52px; align-items: start; }.access h2 { margin-top: 23px; }.form { margin-top: 30px; }.form input,.form button { height: 54px; } }
 @media (prefers-reduced-motion: reduce) { .form button:hover { transform: none; }.form button i { animation-duration: 1.4s; } }

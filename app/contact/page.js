@@ -8,13 +8,13 @@ export const metadata = {
   robots: { index: true, follow: true },
   openGraph: {
     type: "website",
-    url: "https://ohiopetwastepros.com/contact/",
+    url: "https://www.ohiopetwastepros.com/contact/",
     siteName: "Ohio Pet Waste Pros",
     title: "Contact Ohio Pet Waste Pros | Free Quote",
     description:
       "Call or text (419) 262-2371, or request a free dog waste removal quote online.",
     images: [
-      "https://ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
+      "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
     ],
   },
 };

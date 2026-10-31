@@ -3,6 +3,10 @@ import { verifyAdminRequest } from "@/lib/admin-auth";
 import { getDb } from "@/lib/db";
 import { updateGoogleReviewTrackingRecord } from "@/lib/airtable";
 import { parseReviewAliases } from "@/lib/google-review-matching.mjs";
+import { protectJsonRequest } from "@/lib/public-api-security";
+import { withRecordLease, patchCockpitRecord } from '@/lib/admin-record-store.mjs';
+import { RecordError } from '@/lib/admin-record-policy.mjs';
+import { refreshSavedReviewAudit } from '@/lib/google-review-state.mjs';
 
 export const dynamic = "force-dynamic";
 
@@ -12,14 +16,6 @@ const ALLOWED = {
   reviewStatus: { field: "Google Review", values: ["Reviewed", "Not reviewed"] },
   reviewAliases: { field: "Google Review Aliases" },
 };
-
-async function boundedJson(request) {
-  const declared = Number(request.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > 2048) return null;
-  const text = await request.text();
-  if (text.length > 2048) return null;
-  try { return JSON.parse(text); } catch { return null; }
-}
 
 function followUpPriority(fields) {
   if (fields["Google Review"] === "Reviewed") return "Do not contact - reviewed";
@@ -33,23 +29,20 @@ function followUpPriority(fields) {
 }
 
 async function updateSnapshot(db, recordId, fields) {
-  if (!db) return;
-  const snapshot = await db.prepare("SELECT payload FROM airtable_cockpit_snapshots WHERE snapshot_key='business_cockpit'").first();
-  if (!snapshot?.payload) return;
-  const data = JSON.parse(snapshot.payload);
-  const record = data?.opwp?.reviewTracker?.find((row) => row.id === recordId);
-  if (!record) return;
-  record.fields = { ...record.fields, ...fields };
-  await db.prepare("UPDATE airtable_cockpit_snapshots SET payload=?,updated_at=CURRENT_TIMESTAMP WHERE snapshot_key='business_cockpit' AND payload=?")
-    .bind(JSON.stringify(data), snapshot.payload).run();
+  await patchCockpitRecord(db,'tblzRg9DZKdIRQDrn',{id:recordId,fields});
+  await refreshSavedReviewAudit(db);
 }
 
 export async function PATCH(request) {
   const auth = await verifyAdminRequest(await headers());
   if (!auth.authorized) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  const body = await boundedJson(request);
+  if (request.headers.get('origin') !== new URL(request.url).origin || request.headers.get('sec-fetch-site') === 'cross-site') return Response.json({ ok: false, error: 'Cross-site request blocked.' }, { status: 403 });
+  const guarded = await protectJsonRequest(request, { scope: `google_review_edit:${auth.email}`, limit: 30, windowSeconds: 600, maxBytes: 2048, turnstile: false, failClosed: true });
+  if (guarded.response) return guarded.response;
+  const body = guarded.body;
   const recordId = String(body?.recordId || "");
-  const setting = ALLOWED[String(body?.field || "")];
+  const field = String(body?.field || "");
+  const setting = Object.hasOwn(ALLOWED, field) ? ALLOWED[field] : null;
   const suppliedValue = String(body?.value || "");
   const value = setting?.field === "Google Review Aliases"
     ? parseReviewAliases(suppliedValue).join("\n")
@@ -60,6 +53,8 @@ export async function PATCH(request) {
 
   try {
     const db = getDb();
+    if (!db) return Response.json({ok:false,error:'Review storage is unavailable.'},{status:503});
+    return await withRecordLease(db,'google-reviews',async()=>{
     const snapshot = db ? await db.prepare("SELECT payload FROM airtable_cockpit_snapshots WHERE snapshot_key='business_cockpit'").first() : null;
     const snapshotData = snapshot?.payload ? JSON.parse(snapshot.payload) : null;
     const current = snapshotData?.opwp?.reviewTracker?.find((row) => row.id === recordId)?.fields;
@@ -72,9 +67,10 @@ export async function PATCH(request) {
     await updateSnapshot(db, recordId, fields);
     console.log(JSON.stringify({ event: "google_review_tracking_updated", recordId, field: setting.field, actor: auth.email }));
     return Response.json({ ok: true, record: { id: recordId, [body.field]: value, priority } }, { headers: { "Cache-Control": "no-store" } });
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "The review-tracking record could not be updated.";
     console.error(JSON.stringify({ event: "google_review_tracking_update_failed", recordId, field: body?.field, actor: auth.email, error: message }));
-    return Response.json({ ok: false, error: message }, { status: 500 });
+    return Response.json({ ok: false, error: error instanceof RecordError ? error.message : 'The update could not be confirmed. Reload before another change.' }, { status: error instanceof RecordError ? error.status : 500 });
   }
 }

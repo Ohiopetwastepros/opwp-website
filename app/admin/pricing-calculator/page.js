@@ -1,3 +1,4 @@
+import AdminWorkspace from "../AdminWorkspace";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifyAdminRequest } from "@/lib/admin-auth";
@@ -36,7 +37,7 @@ export default async function PricingCalculatorPage() {
     booksStatus: settings.books_status,
   };
 
-  return <main className={`${styles.page} opwp-admin-shell`}>
+  return <AdminWorkspace section="pricing" email={auth.email}><main className={`${styles.page} opwp-admin-shell`}>
     <header className={styles.header}>
       <a className={styles.brand} href="/admin/"><span>O</span><div><strong>OPWP</strong><small>Management tools</small></div></a>
       <div className={styles.headerCopy}><span>Private tool</span><strong>Job Pricing Calculator</strong></div>
@@ -44,5 +45,5 @@ export default async function PricingCalculatorPage() {
     </header>
     <PricingCalculator pricingInputs={pricingInputs} />
     <footer className={styles.footer}>Signed in as {auth.email}. Estimates are management guidance; confirm unusual properties and scope before quoting.</footer>
-  </main>;
+  </main></AdminWorkspace>;
 }

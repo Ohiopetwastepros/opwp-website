@@ -1,0 +1,28 @@
+// Isolated visual preview. Production components, APIs and providers are never mutated.
+import fs from 'node:fs';
+import path from 'node:path';
+import http from 'node:http';
+import {build} from 'esbuild';
+import {sampleAccount,routeChoices} from '../design/dog-food-premium/fixtures.mjs';
+const root=process.cwd(),port=Number(process.env.FOOD_PREMIUM_PORT||4340);
+const design='design/dog-food-premium';
+fs.writeFileSync(design+'/account/account.module.css',fs.readFileSync(design+'/baseline/account.module.css','utf8')+'\n'+fs.readFileSync(design+'/premium.css','utf8'));
+const fontRoot=path.join(root,'.next/static/css');
+const fontCss=fs.existsSync(fontRoot)?fs.readdirSync(fontRoot).filter(f=>f.endsWith('.css')).flatMap(f=>fs.readFileSync(path.join(fontRoot,f),'utf8').match(/@font-face\{[^}]+\}/g)||[]).filter(r=>r.includes('-s.p.woff2')&&r.includes('Hanken Grotesk')).map(r=>r.replace(/;unicode-range:[^}]+/,'')).join(''):'';
+const bundle=await build({stdin:{contents:`import React from 'react';import {createRoot} from 'react-dom/client';import './app/globals.css';import App from './${design}/account/FoodAccountClient.js';createRoot(document.getElementById('app')).render(<App/>);`,loader:'jsx',resolveDir:root},bundle:true,write:false,outdir:'tmp/food-premium-build',format:'iife',jsx:'automatic',loader:{'.js':'jsx','.css':'local-css'},define:{'process.env.NODE_ENV':'"production"','process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY':'""'},plugins:[{name:'local-source',setup(b){b.onResolve({filter:/^@\//},a=>({path:path.join(root,a.path.slice(2)+(path.extname(a.path)?'':'.js'))}));}}]});
+const js=bundle.outputFiles.find(f=>f.path.endsWith('.js')).text.replaceAll('</script','<\\/script'),css=bundle.outputFiles.find(f=>f.path.endsWith('.css')).text;
+const scenarios=['member','empty','new','login','paused','external','requests','unpaid','pickup-ready','pickup-arranged','direct'];
+const index=`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Premium portal — local review</title><style>body{font:16px system-ui;background:#F1F4F6;color:#142D46;margin:40px auto;max-width:800px;padding:0 20px}a{display:block;padding:16px;background:white;border:1px solid #D5DDE2;border-radius:8px;color:#246847;margin:12px 0}p{line-height:1.6}</style><h1>My Dog Food · premium preview</h1><p>Local visual review with fictional records. Nothing here submits orders, payments, account changes or customer messages. Production is unchanged.</p>${scenarios.map(s=>`<a href="/dog-food/account/?preview=${s}">${s.replaceAll('-',' ')} account</a>`).join('')}<a href="/dog-food/account/?preview=empty&textZoom=200">200% text-only reflow simulation</a></html>`;
+function html(url){return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>My Dog Food · local premium preview</title><style>${fontCss}:root{--font-hanken:'Hanken Grotesk',Arial;--font-bricolage:'Hanken Grotesk',Arial}${css}</style></head><body><div id="app"></div><script>const originalFetch=window.fetch;window.fetch=(url,options)=>originalFetch(url==='/api/dog-food/session/'?url+'?preview='+encodeURIComponent(new URLSearchParams(location.search).get('preview')||'member'):url,options);${js}${url.searchParams.get('textZoom')==='200'?"const observer=new MutationObserver(()=>{const p=document.querySelector('.opwp-food-account-shell');if(p){p.setAttribute('data-text-zoom','200');observer.disconnect();}});observer.observe(document.getElementById('app'),{childList:true,subtree:true});":''}</script></body></html>`;}
+const server=http.createServer((req,res)=>{
+ const url=new URL(req.url,`http://127.0.0.1:${port}`);res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'");
+ if(req.method==='POST'&&url.pathname==='/api/dog-food/account/'){let body='';req.on('data',c=>{body+=c;if(body.length>8192)req.destroy();});req.on('end',()=>{let b;try{b=JSON.parse(body);}catch{res.writeHead(400);res.end();return;}if(b.action==='delivery_choices'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({ok:true,deliveryChoices:routeChoices}));}else{res.writeHead(405,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:false,error:'Local visual preview: all changes, orders and payments are blocked.'}));}});return;}
+ if(req.method!=='GET'){res.writeHead(405);res.end();return;}
+ if(url.pathname==='/api/dog-food/session/'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(sampleAccount(scenarios.includes(url.searchParams.get('preview'))?url.searchParams.get('preview'):'member')));return;}
+ if(url.pathname==='/'){res.setHeader('Content-Type','text/html;charset=utf-8');res.end(index);return;}
+ if(url.pathname==='/dog-food/account/'){res.setHeader('Content-Type','text/html;charset=utf-8');res.end(html(url));return;}
+ const asset=/^\/assets\/(?:edf\/\d{2}-\d{2}|opwp-logo)\.webp$/.test(url.pathname)?path.join(root,'public',url.pathname):/^\/_next\/static\/media\/[a-f0-9-]+-s\.p\.woff2$/.test(url.pathname)?path.join(root,'.next/static/media',path.basename(url.pathname)):null;
+ if(asset&&fs.existsSync(asset)){res.setHeader('Content-Type',asset.endsWith('.woff2')?'font/woff2':'image/webp');res.end(fs.readFileSync(asset));return;}
+ res.writeHead(404);res.end();
+});
+server.listen(port,'127.0.0.1',()=>console.log(`Local-only premium preview: http://127.0.0.1:${port}/`));

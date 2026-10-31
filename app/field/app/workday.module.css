@@ -1,0 +1,501 @@
+.shell {
+  min-height: 100dvh;
+  background: #f3f6f9;
+  color: #203242;
+  font-family: Arial, sans-serif;
+  padding-bottom: 145px;
+}
+.shell * {
+  box-sizing: border-box;
+}
+.header {
+  background: #1f4566;
+  color: #fff;
+  padding: 14px max(18px, calc((100vw - 620px) / 2));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.header img {
+  width: 43px;
+  height: 43px;
+  object-fit: contain;
+  background: white;
+  border-radius: 9px;
+}
+.header div {
+  flex: 1;
+}
+.header b,
+.header span {
+  display: block;
+}
+.header span {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-top: 4px;
+}
+.shell button,
+.shell input,
+.shell select,
+.shell textarea {
+  font: inherit;
+}
+.shell button,
+.secondary,
+.photoButton {
+  border: 0;
+  border-radius: 10px;
+  padding: 13px 16px;
+  min-height: 46px;
+  background: #24734a;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+}
+.shell button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.header button {
+  background: #ffffff15;
+  border: 1px solid #ffffff55;
+  font-size: 12px;
+  padding: 8px 12px;
+}
+.connection {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px max(18px, calc((100vw - 620px) / 2));
+  background: white;
+  font-size: 11px;
+  border-bottom: 1px solid #d9e3ec;
+}
+.connection span {
+  color: #607180;
+}
+.warning {
+  background: #fff3d8;
+  color: #704b04;
+}
+.main {
+  max-width: 656px;
+  margin: auto;
+  padding: 22px 18px;
+}
+.title {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+}
+.title span {
+  font-size: 12px;
+  color: #596b79;
+}
+.title h1 {
+  font-size: 26px;
+  line-height: 1.2;
+  margin: 7px 0 16px;
+}
+.title button {
+  background: transparent;
+  color: #1f4566;
+  font-size: 12px;
+  padding: 8px;
+}
+.stats {
+  background: #fff;
+  border: 1px solid #d8e2ea;
+  border-radius: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0 0 20px;
+  padding: 16px 5px;
+  text-align: center;
+}
+.stats span {
+  font-size: 10px;
+  color: #607180;
+  border-right: 1px solid #e3e9ee;
+}
+.stats span:last-child {
+  border: 0;
+}
+.stats b {
+  display: block;
+  color: #203242;
+  font-size: 23px;
+  margin-bottom: 6px;
+}
+.card {
+  background: white;
+  border: 1px solid #d8e2ea;
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.card h1 {
+  font-size: 25px;
+}
+.card h2,
+.property h2 {
+  font-size: 21px;
+  margin: 0 0 10px;
+}
+.card h3 {
+  font-size: 16px;
+}
+.card p,
+.property p {
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 10px 0;
+}
+.card small,
+.tip {
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #607180;
+}
+.shell label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 13px 0;
+}
+.shell input:not([type="checkbox"]):not([type="file"]),
+.shell select,
+.shell textarea {
+  display: block;
+  background: white;
+  color: #203242;
+  border: 1px solid #b8c8d5;
+  border-radius: 8px;
+  padding: 12px;
+  width: 100%;
+  margin-top: 7px;
+  min-width: 0;
+}
+.shell textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+.shell .check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.5;
+}
+.check input {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  accent-color: #24734a;
+  margin-top: 0;
+}
+.shell fieldset {
+  border: 1px solid #d8e2ea;
+  border-radius: 10px;
+  margin: 16px 0;
+  padding: 12px;
+}
+.card > button {
+  margin: 5px 7px 5px 0;
+}
+.card a {
+  display: block;
+  margin-top: 12px;
+  color: #1f4566;
+}
+.property {
+  border: 1px solid #d8e2ea;
+  border-radius: 15px;
+  background: white;
+  overflow: hidden;
+  margin-bottom: 17px;
+}
+.propertyBar {
+  background: #1f4566;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  font-size: 10px;
+}
+.propertyBody {
+  padding: 18px;
+}
+.propertyBody h3 {
+  font-size: 16px;
+  margin-top: 22px;
+}
+.actions {
+  display: flex;
+  gap: 10px;
+  margin: 14px 0;
+  flex-wrap: wrap;
+}
+.shell .secondary {
+  background: #e9f0f6;
+  color: #1f4566;
+}
+.access {
+  background: #edf3f8;
+  border: 1px solid #d7e3ec;
+  border-radius: 11px;
+  padding: 15px;
+  margin: 16px 0;
+}
+.access > b {
+  font-size: 13px;
+  color: #1f4566;
+}
+.access p {
+  font-size: 13px;
+  margin: 7px 0;
+}
+.service {
+  border: 1px solid #dbe4eb;
+  border-radius: 12px;
+  margin: 10px 0;
+  overflow: hidden;
+}
+.shell .serviceTitle {
+  color: #203242;
+  background: white;
+  width: 100%;
+  text-align: left;
+  padding: 16px;
+  display: block;
+}
+.serviceTitle b {
+  display: block;
+  font-size: 15px;
+}
+.serviceTitle span {
+  font-size: 10px;
+  display: block;
+  margin-top: 7px;
+}
+.done {
+  border-color: #b9d8c0;
+}
+.done .serviceTitle {
+  background: #edf6ed;
+  color: #25613f;
+}
+.working {
+  border-color: #9bb7cf;
+}
+.working .serviceTitle {
+  background: #edf3f9;
+}
+.serviceBody {
+  padding: 0 16px 16px;
+}
+.shell .textButton {
+  background: transparent;
+  color: #1f4566;
+  padding: 10px 4px;
+  font-size: 12px;
+  display: block;
+  text-align: left;
+}
+.shell .timer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #edf3f8;
+  color: #1f4566;
+  width: 100%;
+  margin: 12px 0;
+}
+.timer b {
+  font-size: 40px;
+  font-variant-numeric: tabular-nums;
+}
+.timer span {
+  font-size: 12px;
+  margin: 5px;
+}
+.shell .over {
+  background: #fff0ef;
+  color: #a52323;
+}
+.photoButton {
+  background: #edf3f8;
+  border: 1px dashed #92adc2;
+  color: #1f4566;
+  width: 100%;
+}
+.photoButton input {
+  display: block;
+  max-width: 100%;
+  font-size: 11px;
+  margin-top: 8px;
+}
+.photos {
+  display: flex;
+  gap: 9px;
+  overflow: auto;
+  margin: 12px 0;
+}
+.photos a {
+  flex: 0 0 84px;
+  display: block;
+  color: #1f4566;
+  font-size: 10px;
+}
+.photos img {
+  width: 84px;
+  height: 70px;
+  object-fit: cover;
+  border-radius: 7px;
+}
+.photos small {
+  display: block;
+}
+.routeRow {
+  display: flex !important;
+  background: white !important;
+  color: #203242 !important;
+  text-align: left !important;
+  gap: 12px;
+  width: 100%;
+  border: 1px solid #d8e2ea !important;
+  margin: 10px 0;
+  padding: 17px !important;
+}
+.routeRow > span {
+  background: #e9f0f6;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.routeRow small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  margin-top: 6px;
+}
+.nav {
+  position: fixed;
+  z-index: 20;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100%, 656px);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: #14304a;
+  padding: 9px 7px max(10px, env(safe-area-inset-bottom));
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -3px 15px #14304a22;
+}
+.nav button {
+  color: #d6e2eb;
+  background: transparent;
+  font-size: 12px;
+  padding: 12px 5px;
+}
+.nav button[aria-current="page"] {
+  background: #315b7c;
+  color: white;
+  outline: 2px solid #c6d7b2;
+}
+.shell .running {
+  position: fixed;
+  z-index: 19;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(calc(100% - 24px), 610px);
+  background: #dcebf6;
+  color: #14304a;
+  box-shadow: 0 3px 12px #1233;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  font-size: 12px;
+}
+.running b {
+  font-size: 23px;
+  font-variant-numeric: tabular-nums;
+}
+.error {
+  border: 1px solid #e1a6a6;
+  background: #fff0ef;
+  color: #932626;
+  padding: 14px;
+  border-radius: 10px;
+  line-height: 1.5;
+  font-size: 14px;
+}
+.attention {
+  border-color: #d4b66d;
+  background: #fff9e9;
+}
+.dialog {
+  border: 0;
+  border-radius: 16px;
+  padding: 22px;
+  max-width: 480px;
+  width: calc(100% - 28px);
+  color: #203242;
+  max-height: 90dvh;
+  overflow: auto;
+}
+.dialog::backdrop {
+  background: #102a42bb;
+}
+.dialog form > button:last-child {
+  width: 100%;
+}
+.shell .danger {
+  background: #a83333;
+}
+.tip button {
+  font-size: 11px;
+  padding: 5px;
+  min-height: 30px;
+  margin-left: 6px;
+}
+@media (max-width: 360px) {
+  .main {
+    padding: 18px 12px;
+  }
+  .propertyBody {
+    padding: 14px;
+  }
+  .stats b {
+    font-size: 20px;
+  }
+  .title h1 {
+    font-size: 23px;
+  }
+  .header {
+    padding: 12px;
+  }
+  .connection {
+    padding: 9px 12px;
+    font-size: 10px;
+  }
+  .actions > * {
+    flex: 1;
+  }
+  .running span {
+    max-width: 65%;
+  }
+}

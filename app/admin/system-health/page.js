@@ -1,3 +1,4 @@
+import AdminWorkspace from "../AdminWorkspace";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -13,7 +14,7 @@ export default async function SystemHealthPage() {
   const auth = await verifyAdminRequest(await headers());
   if (!auth.authorized) redirect("/admin/login/?next=/admin/system-health/");
   const health = await getSystemHealth();
-  return <main style={{ maxWidth: 1040, margin: "0 auto", padding: "36px 22px 70px", fontFamily: "system-ui,sans-serif" }}>
+  return <AdminWorkspace section="system-health" email={auth.email}><main style={{ maxWidth: 1040, margin: "0 auto", padding: "36px 22px 70px", fontFamily: "system-ui,sans-serif" }}>
     <Link href="/admin/">← Executive cockpit</Link>
     <h1 style={{ color: "#1a3c5a", marginBottom: 6 }}>System Health</h1>
     <p style={{ color: "#667680", marginTop: 0 }}>Safe operational metadata only. Generated {health.generatedAt}.</p>
@@ -28,5 +29,5 @@ export default async function SystemHealthPage() {
         {row.details ? <p style={{ color: "#64727a", marginBottom: 0, overflowWrap: "anywhere" }}>{row.details}</p> : null}
       </section>)}
     </div>
-  </main>;
+  </main></AdminWorkspace>;
 }

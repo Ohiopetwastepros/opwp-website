@@ -1,3 +1,4 @@
+import AdminWorkspace from "../AdminWorkspace";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifyAdminRequest } from "@/lib/admin-auth";
@@ -6,6 +7,8 @@ import { getFinancialManagementDashboard, listDailyFinancialSnapshots, recordDai
 import FinancialPeriodExplorer from "./FinancialPeriodExplorer";
 import FinancialPlanClient from "./FinancialPlanClient";
 import styles from "./financials.module.css";
+import nav from "../admin-navigation.module.css";
+import AdminSectionShell from "../AdminSectionShell";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Financials | OPWP Executive Cockpit", robots: { index: false, follow: false } };
@@ -37,7 +40,7 @@ export default async function FinancialsPage() {
   const auth = await verifyAdminRequest(await headers());
   if (!auth.authorized) redirect("/");
   const data = await getQuickBooksFinancialDashboard();
-  if (!data.connected) redirect("/admin/");
+  if (!data.connected) return <AdminSectionShell section="financial-overview" title="Financial overview" description="Company accounting, cash, and the owner plan." email={auth.email}><section className={nav.notice}><strong>QuickBooks is not connected</strong><p>Connect QuickBooks to load company financials. Route reporting remains available separately.</p><div className={nav.shortcuts}><a href="/admin/quickbooks/connect/">Connect QuickBooks</a><a href="/admin/financials/routes/">Open route profitability</a></div></section></AdminSectionShell>;
   const management = await getFinancialManagementDashboard(data);
   await recordDailyFinancialSnapshot(data);
   const snapshots = await listDailyFinancialSnapshots(31);
@@ -51,9 +54,11 @@ export default async function FinancialsPage() {
   const banks = (data.accounts ?? []).filter((account) => /bank|cash/i.test(account.type));
   const liabilities = (data.accounts ?? []).filter((account) => /liability|credit card/i.test(account.type));
 
-  return <main className={`${styles.shell} opwp-admin-shell`}><div className={styles.wrap}>
-    <header className={styles.header}><div><div className={styles.eyebrow}>QuickBooks + management ledger · {data.environment}</div><h1 className={styles.title}>Financial command center</h1><div className={styles.muted}>{data.companyName} · through {data.periodEnd} · signed in as {auth.email}</div></div><div className={styles.bookBadge} data-status={management.settings.books_status}>{management.settings.books_status === "verified" ? "Books verified" : management.settings.books_status === "rectifying" ? "Books being rectified" : "Books provisional"}</div></header>
-    <nav className={styles.nav}><a href="/admin/">Overview</a><a href="/admin/financials/">Financials</a><a href="#periods">Periods</a><a href="#plan">Owner plan</a><a href="#position">Position</a></nav>
+  return <AdminWorkspace section="financial-overview" email={auth.email}><main className={`${styles.shell} opwp-admin-shell`}><div className={styles.wrap}>
+    <header className={styles.header}><div><div className={styles.eyebrow}>QuickBooks + management ledger · {data.environment}</div><h1 className={styles.title}>Financial overview</h1><div className={styles.muted}>{data.companyName} · through {data.periodEnd} · signed in as {auth.email}</div></div><div className={styles.bookBadge} data-status={management.settings.books_status}>{management.settings.books_status === "verified" ? "Books verified" : management.settings.books_status === "rectifying" ? "Books being rectified" : "Books provisional"}</div></header>
+    <nav className={styles.nav} aria-label="Financial overview sections"><a href="#periods">Income &amp; expenses</a><a href="#plan">Owner plan</a><a href="#position">Cash &amp; liabilities</a><a href="/admin/financials/reconciliation/">Bank reconciliation</a></nav>
+
+    <section className={nav.notice} id="route-costs"><strong>Looking for route profitability?</strong>Revenue by service day, allocated route costs, and source-data corrections now live in one report.<div className={nav.shortcuts}><a href="/admin/financials/routes/">Open route profitability</a></div></section>
 
     {management.dataWarnings.length ? <section className={styles.qualityBanner}><div><strong>Decision-data controls are active</strong><p>Verified management values override unreliable accounting fields for planning. QuickBooks remains visible for reconciliation.</p></div><ul>{management.dataWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></section> : null}
 
@@ -89,5 +94,5 @@ export default async function FinancialsPage() {
     <section id="position" className={styles.section}><div className={styles.sectionHead}><div><div className={styles.eyebrow}>Financial position</div><h2 className={styles.sectionTitle}>Liquidity and obligations</h2></div></div><div className={styles.equal}><div className={styles.panel}><div className={styles.balance}><div className={styles.balanceGroup}><h3>Management position</h3><div className={styles.balanceItem}><span>Verified cash</span><b>{money(management.cash.verified)}</b></div><div className={styles.balanceItem}><span>Protected floor</span><b>{money(management.cash.protectedFloor)}</b></div><div className={styles.balanceItem}><span>Available above floor</span><b>{money(management.cash.availableAboveFloor)}</b></div></div><div className={styles.balanceGroup}><h3>QuickBooks reconciliation</h3><div className={styles.balanceItem}><span>QuickBooks cash</span><b>{money(data.cash)}</b></div><div className={styles.balanceItem}><span>Accounts receivable</span><b>{money(data.accountsReceivable)}</b></div><div className={styles.balanceItem}><span>Working capital</span><b>{money(workingCapital)}</b></div></div></div></div><div className={styles.panel}><div className={styles.eyebrow}>Daily management ledger</div>{snapshots.length ? <div className={styles.snapshotList}>{snapshots.slice(-7).reverse().map((row) => <div key={row.snapshot_date}><span>{row.snapshot_date}</span><strong>{money(row.verified_cash || row.qbo_cash)}</strong><small>{row.books_status}</small></div>)}</div> : <div className={styles.emptyState}><strong>Daily snapshots begin after deployment.</strong><p>The scheduled Worker will preserve one management snapshot per day so cash and reported results can be compared over time.</p></div>}</div></div></section>
 
     <section className={styles.section}><div className={styles.equal}><div className={styles.panel}><div className={styles.eyebrow}>Cash accounts · QuickBooks reconciliation</div><table className={styles.table}><tbody>{banks.map((account) => <tr key={account.id}><td>{account.name}</td><td>{account.type}</td><td>{money(account.balance)}</td></tr>)}</tbody></table></div><div className={styles.panel}><div className={styles.eyebrow}>Liability accounts · QuickBooks reconciliation</div><table className={styles.table}><tbody>{liabilities.map((account) => <tr key={account.id}><td>{account.name}</td><td>{account.type}</td><td>{money(account.balance)}</td></tr>)}</tbody></table></div></div></section>
-  </div></main>;
+  </div></main></AdminWorkspace>;
 }

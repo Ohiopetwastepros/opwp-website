@@ -3,13 +3,19 @@ import { getDb } from "@/lib/db";
 import { activateDogFoodSubscriptionFromOrder, recordDogFoodPayment } from "@/lib/dog-food-payments";
 import { createDogFoodPaymentSetup } from "@/lib/stripe";
 import { applicationConfig } from "@/lib/app-config";
+import { readBoundedBytes } from "@/lib/bounded-body.mjs";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import {getRuntimeEnv} from '@/lib/cloudflare';
+import {runFoodCommand} from '@/lib/dog-food-ops-store';
+import {FoodError} from '@/lib/dog-food-operations.mjs';
 
 export const dynamic = "force-dynamic";
 
-const validDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
+const validDate = (value) => {const d=new Date(`${value}T12:00:00Z`);return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))&&Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===value;};
 const clean = (value, max = 200) => String(value || "").trim().slice(0, max);
 
 async function pricedItems(db, requestedItems) {
+  if(!Array.isArray(requestedItems)||requestedItems.length>8||requestedItems.some(item=>!item||!Number.isSafeInteger(Number(item.quantity))||Number(item.quantity)<0||Number(item.quantity)>10))throw new Error('Bag quantities must be whole numbers from zero to ten.');
   const quantities = new Map((Array.isArray(requestedItems) ? requestedItems : []).map((item) => [
     clean(item.productId, 100), Math.max(0, Math.min(10, Number(item.quantity) || 0)),
   ]));
@@ -43,7 +49,7 @@ async function context(request) {
 async function markPaid(db, body, actor) {
   const orderId = clean(body.orderId, 100);
   const reference = clean(body.reference, 100);
-  const provider = body.provider === "cardpointe" ? "cardpointe" : "sng_manual";
+  const provider = ["cardpointe","cash","venmo","check","sng_manual"].includes(body.provider) ? body.provider : "sng_manual";
   if (!orderId || !reference) throw new Error("An order and SNG/CardPointe transaction reference are required.");
   return recordDogFoodPayment({ db, orderId, provider, reference, actor });
 }
@@ -53,10 +59,12 @@ async function scheduleOrder(db, body) {
   const scheduledDate = clean(body.scheduledDate, 10);
   if (!orderId || !validDate(scheduledDate)) throw new Error("Choose an order and a valid delivery date.");
   const order = await db.prepare(
-    `SELECT o.id,o.customer_id,o.address_id,o.status,o.requested_delivery_speed,c.customer_type,a.placement_preference,a.placement_other
-     FROM dog_food_orders o JOIN dog_food_customers c ON c.id=o.customer_id JOIN dog_food_addresses a ON a.id=o.address_id WHERE o.id=? LIMIT 1`
+    `SELECT o.id,o.customer_id,o.address_id,o.status,o.source,o.requested_delivery_speed,o.fulfillment_method,c.customer_type,a.placement_preference,a.placement_other
+     FROM dog_food_orders o JOIN dog_food_customers c ON c.id=o.customer_id JOIN dog_food_addresses a ON a.id=o.address_id WHERE o.id=? AND o.deleted_at IS NULL AND c.deleted_at IS NULL LIMIT 1`
   ).bind(orderId).first();
   if (!order) throw new Error("The order was not found.");
+  if (['customer_portal','subscription_renewal'].includes(order.source))throw new FoodError('Confirm ZIP/date technician capacity in Website automation, then run the workflow to assign this order.',409);
+  if(order.fulfillment_method==='pickup')throw new FoodError('Arrange this pickup through Website automation; it does not use a driver delivery.',409);
   if (["cancelled", "refunded", "fulfilled"].includes(order.status)) throw new Error("This order can no longer be scheduled.");
   const deliveryType = order.customer_type === "scoop" && order.requested_delivery_speed === "route_day" ? "scoop_route"
     : order.customer_type === "route_partner" && order.requested_delivery_speed === "route_day" ? "route_partner" : "on_demand";
@@ -83,11 +91,12 @@ async function updateOrder(db, body, actor) {
   if (plan === "subscription" && delivery !== "route_day") throw new Error("Monthly delivery must use the free route day.");
   if (scheduledDate && !validDate(scheduledDate)) throw new Error("Enter a valid delivery date.");
   const order = await db.prepare(
-    `SELECT o.id,o.order_number,o.customer_id,o.address_id,o.status,c.customer_type,d.id AS delivery_id,d.status AS delivery_status
+    `SELECT o.id,o.order_number,o.customer_id,o.address_id,o.status,o.source,c.customer_type,d.id AS delivery_id,d.status AS delivery_status
      FROM dog_food_orders o JOIN dog_food_customers c ON c.id=o.customer_id
-     LEFT JOIN dog_food_deliveries d ON d.order_id=o.id WHERE o.id=? LIMIT 1`
+     LEFT JOIN dog_food_deliveries d ON d.order_id=o.id WHERE o.id=? AND o.deleted_at IS NULL AND c.deleted_at IS NULL LIMIT 1`
   ).bind(orderId).first();
   if (!order) throw new Error("The order was not found.");
+  if (['customer_portal','subscription_renewal'].includes(order.source))throw new FoodError('Website orders keep their original checkout, prices and stock allocation. Resolve or cancel the original order before creating a replacement.',409);
   if (!["draft", "pending_payment", "payment_failed"].includes(order.status)) throw new Error("Product and price edits are locked after payment is recorded.");
   const captured = await db.prepare("SELECT id FROM dog_food_payments WHERE order_id=? AND status='captured' LIMIT 1").bind(orderId).first();
   if (captured) throw new Error("This order already has a captured payment and cannot be repriced.");
@@ -136,7 +145,7 @@ async function createOrder(db, body, actor) {
   if (!customerId || !validDate(scheduledDate)) throw new Error("Choose a customer and a valid first delivery date.");
   if (plan === "subscription" && delivery !== "route_day") throw new Error("Monthly delivery must use the free route day.");
 
-  const customer = await db.prepare("SELECT id,customer_type FROM dog_food_customers WHERE id=? AND status='active'").bind(customerId).first();
+  const customer = await db.prepare("SELECT id,customer_type FROM dog_food_customers WHERE id=? AND status='active' AND deleted_at IS NULL").bind(customerId).first();
   const address = await db.prepare("SELECT id,placement_preference,placement_other FROM dog_food_addresses WHERE customer_id=? ORDER BY is_primary DESC,created_at DESC LIMIT 1").bind(customerId).first();
   if (!customer || !address) throw new Error("The selected customer needs an active profile and delivery address.");
 
@@ -180,26 +189,24 @@ async function createStripeSetup(db, body) {
 export async function POST(request) {
   const current = await context(request);
   if (current.response) return current.response;
+  if (request.headers.get("origin") !== new URL(request.url).origin) return Response.json({ok:false,error:"Cross-site request rejected"},{status:403});
+  const rate = await checkRateLimit(request,{scope:`admin_dog_food:${current.auth.email}`,limit:20,windowSeconds:60,failClosed:true});
+  if (!rate.allowed) return rateLimitResponse(rate);
   try {
-    const body = await request.json();
+    const body = JSON.parse(new TextDecoder().decode(await readBoundedBytes(request,16384)));
     const action = clean(body?.action, 40);
-    const result = action === "mark_paid"
-      ? await markPaid(current.db, body, current.auth.email)
-      : action === "create_order"
-        ? await createOrder(current.db, body, current.auth.email)
-        : action === "update_order"
-          ? await updateOrder(current.db, body, current.auth.email)
-        : action === "schedule_order"
-          ? await scheduleOrder(current.db, body)
-        : action === "create_stripe_setup"
-          ? await createStripeSetup(current.db, body)
-        : null;
-    if (!result) return Response.json({ ok: false, error: "The requested action is not supported." }, { status: 400 });
+    const operation=action==='mark_paid'?()=>markPaid(current.db,body,current.auth.email)
+      :action==='create_order'?()=>createOrder(current.db,body,current.auth.email)
+      :action==='update_order'?()=>updateOrder(current.db,body,current.auth.email)
+      :action==='schedule_order'?()=>scheduleOrder(current.db,body)
+      :action==='create_stripe_setup'?()=>createStripeSetup(current.db,body):null;
+    if(!operation)return Response.json({ok:false,error:'The requested action is not supported.'},{status:400});
+    const result=await runFoodCommand({...getRuntimeEnv(),DB:current.db},{...body,action:`native_${action}`},current.auth.email,operation);
     console.log(JSON.stringify({ event: `dog_food_${action}`, actor: current.auth.email, ...result }));
     return Response.json({ ok: true, result }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "The dog-food operation failed.";
     console.error(JSON.stringify({ event: "dog_food_operation_failed", message }));
-    return Response.json({ ok: false, error: message }, { status: 400 });
+    return Response.json({ ok: false, error: message }, { status:error instanceof FoodError?error.status:error instanceof RangeError?413:400 });
   }
 }

@@ -2,10 +2,22 @@
 
 import { useMemo, useState } from "react";
 import styles from "./dashboard.module.css";
+import { normalizeReviewIdentity } from "@/lib/google-review-matching.mjs";
+import {recordDestination} from '@/lib/admin-record-policy.mjs';
 
 const TYPE_OPTIONS = ["Recurring", "One-time", "Unmatched review"];
 const STATUS_OPTIONS = ["Active", "Paused", "Inactive", "Dropped", "Past", "Unknown", "Needs matching"];
 const REVIEW_OPTIONS = ["Reviewed", "Not reviewed"];
+
+function ReviewEvidence({ row, audit }) {
+  const alternate = row.reviewName && normalizeReviewIdentity(row.reviewName) !== normalizeReviewIdentity(row.customer);
+  const verified = audit?.verifiedRecordIds?.includes(row.id);
+  return <><div>{row.reviewName || "—"}</div><a href={recordDestination('appcAWPBQB8GmOrcT','tblzRg9DZKdIRQDrn',row.id)}>Edit review details</a>{alternate ? <div className={`${styles.badge} ${styles.warn}`}>Different reviewer / household name</div> : null}
+    {row.reviewAliases ? <div className={styles.subtle}>Saved alias: {row.reviewAliases}</div> : null}
+    {row.reviewDate || row.reviewRating ? <div className={styles.subtle}>{row.reviewRating ? `${row.reviewRating}/5` : ''}{row.reviewDate ? ` · ${row.reviewDate}` : ''}</div> : null}
+    {row.reviewStatus === 'Reviewed' ? <div className={styles.subtle}>{verified ? 'Matched in last Google check' : 'Completed; Google match unverified'}</div> : null}
+    {row.reviewNotes ? <div className={styles.subtle}>{row.reviewNotes}</div> : null}</>;
+}
 
 function Metric({ label, value }) {
   return <div className={styles.miniMetric}><div className={styles.miniLabel}>{label}</div><div className={styles.miniValue}>{new Intl.NumberFormat("en-US").format(value)}</div></div>;
@@ -20,7 +32,7 @@ function AliasEditor({ row, saving, onSave }) {
   </div>;
 }
 
-export default function GoogleReviewTable({ initialRows = [] }) {
+export default function GoogleReviewTable({ initialRows = [], audit = null }) {
   const [rows, setRows] = useState(initialRows);
   const [clientSearch, setClientSearch] = useState("");
   const [clientTypeFilter, setClientTypeFilter] = useState("");
@@ -41,7 +53,7 @@ export default function GoogleReviewTable({ initialRows = [] }) {
   const filteredRows = useMemo(() => {
     const query = clientSearch.trim().toLocaleLowerCase();
     return rows.filter((row) => {
-      const matchesClient = !query || row.customer.toLocaleLowerCase().includes(query);
+      const matchesClient = !query || [row.customer,row.reviewName,row.reviewAliases,row.reviewNotes].some(value => String(value || '').toLocaleLowerCase().includes(query));
       const matchesType = !clientTypeFilter || row.clientType === clientTypeFilter;
       const matchesStatus = !customerStatusFilter || row.customerStatus === customerStatusFilter;
       const matchesReview = !reviewStatusFilter || row.reviewStatus === reviewStatusFilter;
@@ -76,8 +88,7 @@ export default function GoogleReviewTable({ initialRows = [] }) {
   }
 
   function confirmReviewed(row) {
-    const confirmed = window.confirm(`Are you sure you want to mark ${row.customer} as reviewed? This will save the change to Airtable.`);
-    if (confirmed) void markReviewed(row);
+    void markReviewed(row);
   }
 
   return <>
@@ -87,11 +98,11 @@ export default function GoogleReviewTable({ initialRows = [] }) {
       <div className={styles.resultCount} aria-live="polite">Showing {filteredRows.length} of {rows.length} records</div>
     </div>
     <div className={styles.tableWrap}><table className={styles.table}><thead><tr>
-      <th><label className={styles.tableFilter}><span>Client</span><input className={styles.tableFilterInput} type="search" value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} placeholder="Search client..." aria-label="Search clients by name" /></label></th>
+      <th><label className={styles.tableFilter}><span>Client</span><input className={styles.tableFilterInput} type="search" value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} placeholder="Client or Google name..." aria-label="Search clients, reviewers, aliases and notes" /></label></th>
       <th><label className={styles.tableFilter}><span>Client type</span><select className={styles.tableFilterSelect} value={clientTypeFilter} onChange={(event) => setClientTypeFilter(event.target.value)} aria-label="Filter by client type"><option value="">All client types</option>{TYPE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></label></th>
       <th><label className={styles.tableFilter}><span>Customer status</span><select className={styles.tableFilterSelect} value={customerStatusFilter} onChange={(event) => setCustomerStatusFilter(event.target.value)} aria-label="Filter by customer status"><option value="">All statuses</option>{STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></label></th>
       <th><label className={styles.tableFilter}><span>Google review</span><select className={styles.tableFilterSelect} value={reviewStatusFilter} onChange={(event) => setReviewStatusFilter(event.target.value)} aria-label="Filter by Google review status"><option value="">All review statuses</option>{REVIEW_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></label></th>
       <th>Review name</th><th>Google aliases</th><th>Last completed</th><th>Jobs</th><th>Follow-up</th>
-    </tr></thead><tbody>{filteredRows.length ? filteredRows.map((row) => <tr key={row.id}><td>{row.customer}</td><td>{row.clientType || "\u2014"}</td><td>{row.customerStatus || "\u2014"}</td><td><div className={styles.reviewStatusCell}><span>{row.reviewStatus || "\u2014"}</span>{row.reviewStatus !== "Reviewed" ? <button className={styles.markReviewedButton} type="button" disabled={savingReview === `${row.id}:reviewStatus`} onClick={() => confirmReviewed(row)}>{savingReview === `${row.id}:reviewStatus` ? "Saving..." : "Mark reviewed"}</button> : null}</div></td><td>{row.reviewName || "\u2014"}</td><td><AliasEditor row={row} saving={savingReview === `${row.id}:reviewAliases`} onSave={(item, aliases) => saveReviewField(item, "reviewAliases", aliases)} /></td><td>{row.lastCompleted || "\u2014"}</td><td>{row.completedJobs}</td><td><span className={`${styles.badge} ${row.priority === "Highlight - recent one-time" ? styles.warn : ""}`}>{row.priority || "\u2014"}</span></td></tr>) : <tr><td className={styles.empty} colSpan="9">{rows.length ? "No clients match the selected filters." : "No review-tracking records are available."}</td></tr>}</tbody></table></div>
+    </tr></thead><tbody>{filteredRows.length ? filteredRows.map((row) => <tr key={row.id}><td>{row.customer}</td><td>{row.clientType || "\u2014"}</td><td>{row.customerStatus || "\u2014"}</td><td><div className={styles.reviewStatusCell}><span>{row.reviewStatus || "\u2014"}</span>{row.reviewStatus !== "Reviewed" ? <button className={styles.markReviewedButton} type="button" disabled={savingReview === `${row.id}:reviewStatus`} onClick={() => confirmReviewed(row)}>{savingReview === `${row.id}:reviewStatus` ? "Saving..." : "Mark reviewed"}</button> : null}</div></td><td><ReviewEvidence row={row} audit={audit} /></td><td><AliasEditor row={row} saving={savingReview === `${row.id}:reviewAliases`} onSave={(item, aliases) => saveReviewField(item, "reviewAliases", aliases)} /></td><td>{row.lastCompleted || "\u2014"}</td><td>{row.completedJobs}</td><td><span className={`${styles.badge} ${row.priority === "Highlight - recent one-time" ? styles.warn : ""}`}>{row.priority || "\u2014"}</span></td></tr>) : <tr><td className={styles.empty} colSpan="9">{rows.length ? "No clients match the selected filters." : "No review-tracking records are available."}</td></tr>}</tbody></table></div>
   </>;
 }

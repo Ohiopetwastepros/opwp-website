@@ -136,6 +136,7 @@ export default function QuoteForm() {
   const [onboardTurnstileReset, setOnboardTurnstileReset] = useState(0);
   const [funnelId, setFunnelId] = useState("");
   const [partialRetry, setPartialRetry] = useState(0);
+  const [prefillNotice, setPrefillNotice] = useState('');
   const signupFormRef = useRef(null);
 
   // Browsers can visually autofill controlled inputs without firing React's
@@ -179,6 +180,27 @@ export default function QuoteForm() {
       try { window.sessionStorage.setItem(storageKey, id); } catch { /* keep the in-memory ID */ }
     }
     setFunnelId(id);
+  }, []);
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.hash.slice(1)).get('lead');
+    if (!token) return undefined;
+    // Fragments are not sent in page requests/referrers. Remove the capability from browser history.
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    let stopped = false;
+    setPrefillNotice('Loading your saved quote details…');
+    fetch('/api/lead-prefill/', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token}),cache:'no-store'})
+      .then(async response => {const result=await response.json();if(!response.ok||!result.ok)throw new Error(result.error||'Saved details are unavailable.');return result.prefill;})
+      .then(value => {
+        if (stopped) return;
+        setFirstName(value.firstName||'');setLastName(value.lastName||'');setPhone(value.phone||'');setEmail(value.email||'');
+        setAddress(value.address||'');setCity(value.city||'');setUsState(value.state||'OH');setZip(value.zip||'');
+        setDogs(Number(value.dogs));setFrequency(value.frequency);setLastCleaned(value.lastCleaned);setYardSize(value.yardSize);
+        setSelected(Object.fromEntries((value.addons||[]).map(id=>[id,true])));
+        if(value.funnelId){setFunnelId(value.funnelId);try{window.sessionStorage.setItem('opwp_quote_funnel_id',value.funnelId);}catch{/* in-memory attribution remains available */}}
+        setPrefillNotice('Your details are filled in. Please review your quote, confirm your information, and complete secure signup.');
+      }).catch(error => {if(!stopped)setPrefillNotice(error.message+' You can still complete the form below.');});
+    return () => {stopped=true;};
   }, []);
 
   // ── Derived ─────────────────────────────────────────────────────────────
@@ -581,6 +603,8 @@ export default function QuoteForm() {
       `}</style>
 
       <StepBar />
+
+      {prefillNotice ? <p role="status" style={{color:'#315b45',background:'#eff6ec',padding:'12px 14px',borderRadius:10,fontSize:14}}>{prefillNotice}</p> : null}
 
       {/* ZIP — required to start */}
       <div style={{ marginBottom: "22px" }}>

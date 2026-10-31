@@ -39,6 +39,6 @@ export default function PaymentSuccessClient() {
       <div className={styles.receipt}><div><span>Order</span><strong>{state.orderNumber}</strong></div><div><span>Paid</span><strong>{money(state.totalCents)}</strong></div></div>
       {state.monthly ? <div className={styles.monthly}><strong>Monthly delivery is ready for scheduling.</strong><span>Your saved Stripe payment method will be charged approximately 48 hours before each future confirmed delivery.</span></div> : null}
     </> : methodSaved ? <p>Your card was securely saved by Stripe. OPWP does not receive or store your full card number, and no additional payment was collected on this step.</p> : state.status === "failed" ? <p>Return to the order tool to try again, or contact OPWP if you need help completing payment.</p> : <p>This normally takes only a few seconds. You may safely leave this page after Stripe finishes confirming the payment.</p>}
-    <div className={styles.actions}><a href="/dog-food/">Back to dog food</a><a href="tel:+14192622371">Call OPWP</a></div>
+    <div className={styles.actions}><a href="/dog-food/account/">View my orders & delivery</a><a href="tel:+14192622371">Call OPWP</a></div>
   </section>;
 }

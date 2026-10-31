@@ -1,0 +1,76 @@
+CREATE TABLE bank_connection (
+  id TEXT PRIMARY KEY CHECK(id='primary'),
+  environment TEXT NOT NULL,
+  access_token_encrypted TEXT,
+  item_id TEXT,
+  qbo_realm_id TEXT,
+  cursor TEXT NOT NULL DEFAULT '',
+  bank_updated_at TEXT,
+  synced_at TEXT,
+  history_ready INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  next_check_at TEXT,
+  lease_token TEXT,
+  lease_until TEXT,
+  connected_by TEXT,
+  connected_at TEXT
+);
+CREATE TABLE bank_accounts (
+  account_id TEXT PRIMARY KEY,
+  account_name TEXT NOT NULL,
+  account_mask TEXT NOT NULL UNIQUE,
+  qbo_account_id TEXT UNIQUE,
+  current_cents INTEGER,
+  available_cents INTEGER
+);
+CREATE TABLE bank_link_sessions (
+  actor TEXT PRIMARY KEY,
+  token_encrypted TEXT NOT NULL,
+  environment TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  update_mode INTEGER NOT NULL
+);
+CREATE TABLE bank_transactions (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  date TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL,
+  description TEXT NOT NULL,
+  pending INTEGER NOT NULL,
+  removed INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX bank_transactions_date ON bank_transactions(date);
+CREATE TABLE bank_settlement_links (
+  bank_transaction_id TEXT PRIMARY KEY,
+  qbo_deposit_id TEXT NOT NULL UNIQUE,
+  bank_date TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL,
+  evidence_note TEXT NOT NULL,
+  reviewed_by TEXT NOT NULL,
+  reviewed_at TEXT NOT NULL
+);
+CREATE TABLE financial_reconciliation_runs (
+  id TEXT PRIMARY KEY,
+  checked_at TEXT NOT NULL,
+  status TEXT NOT NULL,
+  summary TEXT NOT NULL
+);
+CREATE INDEX financial_reconciliation_runs_time ON financial_reconciliation_runs(checked_at);
+CREATE TABLE financial_reconciliation_cases (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  status TEXT NOT NULL,
+  evidence TEXT NOT NULL,
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  resolved_at TEXT
+);
+CREATE INDEX financial_reconciliation_cases_status ON financial_reconciliation_cases(status,first_seen_at);
+CREATE TABLE financial_reconciliation_audit (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  at TEXT NOT NULL,
+  actor TEXT NOT NULL,
+  action TEXT NOT NULL,
+  detail TEXT NOT NULL
+);

@@ -1,0 +1,22 @@
+{
+  "name": "Ohio Pet Waste Pros - Field",
+  "short_name": "OPWP Field",
+  "id": "/field/app/",
+  "start_url": "/field/app/",
+  "scope": "/field/",
+  "display": "standalone",
+  "background_color": "#F3F6F9",
+  "theme_color": "#1F4566",
+  "icons": [
+    {
+      "src": "/field-app/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/field-app/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

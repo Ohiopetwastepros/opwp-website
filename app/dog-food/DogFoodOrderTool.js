@@ -1,39 +1,10 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import TurnstileWidget from "@/components/TurnstileWidget";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import styles from "./dog-food.module.css";
 
-const FORMULAS = {
-  pink: {
-    code: "22-12", color: "Pink", title: "Chicken & Brown Rice", image: "/assets/edf/22-12.png",
-    description: "A lean, highly digestible all-life-stage formula for less active dogs, senior dogs, and dogs that gain weight easily.",
-    bestFor: ["Lower activity", "Weight control", "Senior friendly"], calories: "3,432 kcal/kg · 419 kcal/cup",
-    ingredients: "Chicken Meal, Whole Brown Rice, Sorghum, Rice Bran, Chicken Fat (preserved with mixed tocopherols), Pork Meal, Dried Beet Pulp, Dried Green Peas, Brewers Dried Yeast, Flaxseed, Fish Meal, Chicken By-Product Meal, Natural Chicken Liver Flavor, Canola Oil, Dried Egg Product, Sunflower Oil, Potassium Chloride, Calcium Carbonate, Hydrated Sodium Calcium Aluminosilicate, Choline Chloride, Calcium Iodate, Zinc Amino Acid Chelate, Iron Amino Acid Chelate, Ferrous Sulfate, Vitamin E Supplement, Zinc Sulfate, Zinc Oxide, Manganese Amino Acid Chelate, Manganese Sulfate, Copper Amino Acid Chelate, Copper Sulfate, Sodium Selenite, Niacin, Biotin, Calcium Pantothenate, Vitamin A Supplement, Riboflavin, Thiamine Mononitrate, Vitamin B12 Supplement, Pyridoxine Hydrochloride, Vitamin D3 Supplement, Ascorbic Acid, Cobalt Carbonate, Folic Acid, Dried Lactobacillus Acidophilus Fermentation Product, Dried Lactobacillus Casei Fermentation Product, Dried Bifidobacterium Thermophilum Fermentation Product, Dried Enterococcus Faecium Fermentation Product.",
-    analysis: [["Crude protein", "22% min"], ["Crude fat", "12% min"], ["Crude fiber", "3.5% max"], ["Moisture", "10% max"], ["Linoleic acid", "2.5% min"], ["Calcium", "1% min"], ["Phosphorus", "0.8% min"], ["Zinc", "200 mg/kg min"], ["Vitamin A", "8,500 IU/kg min"], ["Vitamin E", "350 IU/kg min"], ["Vitamin C", "98 IU/kg min"], ["Vitamin B12", "0.045 mg/kg min"], ["Folic acid", "0.40 mg/kg min"], ["Omega-6", "2% min"], ["Omega-3", "0.4% min"], ["Glucosamine", "350 ppm min"], ["Chondroitin", "200 ppm min"]],
-  },
-  blue: {
-    code: "26-14", color: "Blue", title: "Puppies & Active Dogs", image: "/assets/edf/26-14.png",
-    description: "A balanced all-life-stage formula built to support growing puppies, healthy weight gain, lean muscle, and active adult dogs.",
-    bestFor: ["Puppies", "Active adults", "Healthy growth"], calories: "3,549 kcal/kg · 421 kcal/cup",
-    ingredients: "Chicken Meal, Whole Brown Rice, Sorghum, Chicken Fat (preserved with mixed tocopherols), Rice Bran, Pork Meal, Fish Meal, Dried Beet Pulp, Dried Green Peas, Chicken By-Product Meal, Brewers Dried Yeast, Flaxseed, Natural Chicken Liver Flavor, Canola Oil, Dried Egg Product, Sunflower Oil, Potassium Chloride, Calcium Carbonate, Hydrated Sodium Calcium Aluminosilicate, Choline Chloride, Calcium Iodate, Zinc Amino Acid Chelate, Iron Amino Acid Chelate, Ferrous Sulfate, Vitamin E Supplement, Zinc Sulfate, Zinc Oxide, Manganese Amino Acid Chelate, Manganese Sulfate, Copper Amino Acid Chelate, Copper Sulfate, Sodium Selenite, Niacin, Biotin, Calcium Pantothenate, Vitamin A Supplement, Riboflavin, Thiamine Mononitrate, Vitamin B12 Supplement, Pyridoxine Hydrochloride, Vitamin D3 Supplement, Ascorbic Acid, Cobalt Carbonate, Folic Acid, Dried Lactobacillus Acidophilus Fermentation Product, Dried Lactobacillus Casei Fermentation Product, Dried Bifidobacterium Thermophilum Fermentation Product, Dried Enterococcus Faecium Fermentation Product.",
-    analysis: [["Crude protein", "26% min"], ["Crude fat", "14% min"], ["Crude fiber", "3.5% max"], ["Moisture", "10% max"], ["Linoleic acid", "3% min"], ["Calcium", "1% min"], ["Phosphorus", "0.8% min"], ["Zinc", "200 mg/kg min"], ["Vitamin A", "9,000 IU/kg min"], ["Vitamin E", "350 IU/kg min"], ["Vitamin C", "98 IU/kg min"], ["Vitamin B12", "0.035 mg/kg min"], ["Folic acid", "0.30 mg/kg min"], ["Omega-6", "2.5% min"], ["Omega-3", "0.5% min"], ["Glucosamine", "400 ppm min"], ["Chondroitin", "200 ppm min"]],
-  },
-  green: {
-    code: "26-18", color: "Green", title: "Active Dogs", image: "/assets/edf/26-18.png",
-    description: "Sustained energy and muscle support for active and working dogs, with balanced omegas plus glucosamine and chondroitin for joint support.",
-    bestFor: ["Active dogs", "Working dogs", "Joint support"], calories: "3,767 kcal/kg · 459 kcal/cup",
-    ingredients: "Chicken Meal, Whole Brown Rice, Chicken Fat (preserved with mixed tocopherols), Sorghum, Rice Bran, Pork Meal, Fish Meal, Chicken By-Product Meal, Dried Beet Pulp, Dried Green Peas, Brewers Dried Yeast, Flaxseed, Natural Chicken Liver Flavor, Canola Oil, Dried Egg Product, Sunflower Oil, Potassium Chloride, Calcium Carbonate, Hydrated Sodium Calcium Aluminosilicate, Choline Chloride, Calcium Iodate, Zinc Amino Acid Chelate, Iron Amino Acid Chelate, Ferrous Sulfate, Vitamin E Supplement, Zinc Sulfate, Zinc Oxide, Manganese Amino Acid Chelate, Manganese Sulfate, Copper Amino Acid Chelate, Copper Sulfate, Sodium Selenite, Niacin, Biotin, Calcium Pantothenate, Vitamin A Supplement, Riboflavin, Thiamine Mononitrate, Vitamin B12 Supplement, Pyridoxine Hydrochloride, Vitamin D3 Supplement, Ascorbic Acid, Cobalt Carbonate, Folic Acid, Dried Lactobacillus Acidophilus Fermentation Product, Dried Lactobacillus Casei Fermentation Product, Dried Bifidobacterium Thermophilum Fermentation Product, Dried Enterococcus Faecium Fermentation Product.",
-    analysis: [["Crude protein", "26% min"], ["Crude fat", "18% min"], ["Crude fiber", "3.5% max"], ["Moisture", "10% max"], ["Linoleic acid", "3% min"], ["Calcium", "1% min"], ["Phosphorus", "0.8% min"], ["Zinc", "200 mg/kg min"], ["Vitamin A", "8,500 IU/kg min"], ["Vitamin E", "350 IU/kg min"], ["Vitamin C", "98 IU/kg min"], ["Vitamin B12", "0.035 mg/kg min"], ["Folic acid", "0.35 mg/kg min"], ["Omega-6", "2.5% min"], ["Omega-3", "0.5% min"], ["Glucosamine", "600 ppm min"], ["Chondroitin", "400 ppm min"]],
-  },
-  red: {
-    code: "30-20", color: "Red", title: "Pro Athlete", image: "/assets/edf/30-20.png",
-    description: "The most energy-dense blend for hard-working and athletic dogs that need maximum performance fuel, recovery support, and calorie density.",
-    bestFor: ["Pro athletes", "High performance", "Maximum energy"], calories: "3,989 kcal/kg · 485 kcal/cup",
-    ingredients: "Chicken Meal, Whole Brown Rice, Chicken Fat (preserved with mixed tocopherols), Pork Meal, Sorghum, Rice Bran, Fish Meal, Chicken By-Product Meal, Dried Beet Pulp, Dried Green Peas, Brewers Dried Yeast, Flaxseed, Natural Chicken Liver Flavor, Canola Oil, Dried Egg Product, Sunflower Oil, Potassium Chloride, Calcium Carbonate, Hydrated Sodium Calcium Aluminosilicate, Choline Chloride, Calcium Iodate, Zinc Amino Acid Chelate, Iron Amino Acid Chelate, Ferrous Sulfate, Vitamin E Supplement, Zinc Sulfate, Zinc Oxide, Manganese Amino Acid Chelate, Manganese Sulfate, Copper Amino Acid Chelate, Copper Sulfate, Sodium Selenite, Niacin, Biotin, Calcium Pantothenate, Vitamin A Supplement, Riboflavin, Thiamine Mononitrate, Vitamin B12 Supplement, Pyridoxine Hydrochloride, Vitamin D3 Supplement, Ascorbic Acid, Cobalt Carbonate, Folic Acid, Dried Lactobacillus Acidophilus Fermentation Product, Dried Lactobacillus Casei Fermentation Product, Dried Bifidobacterium Thermophilum Fermentation Product, Dried Enterococcus Faecium Fermentation Product.",
-    analysis: [["Crude protein", "30% min"], ["Crude fat", "20% min"], ["Crude fiber", "3.5% max"], ["Moisture", "10% max"], ["Linoleic acid", "3% min"], ["Calcium", "1% min"], ["Phosphorus", "0.8% min"], ["Zinc", "200 mg/kg min"], ["Vitamin A", "8,500 IU/kg min"], ["Vitamin E", "350 IU/kg min"], ["Vitamin C", "98 IU/kg min"], ["Vitamin B12", "0.03 mg/kg min"], ["Folic acid", "0.30 mg/kg min"], ["Omega-6", "2.5% min"], ["Omega-3", "0.5% min"], ["Glucosamine", "400 ppm min"], ["Chondroitin", "200 ppm min"]],
-  },
-};
+import { FORMULAS } from '@/lib/dog-food-catalog.mjs';
+
 
 const DELIVERY = {
   route_day: { name: "My free route day", detail: "Delivered when OPWP is already in your area", fee: 0 },
@@ -121,361 +92,54 @@ function dogProfileCompletion(dogs) {
 }
 
 export default function DogFoodOrderTool({ paymentConfigured = false }) {
-  const [step, setStep] = useState(1);
-  const [customer, setCustomer] = useState(initialCustomer);
-  const [dogs, setDogs] = useState([newDog(1, true)]);
-  const [plan, setPlan] = useState("subscription");
-  const [delivery, setDelivery] = useState("route_day");
-  const [billingConsent, setBillingConsent] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState("");
-  const [partialSubmissionId, setPartialSubmissionId] = useState(null);
-  const [quoteTurnstileToken, setQuoteTurnstileToken] = useState("");
-  const [quoteTurnstileReset, setQuoteTurnstileReset] = useState(0);
-  const [orderTurnstileToken, setOrderTurnstileToken] = useState("");
-  const [orderTurnstileReset, setOrderTurnstileReset] = useState(0);
-  const [expandedFormula, setExpandedFormula] = useState(null);
-  const [formulaDetailTab, setFormulaDetailTab] = useState("overview");
-  const [sameDayAvailable, setSameDayAvailable] = useState(false);
-  const leadSentRef = useRef(false);
-  const toolRef = useRef(null);
-  const activePanelRef = useRef(null);
-  const previousStepRef = useRef(step);
-  const completedProfiles = useMemo(() => dogProfileCompletion(dogs), [dogs]);
-  const completedProfileCount = completedProfiles.filter(Boolean).length;
-
+  const [step,setStep] = useState(2), [dogs,setDogs] = useState([newDog(1,true)]), [error,setError] = useState("");
+  const [expandedFormula,setExpandedFormula] = useState(null), [formulaDetailTab,setFormulaDetailTab] = useState("overview");
+  const toolRef = useRef(null), activePanelRef = useRef(null);
   const recommendations = useMemo(() => {
-    const recommendationsByDogId = new Map();
-    return dogs.map((dog, index) => {
-      const copiedRecommendation = dog.matchMode === "same_food"
-        ? recommendationsByDogId.get(Number(dog.sameAsDogId))
-        : null;
-      const recommendation = copiedRecommendation || recommendationFor(dog);
-      const monthlyPounds = copiedRecommendation?.monthlyPounds ?? estimatedMonthlyPounds(dog);
-      const result = {
-        dog: index + 1,
-        dogId: dog.id,
-        formula: recommendation.formula,
-        reasons: copiedRecommendation
-          ? [`Same food selected as Dog ${copiedRecommendation.dog}.`]
-          : recommendation.reasons,
-        notes: recommendation.notes,
-        idealBag: copiedRecommendation?.idealBag ?? (monthlyPounds <= 20 ? 20 : 40),
-        monthlyPounds,
-        sameAsDog: copiedRecommendation?.dog ?? null,
-      };
-      recommendationsByDogId.set(dog.id, result);
-      return result;
+    const found = new Map();
+    return dogs.map((dog,index) => {
+      const copied = dog.matchMode === "same_food" ? found.get(Number(dog.sameAsDogId)) : null;
+      const match = copied || recommendationFor(dog), monthlyPounds = copied?.monthlyPounds ?? estimatedMonthlyPounds(dog);
+      const result = {dog:index+1,dogId:dog.id,formula:match.formula,reasons:copied ? ["Same formula as Dog "+copied.dog+"."] : match.reasons,notes:match.notes,monthlyPounds,idealBag:40,sameAsDog:copied?.dog ?? null};
+      found.set(dog.id,result);return result;
     });
-  }, [dogs]);
-
-  const orderLines = useMemo(() => {
-    const grouped = new Map();
-    for (const recommendation of recommendations) {
-      const current = grouped.get(recommendation.formula.code) || { formula: recommendation.formula, pounds: 0, dogs: [] };
-      current.pounds += recommendation.monthlyPounds;
-      current.dogs.push(recommendation.dog);
-      grouped.set(recommendation.formula.code, current);
+  },[dogs]);
+  const updateDog = (id,field,value) => setDogs(current => current.map(d => d.id === id ? {...d,[field]:value} : d));
+  const setDogMatchMode = (id,mode,earlier) => setDogs(current => current.map(d => d.id === id ? {...d,matchMode:mode,sameAsDogId:mode === "same_food" && earlier.length === 1 ? earlier[0].id : null} : d));
+  const toggleJointNeed = (id,value) => setDogs(current => current.map(d => d.id !== id ? d : {...d,jointNeeds:value === "none" ? (d.jointNeeds.includes("none") ? [] : ["none"]) : d.jointNeeds.includes(value) ? d.jointNeeds.filter(v => v !== value && v !== "none") : [...d.jointNeeds.filter(v => v !== "none"),value]}));
+  function addDog() {if(dogs.length < 10)setDogs(current => [...current,newDog(Math.max(...current.map(d => d.id))+1)]);}
+  function removeDog(id) {if(dogs.length > 1)setDogs(current => current.filter(d => d.id !== id).map(d => Number(d.sameAsDogId) === id ? {...d,matchMode:"",sameAsDogId:null} : d));}
+  useLayoutEffect(() => {activePanelRef.current?.focus({preventScroll:true});},[step]);
+  function saveRecommendation() {
+    const items = new Map();
+    for (const r of recommendations) {
+      const productId = {"22-12":"edf-22-12-pink-40","26-14":"edf-26-14-blue-40","26-18":"edf-26-18-green-40","30-20":"edf-30-20-red-40"}[r.formula.code];
+      const line = items.get(productId) || { productId, pounds:0 };
+      line.pounds += r.monthlyPounds; items.set(productId,line);
     }
-    return [...grouped.values()].map((line) => ({
-      ...line, bagWeight: 40, quantity: Math.max(1, Math.ceil(line.pounds / 40)), unitPrice: 59,
-    }));
-  }, [recommendations]);
-
-  const totals = useMemo(() => {
-    const subtotal = orderLines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
-    const fee = DELIVERY[delivery].fee;
-    const foodTax = orderLines.reduce((sum, line) => sum + Math.round(line.unitPrice * 0.0775 * 100) / 100 * line.quantity, 0);
-    const tax = foodTax + Math.round(fee * 0.0775 * 100) / 100;
-    return { subtotal, fee, tax, total: subtotal + fee + tax };
-  }, [orderLines, delivery]);
-
-  const updateCustomer = (field, value) => setCustomer((current) => ({ ...current, [field]: value }));
-  const selectCustomerType = (customerType) => {
-    updateCustomer("customerType", customerType);
-    if (customerType === "on_demand") setPlan("on_demand");
-    if (customerType === "route_partner") {
-      setPlan("subscription");
-      setDelivery("route_day");
-    }
-  };
-  const selectMonthlyPlan = () => {
-    if (customer.customerType === "on_demand") updateCustomer("customerType", "route_partner");
-    setPlan("subscription");
-    setDelivery("route_day");
-  };
-  const updateDog = (id, field, value) => setDogs((current) => current.map((dog) => dog.id === id ? { ...dog, [field]: value } : dog));
-  const setDogMatchMode = (id, mode, earlierDogs) => setDogs((current) => current.map((dog) => {
-    if (dog.id !== id) return dog;
-    return {
-      ...dog,
-      matchMode: mode,
-      sameAsDogId: mode === "same_food" && earlierDogs.length === 1 ? earlierDogs[0].id : null,
-    };
-  }));
-  const toggleJointNeed = (id, value) => setDogs((current) => current.map((dog) => {
-    if (dog.id !== id) return dog;
-    if (value === "none") return { ...dog, jointNeeds: dog.jointNeeds.includes("none") ? [] : ["none"] };
-    const withoutNone = dog.jointNeeds.filter((item) => item !== "none");
-    return { ...dog, jointNeeds: withoutNone.includes(value) ? withoutNone.filter((item) => item !== value) : [...withoutNone, value] };
-  }));
-
-  function addDog() {
-    if (dogs.length >= 10) return;
-    setDogs((current) => [...current, newDog(Math.max(...current.map((dog) => dog.id)) + 1)]);
-  }
-
-  function removeDog(id) {
-    if (dogs.length === 1) return;
-    setDogs((current) => current
-      .filter((dog) => dog.id !== id)
-      .map((dog) => Number(dog.sameAsDogId) === id
-        ? { ...dog, matchMode: "", sameAsDogId: null }
-        : dog));
-  }
-
-  function quoteContactIsValid() {
-    return Boolean(customer.firstName.trim() && customer.lastName.trim() && customer.email.includes("@") &&
-      customer.phone.replace(/\D/g, "").length >= 10);
-  }
-
-  function quoteIsValid() {
-    return quoteContactIsValid() && customer.consent;
-  }
-
-  function dogsAreValid() {
-    return completedProfiles.every(Boolean);
-  }
-
-  function deliveryIsValid() {
-    return Boolean(customer.address.trim() && customer.city.trim() && /^\d{5}$/.test(customer.zip) &&
-      (customer.placement !== "Other" || customer.placementOther.trim()));
-  }
-
-  function goNext() {
-    setError("");
-    if (step === 1 && !quoteIsValid()) {
-      setError("Complete the contact fields and text consent to save your quote and continue.");
-      return;
-    }
-    if (step === 1 && !partialSubmissionId) {
-      setError("Complete verification and wait for your quote to be securely saved.");
-      return;
-    }
-    if (step === 2 && !dogsAreValid()) {
-      setError("Complete every required questionnaire item for each dog before continuing.");
-      return;
-    }
-    setStep((current) => Math.min(current + 1, 4));
-  }
-
-  function goBack() {
-    setError("");
-    setStep((current) => Math.max(current - 1, 1));
-  }
-
-  async function submitOrder() {
-    setError("");
-    if (!orderTurnstileToken) {
-      setError("Please complete verification before submitting the order.");
-      return;
-    }
-    if (!deliveryIsValid()) {
-      setError("Please complete the delivery address before ordering.");
-      return;
-    }
-    if (plan === "subscription" && !billingConsent) {
-      setError("Please authorize monthly billing before continuing to secure payment.");
-      return;
-    }
-    setSubmitting(true);
     try {
-      const response = await fetch("/api/dog-food/order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customer, dogs, recommendations, orderLines, plan, delivery, totals, partialSubmissionId, billingConsent, turnstileToken: orderTurnstileToken }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "We could not submit your order.");
-      if (data.checkoutUrl) {
-        window.location.assign(data.checkoutUrl);
-        return;
-      }
-      toolRef.current?.scrollIntoView({ behavior: "auto", block: "start" });
-      setResult(data);
-    } catch (submissionError) {
-      setError(submissionError.message || "We could not submit your order. Please try again.");
-      setOrderTurnstileReset((value) => value + 1);
-    } finally {
-      setSubmitting(false);
+      localStorage.setItem("opwp-food-recommendation",JSON.stringify({
+        expiresAt:Date.now()+86400000,
+        items:[...items.values()].map(i => ({productId:i.productId,quantity:Math.min(10,Math.max(1,Math.ceil(i.pounds/40)))})),
+      }));
+    } catch { /* Account checkout can still select formulas when local storage is unavailable. */ }
+  }
+  function next() {
+    setError("");
+    if (!dogProfileCompletion(dogs).every(Boolean)) {
+      setError("Answer every questionnaire item for each dog to see their formula match.");
+      return;
     }
+    setStep(3);
+    toolRef.current?.scrollIntoView({behavior:"smooth",block:"start"});
   }
-
-  const quoteReady = quoteIsValid();
-
-  useLayoutEffect(() => {
-    if (previousStepRef.current === step) return;
-    previousStepRef.current = step;
-    activePanelRef.current?.focus({ preventScroll: true });
-    toolRef.current?.scrollIntoView({ behavior: "auto", block: "start" });
-  }, [step]);
-
-  useEffect(() => {
-    const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "2-digit", hourCycle: "h23" }).formatToParts(new Date()).find((part) => part.type === "hour")?.value || 24);
-    setSameDayAvailable(hour < 12);
-  }, []);
-
-  useEffect(() => {
-    if (!quoteReady || !quoteTurnstileToken || leadSentRef.current) return;
-    leadSentRef.current = true;
-    fetch("/api/dog-food/quote", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ customer, quote: { bagPrice: 59, tax: 4.57, total: 63.57 }, turnstileToken: quoteTurnstileToken }),
-    })
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Partial quote capture failed.");
-        setPartialSubmissionId(data.id);
-      })
-      .catch((captureError) => {
-        leadSentRef.current = false;
-        setError(captureError.message || "We could not save your quote. Please retry.");
-        setQuoteTurnstileReset((value) => value + 1);
-      });
-  }, [quoteReady, customer, quoteTurnstileToken]);
-
-  if (result) {
-    return (
-      <div className={styles.successCard} role="status">
-        <div className={styles.successIcon}>✓</div>
-        <span>Order request {result.orderNumber}</span>
-        <h3>Thanks, {customer.firstName}. Your order is in.</h3>
-        <p>{result.requiresManualPaymentFollowup ? "Your order request is saved, but checkout was not completed. An OPWP team member will confirm your delivery day and finish payment with you." : "Your order request is saved."}</p>
-        <div className={styles.successSummary}>
-          <span>{dogs.length} {dogs.length === 1 ? "dog" : "dogs"}</span>
-          <span>{orderLines.reduce((sum, line) => sum + line.quantity, 0)} {orderLines.length === 1 ? "bag" : "bags"}</span>
-          <strong>{money(totals.total)}</strong>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={styles.toolShell} ref={toolRef}>
-      <div className={styles.stepper} aria-label="Order progress" role="list">
-        {["Blends & price", "About your dogs", "Recommendations", "Order"].map((label, index) => {
-          const number = index + 1;
-          return <div key={label} role="listitem" aria-current={step === number ? "step" : undefined} className={`${styles.step} ${step === number ? styles.stepActive : ""} ${step > number ? styles.stepDone : ""}`}><span>{step > number ? "✓" : number}</span><b>{label}</b></div>;
-        })}
-      </div>
-
-      <div className={`${styles.toolBody} ${step === 2 ? styles.questionnaireToolBody : ""} ${step === 4 ? styles.toolBodyWithSummary : ""}`}>
-        <div className={styles.formPanel} ref={activePanelRef} tabIndex={-1}>
-          {step === 1 && (
-            <section>
-              <div className={styles.panelHeading}>
-                <span>Step 1 of 4</span>
-                <h3>Meet all four blends and unlock your price.</h3>
-                <p>Review the lineup, then enter your contact information to see the exact 40 lb bag price with Lucas County tax.</p>
-              </div>
-              <div className={styles.quoteBlendGrid}>
-                {Object.entries(FORMULAS).map(([formulaKey, formula]) => (
-                  <button
-                    type="button"
-                    key={formula.code}
-                    className={`${styles.quoteBlendCard} ${expandedFormula === formulaKey ? styles.quoteBlendCardSelected : ""}`}
-                    data-color={formula.color.toLowerCase()}
-                    aria-expanded={expandedFormula === formulaKey}
-                    aria-controls="blend-detail-panel"
-                    onClick={() => {
-                      setExpandedFormula((current) => current === formulaKey ? null : formulaKey);
-                      setFormulaDetailTab("overview");
-                    }}
-                  >
-                    <img src={formula.image} alt={`${formula.code} ${formula.color} bag`} />
-                    <div className={styles.quoteBlendCopy}>
-                      <div><strong>{formula.code}</strong><span>{formula.color} bag</span></div>
-                      <p>{formula.title}</p>
-                      <small>Explore this blend <b aria-hidden="true">{expandedFormula === formulaKey ? "−" : "+"}</b></small>
-                    </div>
-                  </button>
-                ))}
-              </div>
-              {expandedFormula && (() => {
-                const formula = FORMULAS[expandedFormula];
-                return (
-                  <section id="blend-detail-panel" className={styles.blendDetail} data-color={formula.color.toLowerCase()} aria-live="polite">
-                    <button type="button" className={styles.blendDetailClose} onClick={() => setExpandedFormula(null)} aria-label="Close blend details">×</button>
-                    <div className={styles.blendDetailHero}>
-                      <div className={styles.blendDetailBag}><img src={formula.image} alt={`${formula.code} ${formula.color} Extreme Dog Fuel bag`} /></div>
-                      <div className={styles.blendDetailIntro}>
-                        <span className={styles.blendEyebrow}>Extreme Dog Fuel · {formula.color} bag</span>
-                        <h4>Elite Nutrition {formula.code}</h4>
-                        <strong>{formula.title}</strong>
-                        <p>{formula.description}</p>
-                        <div className={styles.blendPills}>{formula.bestFor.map((item) => <span key={item}>{item}</span>)}</div>
-                        <small>{formula.calories}</small>
-                      </div>
-                    </div>
-                    <div className={styles.blendTabs} role="tablist" aria-label={`${formula.code} product details`}>
-                      {[['overview', 'Overview'], ['ingredients', 'Ingredients'], ['analysis', 'Guaranteed analysis']].map(([key, label]) => (
-                        <button type="button" key={key} role="tab" aria-selected={formulaDetailTab === key} className={formulaDetailTab === key ? styles.blendTabActive : ""} onClick={() => setFormulaDetailTab(key)}>{label}</button>
-                      ))}
-                    </div>
-                    <div className={styles.blendDetailBody} role="tabpanel">
-                      {formulaDetailTab === "overview" && (
-                        <div className={styles.blendOverview}>
-                          <div><span>Complete nutrition</span><strong>Made for all life stages</strong><p>High-quality animal proteins, brown rice, balanced omegas, vitamins, minerals, and digestive-supporting probiotics.</p></div>
-                          <div><span>Clear ingredient promise</span><strong>No corn, wheat, soy, or glutens</strong><p>A meat-forward formula made without common low-cost fillers.</p></div>
-                        </div>
-                      )}
-                      {formulaDetailTab === "ingredients" && <div className={styles.ingredientsText}><strong>Ingredient list</strong><p>{formula.ingredients}</p><small>Always check the current bag label before feeding, as manufacturers may update formulations.</small></div>}
-                      {formulaDetailTab === "analysis" && <div className={styles.analysisGrid}>{formula.analysis.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>}
-                    </div>
-                  </section>
-                );
-              })()}
-              <div className={styles.contactIntro}><strong>Enter your information and provide text consent to unlock the price.</strong><span>No payment on this step.</span></div>
-              <div className={styles.inputGrid}>
-                <Field label="First name" required><input required autoComplete="given-name" value={customer.firstName} onChange={(event) => updateCustomer("firstName", event.target.value)} /></Field>
-                <Field label="Last name" required><input required autoComplete="family-name" value={customer.lastName} onChange={(event) => updateCustomer("lastName", event.target.value)} /></Field>
-                <Field label="Email" required><input required type="email" autoComplete="email" value={customer.email} onChange={(event) => updateCustomer("email", event.target.value)} /></Field>
-                <Field label="Mobile phone" required><input required type="tel" autoComplete="tel" value={customer.phone} onChange={(event) => updateCustomer("phone", event.target.value)} /></Field>
-              </div>
-              {quoteReady ? (
-                <div className={styles.perBagPrice} role="status">
-                  <div><span>One 40 lb bag</span><strong>{money(59)}</strong></div><b>+</b>
-                  <div><span>Lucas County tax (7.75%)</span><strong>{money(4.57)}</strong></div><b>=</b>
-                  <div className={styles.perBagTotal}><span>Total per bag</span><strong>{money(63.57)}</strong></div>
-                </div>
-              ) : (
-                <div className={styles.priceGate}>
-                  <span>Price locked</span>
-                  <strong>Complete your name, email, mobile phone, and text consent to see the total.</strong>
-                </div>
-              )}
-              <label className={styles.consentRow}>
-                <input type="checkbox" checked={customer.consent} onChange={(event) => updateCustomer("consent", event.target.checked)} />
-                <span>I consent to receive marketing and service messages from Ohio Pet Waste Pros at the phone number provided. Message frequency may vary; message &amp; data rates may apply. Reply STOP to opt out.</span>
-              </label>
-              <TurnstileWidget action="dog_food_quote" onToken={setQuoteTurnstileToken} resetKey={quoteTurnstileReset} />
-              {quoteReady && (
-                <div className={styles.quoteReveal} role="status">
-                  <span>{partialSubmissionId ? "Your quote is saved" : "Saving your verified quote…"}</span>
-                  <strong>{money(63.57)} <small>per 40 lb bag</small></strong>
-                  <small>{money(59)} food + {money(4.57)} Lucas County tax • free recurring route-day delivery</small>
-                  <p>If you stop here, your saved quote may receive one helpful follow-up text. Finishing the order automatically cancels that reminder.</p>
-                </div>
-              )}
-            </section>
-          )}
-
+  return <div className={styles.toolShell} ref={toolRef}>
+    <div className={styles.stepper} aria-label="Order progress" role="list">{["About your dogs","Your formula match","Create account & order"].map((text,index) => <div key={text} role="listitem" aria-current={step === index+2 ? "step" : undefined} className={`${styles.step} ${step === index+2 ? styles.stepActive : ""} ${step > index+2 ? styles.stepDone : ""}`}><span>{step > index+2 ? "✓" : index+1}</span><b>{text}</b></div>)}</div>
+    <div className={`${styles.toolBody} ${step === 2 ? styles.questionnaireToolBody : ""}`}><div className={styles.formPanel} ref={activePanelRef} tabIndex={-1}>
           {step === 2 && (
             <section>
               <div className={`${styles.panelHeading} ${styles.questionnaireHeading}`}>
-                <span>Step 2 of 4</span>
+                <span>Step 1 of 3</span>
                 <h3>Tell us about each dog.</h3>
                 <p>Complete the questionnaire once, then give similar dogs the same food with one simple selection. No dog names are needed.</p>
                 <div className={styles.questionnaireBenefits} aria-label="What this profile determines">
@@ -584,7 +248,7 @@ export default function DogFoodOrderTool({ paymentConfigured = false }) {
           {step === 3 && (
             <section>
               <div className={styles.panelHeading}>
-                <span>Step 3 of 4</span>
+                <span>Step 2 of 3</span>
                 <h3>Your Extreme Dog Fuel recommendations</h3>
                 <p>Each dog gets its own formula match. Always transition foods gradually and confirm feeding amounts on the bag.</p>
               </div>
@@ -606,103 +270,75 @@ export default function DogFoodOrderTool({ paymentConfigured = false }) {
             </section>
           )}
 
-          {step === 4 && (
-            <section>
-              <div className={styles.panelHeading}>
-                <span>Step 4 of 4</span>
-                <h3>Choose your delivery plan.</h3>
-                <p>Recurring route delivery is the simplest option and has no delivery fee.</p>
-              </div>
-              <div className={styles.inputGrid}>
-                <Field label="Street address" required wide><input required autoComplete="street-address" value={customer.address} onChange={(event) => updateCustomer("address", event.target.value)} /></Field>
-                <Field label="City" required><input required autoComplete="address-level2" value={customer.city} onChange={(event) => updateCustomer("city", event.target.value)} /></Field>
-                <Field label="State"><input value={customer.state} disabled /></Field>
-                <Field label="ZIP code" required><input required inputMode="numeric" pattern="[0-9]{5}" maxLength={5} autoComplete="postal-code" value={customer.zip} onChange={(event) => updateCustomer("zip", event.target.value.replace(/\D/g, ""))} /></Field>
-              </div>
-              <fieldset className={styles.choiceFieldset}>
-                <legend>Which best describes you?</legend>
-                <div className={styles.choiceCards}>
-                  <Choice selected={customer.customerType === "scoop"} onClick={() => selectCustomerType("scoop")} title="Current scooping customer" copy="Add dog food to my existing service route" />
-                  <Choice selected={customer.customerType === "route_partner"} onClick={() => selectCustomerType("route_partner")} title="New route partner customer" copy="I want monthly dog food delivery on an OPWP route" />
-                  <Choice selected={customer.customerType === "on_demand"} onClick={() => selectCustomerType("on_demand")} title="One-time delivery only" copy="I only need this order delivered once" />
-                </div>
-              </fieldset>
-              <fieldset className={styles.choiceFieldset}>
-                <legend>Order type</legend>
-                <div className={styles.twoChoices}>
-                  <Choice selected={plan === "subscription"} onClick={selectMonthlyPlan} title="Monthly delivery" copy="Automatic monthly order • free recommended route-day delivery" badge="Recommended" />
-                  <Choice selected={plan === "on_demand"} onClick={() => setPlan("on_demand")} title="One-time order" copy="Delivered once with no recurring schedule" />
-                </div>
-              </fieldset>
-              <fieldset className={styles.choiceFieldset}>
-                <legend>Delivery timing</legend>
-                <div className={styles.deliveryChoices}>
-                  {Object.entries(DELIVERY).map(([key, option]) => <Choice key={key} selected={delivery === key} onClick={() => setDelivery(key)} title={option.name} copy={key === "same_day" && !sameDayAvailable ? "Unavailable after 12:00 PM Eastern" : option.detail} disabled={(plan === "subscription" && key !== "route_day") || (key === "same_day" && !sameDayAvailable)} />)}
-                </div>
-              </fieldset>
-              <div className={styles.inputGrid}>
-                <Field label="Where should we leave the food?"><select value={customer.placement} onChange={(event) => updateCustomer("placement", event.target.value)}><option>Front porch</option><option>Garage door</option><option>Side door</option><option>Back porch</option><option>Inside gate</option><option>Other</option></select></Field>
-                {customer.placement === "Other" && <Field label="Other placement"><input value={customer.placementOther} onChange={(event) => updateCustomer("placementOther", event.target.value)} placeholder="Tell the route professional where to leave it" /></Field>}
-              </div>
-              {plan === "subscription" && <label className={styles.billingConsent}>
-                <input type="checkbox" checked={billingConsent} onChange={(event) => setBillingConsent(event.target.checked)} />
-                <span><strong>Authorize monthly delivery and billing</strong>I authorize OPWP to securely save my payment method with Stripe and charge the current order total now. Future dog-food orders will be charged approximately 48 hours before each confirmed monthly delivery. I can update, pause, or cancel before the next charge.</span>
-              </label>}
-              <div className={styles.paymentNotice}><strong>{paymentConfigured ? "Secure payment powered by Stripe" : "Secure payment setup is coming next"}</strong><span>{paymentConfigured ? "Your order is created using the prices shown here, then you will continue to Stripe to pay. OPWP never receives or stores your full card number." : "Your request will be saved without charging a card. OPWP will confirm the first route date and complete payment with you while Stripe activation is finalized."}</span></div>
-              <TurnstileWidget action="dog_food_order" onToken={setOrderTurnstileToken} resetKey={orderTurnstileReset} />
-            </section>
-          )}
 
-          {error && <div className={styles.errorMessage} role="alert">{error}</div>}
-          <div className={styles.formActions}>
-            {step > 1 && <button type="button" className={styles.backButton} onClick={goBack}>Back</button>}
-            {step < 4 ? <button type="button" className={styles.nextButton} onClick={goNext}>Continue <span>→</span></button> : <button type="button" className={styles.orderButton} onClick={submitOrder} disabled={submitting || !orderTurnstileToken}>{submitting ? (paymentConfigured ? "Opening secure checkout…" : "Saving order…") : (paymentConfigured ? "Order & Pay Securely" : "Submit Order Request")} <span>→</span></button>}
-          </div>
-        </div>
-
-        {step === 4 && <aside className={styles.orderAside}>
-          <div className={styles.asideBrand}><img src="/assets/edf/logo.png" alt="Extreme Dog Fuel" /><span>Delivered by OPWP</span></div>
-          {step === 2 && (
-            <div className={styles.profileAside}>
-              <span>Profile progress</span>
-              <div className={styles.profileCount}><strong>{completedProfileCount}</strong><small>of {dogs.length} complete</small></div>
-              <div className={styles.profileProgress} aria-label={`${completedProfileCount} of ${dogs.length} dog profiles complete`}><i style={{ width: `${dogs.length ? (completedProfileCount / dogs.length) * 100 : 0}%` }} /></div>
-              <ul>
-                <li><b>1</b><span><strong>Build the first profile</strong><small>We use it to recommend the right blend.</small></span></li>
-                <li><b>2</b><span><strong>Add every dog</strong><small>Up to ten dogs in one household.</small></span></li>
-                <li><b>3</b><span><strong>Skip repeat questions</strong><small>Similar dogs can use the same food.</small></span></li>
-              </ul>
-            </div>
-          )}
-          {step !== 2 && <h3>{step === 1 ? (quoteReady ? "Price per bag" : "Unlock your price") : "Your order"}</h3>}
-          {step === 1 ? (
-            quoteReady ?
-              <div className={styles.emptyOrder}><span>Every 40 lb blend</span><strong>{money(63.57)}</strong><p>{money(59)} per bag + {money(4.57)} Lucas County tax. Recurring route-day delivery is free.</p></div> :
-              <div className={styles.emptyOrder}><span>Contact information and consent</span><strong>Price locked</strong><p>Complete your name, email, mobile phone, and text consent to reveal the exact price with tax.</p></div>
-          ) : step === 2 ? null : (
-            <>
-              <div className={styles.orderLines}>
-                {orderLines.map((line) => (
-                  <div className={styles.orderLine} key={line.formula.code}>
-                    <img src={line.formula.image} alt="" />
-                    <div><strong>{line.formula.code} {line.formula.color}</strong><span>{line.quantity} × 40 lb bag</span><small>For Dog {line.dogs.join(", ")}</small></div>
-                    <b>{money(line.quantity * line.unitPrice)}</b>
-                  </div>
+      {error && <div className={styles.errorMessage} role="alert">{error}</div>}
+      <div className={styles.formActions}>
+        {step === 2 ? <button className={styles.nextButton} onClick={next}>See my formula match →</button> : <>
+          <button className={styles.backButton} onClick={() => {setStep(2);setError("");}}>Edit answers</button>
+          <a className={styles.heroCta} href="/dog-food/account/?start=signup&from=finder" onClick={saveRecommendation}>Create account & continue →</a>
+        </>}
+      </div>
+      {step === 3 && <p className={styles.signupHint}>Your recommended formulas carry into your account. Choose one-time or monthly delivery and review quantities before paying with Stripe. Already have a dog-food account? <a href="/dog-food/account/?from=finder" onClick={saveRecommendation}>Sign in to continue.</a> Your Sweep & Go login is separate.{!paymentConfigured && " Checkout is currently unavailable; no payment will be taken."}</p>}
+      <details className={styles.moreBlends}><summary>Want to look closer? Meet the four blends</summary><p>Optional: explore ingredients and analysis. You don’t need to read this to get your match or order.</p>              <div className={styles.quoteBlendGrid}>
+                {Object.entries(FORMULAS).map(([formulaKey, formula]) => (
+                  <button
+                    type="button"
+                    key={formula.code}
+                    className={`${styles.quoteBlendCard} ${expandedFormula === formulaKey ? styles.quoteBlendCardSelected : ""}`}
+                    data-color={formula.color.toLowerCase()}
+                    aria-expanded={expandedFormula === formulaKey}
+                    aria-controls="blend-detail-panel"
+                    onClick={() => {
+                      setExpandedFormula((current) => current === formulaKey ? null : formulaKey);
+                      setFormulaDetailTab("overview");
+                    }}
+                  >
+                    <img src={formula.image} alt={`${formula.code} ${formula.color} bag`} />
+                    <div className={styles.quoteBlendCopy}>
+                      <div><strong>{formula.code}</strong><span>{formula.color} bag</span></div>
+                      <p>{formula.title}</p>
+                      <small>Explore this blend <b aria-hidden="true">{expandedFormula === formulaKey ? "−" : "+"}</b></small>
+                    </div>
+                  </button>
                 ))}
               </div>
-              <div className={styles.totals}>
-                <div><span>Food</span><b>{money(totals.subtotal)}</b></div>
-                <div><span>Delivery</span><b>{totals.fee ? money(totals.fee) : "Free"}</b></div>
-                <div><span>Lucas County tax</span><b>{money(totals.tax)}</b></div>
-                <div className={styles.totalRow}><span>Estimated total</span><b>{money(totals.total)}</b></div>
-              </div>
-            </>
-          )}
-          <div className={styles.asideTrust}><span>✓</span><p><strong>Local route delivery</strong> from the Ohio Pet Waste Pros team you know.</p></div>
-        </aside>}
-      </div>
-    </div>
-  );
+              {expandedFormula && (() => {
+                const formula = FORMULAS[expandedFormula];
+                return (
+                  <section id="blend-detail-panel" className={styles.blendDetail} data-color={formula.color.toLowerCase()} aria-live="polite">
+                    <button type="button" className={styles.blendDetailClose} onClick={() => setExpandedFormula(null)} aria-label="Close blend details">×</button>
+                    <div className={styles.blendDetailHero}>
+                      <div className={styles.blendDetailBag}><img src={formula.image} alt={`${formula.code} ${formula.color} Extreme Dog Fuel bag`} /></div>
+                      <div className={styles.blendDetailIntro}>
+                        <span className={styles.blendEyebrow}>Extreme Dog Fuel · {formula.color} bag</span>
+                        <h4>Elite Nutrition {formula.code}</h4>
+                        <strong>{formula.title}</strong>
+                        <p>{formula.description}</p>
+                        <div className={styles.blendPills}>{formula.bestFor.map((item) => <span key={item}>{item}</span>)}</div>
+                        <small>{formula.calories}</small>
+                      </div>
+                    </div>
+                    <div className={styles.blendTabs} role="tablist" aria-label={`${formula.code} product details`}>
+                      {[['overview', 'Overview'], ['ingredients', 'Ingredients'], ['analysis', 'Guaranteed analysis']].map(([key, label]) => (
+                        <button type="button" key={key} role="tab" aria-selected={formulaDetailTab === key} className={formulaDetailTab === key ? styles.blendTabActive : ""} onClick={() => setFormulaDetailTab(key)}>{label}</button>
+                      ))}
+                    </div>
+                    <div className={styles.blendDetailBody} role="tabpanel">
+                      {formulaDetailTab === "overview" && (
+                        <div className={styles.blendOverview}>
+                          <div><span>Complete nutrition</span><strong>Made for all life stages</strong><p>High-quality animal proteins, brown rice, balanced omegas, vitamins, minerals, and digestive-supporting probiotics.</p></div>
+                          <div><span>Clear ingredient promise</span><strong>No corn, wheat, soy, or glutens</strong><p>A meat-forward formula made without common low-cost fillers.</p></div>
+                        </div>
+                      )}
+                      {formulaDetailTab === "ingredients" && <div className={styles.ingredientsText}><strong>Ingredient list</strong><p>{formula.ingredients}</p><small>Always check the current bag label before feeding, as manufacturers may update formulations.</small></div>}
+                      {formulaDetailTab === "analysis" && <div className={styles.analysisGrid}>{formula.analysis.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>}
+                    </div>
+                  </section>
+                );
+              })()}
+</details>
+    </div></div>
+  </div>;
 }
 
 function Field({ label, required = false, wide = false, children }) {

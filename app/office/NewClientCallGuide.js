@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { PRICING, YARD_TIERS, calcLocalQuote, haulAwayPrice } from "@/app/free-quote/pricing";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { PRICING, YARD_TIERS, calcLocalQuote, haulAwayPrice, isInArea } from "@/app/free-quote/pricing";
+import { BILLING_VISITS_PER_MONTH, callGuideProration } from "@/lib/call-guide-proration.mjs";
+import { formatLeadPhone } from "@/lib/lead-inbox.mjs";
 import PropertyMap from "./PropertyMap";
 import styles from "./call-guide.module.css";
 
@@ -17,8 +19,7 @@ const FREQUENCY_NAMES = Object.fromEntries(PRICING.frequencies.map((item) => [it
 const LAST_CLEANED_NAMES = Object.fromEntries(PRICING.lastCleanedOptions.map((item) => [item.id, item.label]));
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const AREAS = ["Back yard", "Front yard", "Side yard", "Dog run", "Kids' play area", "Pool area", "Mulch or rock areas"];
-const BILLING_VISITS_PER_MONTH = { twice_a_week: 104 / 12, once_a_week: 52 / 12, every_other_week: 26 / 12, once_a_month: 1 };
-const STAFFING_GUIDANCE = "Tony is the full-time scooper and primary route technician. Craig provides fill-in coverage only when needed; do not promise Craig as a customer's regular technician.";
+const STAFFING_GUIDANCE = "Tony is the full-time scooper. Craig is building a dense part-time route for a future hire to inherit. Monday availability is confirmed; confirm other days and preserve Tony's full-time workload.";
 
 const initialForm = {
   firstName: "", lastName: "", phone: "", email: "",
@@ -51,7 +52,7 @@ function fullAddress(form) {
 function technicianLabel(value) {
   const technician = String(value || "").trim();
   if (!technician || /tony|bria/i.test(technician)) return "Tony · full-time scooper";
-  if (/craig/i.test(technician)) return "Craig · fill-in coverage only";
+  if (/craig/i.test(technician)) return "Craig · planned part-time route";
   return `${technician} · confirm against current staffing`;
 }
 
@@ -67,7 +68,7 @@ function Script({ children }) {
   return <div className={styles.script}><span>Say this</span><p>{children}</p></div>;
 }
 
-function MockInvoice({ form, cleanupRange, addonLines, invoiceRange }) {
+function MockInvoice({ form, cleanupRange, addonLines, invoiceRange, proration, monthlyTotal }) {
   const today = new Date().toLocaleDateString("en-US");
   const suffix = form.phone.replace(/\D/g, "").slice(-4) || "NEW";
   const invoiceNumber = `PREVIEW-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${suffix}`;
@@ -86,16 +87,26 @@ function MockInvoice({ form, cleanupRange, addonLines, invoiceRange }) {
       <div className={styles.invoiceItemHead}><span>Description</span><span>Quantity</span><span>Rate</span><span>Amount</span></div>
       <div className={styles.invoiceItem}><strong>{cleanupLabel}{form.startDate ? ` · ${formatDate(form.startDate)}` : ""}</strong><span>1.00</span><span>{range(cleanupRange)}</span><b>{range(cleanupRange)}</b></div>
       {addonLines.map((line) => <div className={styles.invoiceItem} key={line.id}><strong>{line.description}</strong><span>1.00</span><span>{money(line.amount)}</span><b>{money(line.amount)}</b></div>)}
+      {proration.quantity > 0 ? <div className={styles.invoiceItem}><strong>Prorated {FREQUENCIES[form.frequency]} service · {proration.dates.map((date) => formatDate(date)).join("; ")}<small>Monthly rate {money(monthlyTotal)} ÷ {proration.divisor} · includes monthly add-ons</small></strong><span>{proration.quantity.toFixed(2)}</span><span>{money(proration.rate)}</span><b>{money(proration.amount)}</b></div> : null}
     </div>
+    {form.frequency !== "one_time" ? <div className={styles.invoiceNote}><p>{proration.pending ? "Prorated service is pending. Confirm the first-cleanup date, recurring schedule, and monthly price to complete the invoice total." : proration.quantity ? "Prorated dates exclude the initial cleanup. The line amount uses the monthly rate divided by the billing average, multiplied by quantity, then rounded to cents. Confirm these dates in Sweep & Go." : "There are no recurring cleanups remaining in the initial month."}</p></div> : null}
     <div className={styles.invoiceTotals}><div><span>Subtotal</span><b>{range(invoiceRange)}</b></div><div><span>Tax</span><b>$0.00</b></div><div className={styles.invoiceGrandTotal}><span>Invoice total</span><b>{range(invoiceRange)}</b></div></div>
-    <div className={styles.invoiceNote}><strong>What to tell the customer</strong><p>This is the estimated first-service invoice. The cleanup portion stays within the displayed range unless the actual yard condition requires approval for a different amount. Ongoing service is billed separately at the recurring rate shown above.</p></div>
+    <div className={styles.invoiceNote}><strong>What to tell the customer</strong><p>This is the estimated first invoice. The initial cleanup portion stays within the displayed range unless the actual yard condition requires approval for a different amount. {form.frequency !== "one_time" ? "It also includes the remaining prorated cleanups for the first month. Regular monthly billing begins the following month. Treatments and products listed above cover the first visit only." : "It covers the one-time cleanup and selected add-ons."}</p></div>
   </div>;
 }
 
-export default function NewClientCallGuide({ googleMapsKey }) {
-  const [form, setForm] = useState(initialForm);
-  const [addons, setAddons] = useState([]);
+export default function NewClientCallGuide({ googleMapsKey, routeEndpoint = "/api/office/route-assignment/", initialDraft, onDraftChange, onSaveDraft, savingDraft = false }) {
+  const [form, setForm] = useState(() => ({ ...initialForm, ...initialDraft, ...(initialDraft ? {phone:formatLeadPhone(initialDraft.phone)} : {}) }));
+  const [addons, setAddons] = useState(initialDraft?.addons || []);
+  const draftFirstRender = useRef(true);
+  useEffect(() => {
+    if (draftFirstRender.current) { draftFirstRender.current = false; return; }
+    if (onDraftChange) onDraftChange({ ...form, addons });
+    // Notify only for actual guide edits, not parent callback identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, addons]);
   const [route, setRoute] = useState(null);
+  const routeRequest = useRef(0);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState("");
   const [copied, setCopied] = useState("");
@@ -104,7 +115,13 @@ export default function NewClientCallGuide({ googleMapsKey }) {
   const update = (name) => (event) => {
     const value = event.target.type === "checkbox" ? event.target.checked : event.target.value;
     setForm((current) => ({ ...current, [name]: value }));
-    if (["address", "city", "state", "zip", "frequency"].includes(name)) setRoute(null);
+    if (["address", "city", "state", "zip", "frequency"].includes(name)) {
+      routeRequest.current += 1;
+      setRoute(null);
+      setRouteLoading(false);
+      setRouteError("");
+      setForm((current) => ({ ...current, serviceDay: "" }));
+    }
   };
 
   const toggleArray = (name, value) => setForm((current) => ({
@@ -114,7 +131,11 @@ export default function NewClientCallGuide({ googleMapsKey }) {
 
   const toggleAddon = (id) => setAddons((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
 
-  const quote = useMemo(() => calcLocalQuote({ dogs: form.dogs, frequency: form.frequency, lastCleaned: form.lastCleaned }), [form.dogs, form.frequency, form.lastCleaned]);
+  const quote = useMemo(() => {
+    const tier=YARD_TIERS.find(y=>y.id===form.yardSize),plan=PRICING.frequencies.find(f=>f.id===form.frequency);
+    const unknownSavedIntake=onSaveDraft&&(!isInArea(form.zip)||!tier||['unsure','xlarge'].includes(tier.id)||!plan||Number(form.dogs)>5||Number(form.dogs)>plan.maxDogs||(form.frequency==='one_time'&&addons.some(id=>PRICING.addons.find(a=>a.id===id)?.charge==='monthly')));
+    return form.dogs&&form.frequency&&form.lastCleaned&&!unknownSavedIntake?calcLocalQuote({dogs:form.dogs,frequency:form.frequency,lastCleaned:form.lastCleaned}):{monthly:null,initialRange:null,oneTimeRange:null};
+  }, [form.dogs,form.frequency,form.lastCleaned,form.yardSize,form.zip,addons,onSaveDraft]);
   const yard = YARD_TIERS.find((item) => item.id === form.yardSize);
   const selectedAddons = PRICING.addons.filter((item) => addons.includes(item.id));
   const addonPrice = (item) => item.id === "haul_away" ? haulAwayPrice(Number(form.dogs)) : item.price;
@@ -132,7 +153,8 @@ export default function NewClientCallGuide({ googleMapsKey }) {
     amount: item.charge === "monthly" ? addonPrice(item) / billingVisits : addonPrice(item),
   }));
   const invoiceAddonTotal = invoiceAddonLines.reduce((sum, item) => sum + item.amount, 0);
-  const invoiceRange = cleanupRange ? cleanupRange.map((value) => value + invoiceAddonTotal) : null;
+  const proration = callGuideProration({ frequency: form.frequency, startDate: form.startDate, startDatePending: form.startDatePending, serviceDay: form.serviceDay, monthlyTotal });
+  const invoiceRange = cleanupRange && !proration.pending ? cleanupRange.map((value) => Math.round((value + invoiceAddonTotal + proration.amount) * 100) / 100) : null;
 
   const scheduledDays = form.serviceDay || route?.recommendedPair || route?.recommendedDay || "";
   const missing = useMemo(() => {
@@ -151,10 +173,10 @@ export default function NewClientCallGuide({ googleMapsKey }) {
     if (form.frequency !== "one_time" && !scheduledDays) items.push("Confirmed recurring service day");
     if (!form.notificationType) items.push("Customer notification preference");
     if (!form.startDate && !form.startDatePending) items.push("First-cleanup date or explicit pending decision");
-    if (!form.termsConfirmed) items.push("Customer confirmation of service and billing terms");
-    if (form.paymentStatus === "pending") items.push("Secure payment status");
+    if (!onSaveDraft && !form.termsConfirmed) items.push("Customer confirmation of service and billing terms");
+    if (!onSaveDraft && form.paymentStatus === "pending") items.push("Secure payment status");
     return items;
-  }, [form, scheduledDays]);
+  }, [form, scheduledDays, onSaveDraft]);
 
   const readback = useMemo(() => {
     const customer = form.firstName.trim() || "the customer";
@@ -179,21 +201,24 @@ export default function NewClientCallGuide({ googleMapsKey }) {
   }, [form, monthlyTotal, quote, scheduledDays]);
 
   async function analyzeRoute({ signal } = {}) {
+    const requestId = ++routeRequest.current;
     setRouteLoading(true);
     setRouteError("");
+    setRoute(null);
     try {
-      const response = await fetch("/api/office/route-assignment/", {
+      const response = await fetch(routeEndpoint, {
         method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
-        body: JSON.stringify({ address: fullAddress(form), frequency: form.frequency, monthly_revenue: monthlyTotal || 0 }),
+        body: JSON.stringify({ address: form.address.trim(), city: form.city.trim(), state: form.state.trim(), zip: form.zip, frequency: form.frequency, monthly_revenue: monthlyTotal || 0 }),
         signal,
       });
-      const data = await response.json();
-      if (!response.ok || !data.ok) throw new Error(data.error || "The address could not be analyzed.");
+      const data = await response.json().catch(() => null);
+      if (signal?.aborted || requestId !== routeRequest.current) return;
+      if (!response.ok || !data?.ok) throw new Error(response.status === 401 ? "Your session expired. Sign in again, then retry the route check." : data?.error || "The route check could not finish. Retry or confirm the service day with the owner.");
       setRoute(data.recommendation);
       const recommended = data.recommendation?.recommendedPair || data.recommendation?.recommendedDay || "";
-      if (recommended) setForm((current) => ({ ...current, serviceDay: recommended }));
-    } catch (error) { if (error?.name !== "AbortError") setRouteError(error instanceof Error ? error.message : "The route could not be analyzed."); }
-    finally { setRouteLoading(false); }
+      if (recommended && !data.recommendation?.requiresOwnerConfirmation) setForm((current) => ({ ...current, serviceDay: current.serviceDay || recommended }));
+    } catch (error) { if (requestId === routeRequest.current && error?.name !== "AbortError") setRouteError(error instanceof Error ? error.message : "The route could not be analyzed."); }
+    finally { if (requestId === routeRequest.current) setRouteLoading(false); }
   }
 
   async function copyText(name, value) {
@@ -204,7 +229,8 @@ export default function NewClientCallGuide({ googleMapsKey }) {
 
   function resetGuide() {
     if (!window.confirm("Are you sure you want to clear all customer, service, routing, measurement, payment, and message information? This cannot be undone.")) return;
-    setForm({ ...initialForm, areas: [...initialForm.areas] });
+    routeRequest.current += 1;
+    setForm({ ...initialForm, ...(initialDraft ? {dogs:'',frequency:'',lastCleaned:''} : {}), areas: [...initialForm.areas] });
     setAddons([]);
     setRoute(null);
     setRouteLoading(false);
@@ -217,16 +243,23 @@ export default function NewClientCallGuide({ googleMapsKey }) {
   const phoneDigits = form.phone.replace(/\D/g, "");
   const maxDogs = PRICING.frequencies.find((item) => item.id === form.frequency)?.maxDogs || 7;
   const invalidPlan = Number(form.dogs) > maxDogs || (form.frequency !== "one_time" && quote.monthly == null);
+  const routeWarnings = [...new Set([...(route?.routeWarnings || []), route?.airtableFreshness?.warning].filter(Boolean))];
 
   useEffect(() => {
-    if (form.frequency === "one_time" || invalidPlan || !form.address.trim() || !form.city.trim() || !/^\d{5}$/.test(form.zip)) return undefined;
+    routeRequest.current += 1;
+    setRoute(null);
+    setRouteLoading(false);
+    setRouteError("");
+    if (form.frequency === "one_time" || invalidPlan || !form.address.trim() || !form.city.trim() || !/^\d{5}$/.test(form.zip)) {
+      return undefined;
+    }
     const controller = new AbortController();
     const timer = window.setTimeout(() => analyzeRoute({ signal: controller.signal }), 900);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [form.address, form.city, form.state, form.zip, form.frequency, monthlyTotal, invalidPlan]);
+  }, [form.address, form.city, form.state, form.zip, form.frequency, monthlyTotal, invalidPlan, routeEndpoint]);
 
   return <div className={styles.workspace}>
-    <div className={styles.testBanner}><strong>Guided call test mode</strong><span>Nothing entered here is saved to Sweep &amp; Go, no customer is created, and no message is sent automatically.</span></div>
+    <div className={styles.testBanner}><strong>{onSaveDraft ? 'Saved lead intake' : 'Guided call test mode'}</strong><span>{onSaveDraft ? 'Save progress to this lead at any time. Payment entry stays in the secure signup flow; no customer is created or message sent here.' : 'Nothing entered here is saved to Sweep & Go, no customer is created, and no message is sent automatically.'}</span>{onSaveDraft ? <button type="button" disabled={savingDraft} onClick={() => onSaveDraft({ ...form, addons })}>{savingDraft ? 'Saving…' : 'Save intake to lead'}</button> : null}</div>
     <div className={styles.staffingNote}><strong>Current field staffing</strong><span>{STAFFING_GUIDANCE}</span></div>
 
     <div className={styles.titleRow}><div><span>New client call guide</span><h1>One conversation. Nothing missed.</h1><p>Follow the prompts, confirm the route, then use the final read-back and welcome text.</p></div><div className={styles.titleActions}><div className={styles.progress}><strong>{missing.length ? `${missing.length} items left` : "Ready to finish"}</strong><span>{Math.max(0, 100 - missing.length * 6)}% complete</span></div><button type="button" className={styles.resetButton} onClick={resetGuide}>Reset call guide</button></div></div>
@@ -237,7 +270,7 @@ export default function NewClientCallGuide({ googleMapsKey }) {
       <a href="#call-property"><span>03 Property</span><small>Dogs, access, and waste location</small></a>
       <a href="#call-schedule"><span>04 Schedule</span><small>Route day and first cleanup</small></a>
       <a href="#call-invoice"><span>05 Invoice</span><small>Walk through the estimated first invoice</small></a>
-      <a href="#call-finish"><span>06 Finish</span><small>Read-back, payment, and confirmation</small></a>
+      <a href="#call-finish"><span>06 Finish</span><small>{onSaveDraft ? 'Read-back and save progress' : 'Read-back, payment, and confirmation'}</small></a>
       <a href="#call-pricing"><span>Price</span><small>Live recurring and per-cleanup totals</small></a>
     </nav>
 
@@ -266,15 +299,19 @@ export default function NewClientCallGuide({ googleMapsKey }) {
           <div className={styles.formGrid}>
             <Field label="First name"><input value={form.firstName} onChange={update("firstName")} autoComplete="given-name" /></Field>
             <Field label="Last name - confirm spelling"><input value={form.lastName} onChange={update("lastName")} autoComplete="family-name" /></Field>
-            <Field label="Cell phone"><input value={form.phone} onChange={update("phone")} inputMode="tel" autoComplete="tel" /></Field>
+            <Field label="Cell phone"><input value={form.phone} onChange={update("phone")} onBlur={()=>{if(onSaveDraft)setForm(current=>({...current,phone:formatLeadPhone(current.phone)}));}} inputMode="tel" autoComplete="tel" /></Field>
             <Field label="Email"><input value={form.email} onChange={update("email")} type="email" autoComplete="email" /></Field>
             <Field label="Street address" wide><input value={form.address} onChange={update("address")} autoComplete="street-address" /></Field>
             <Field label="City"><input value={form.city} onChange={update("city")} autoComplete="address-level2" /></Field>
             <Field label="State"><input value={form.state} onChange={update("state")} maxLength="2" autoComplete="address-level1" /></Field>
             <Field label="ZIP"><input value={form.zip} onChange={update("zip")} inputMode="numeric" maxLength="5" autoComplete="postal-code" /></Field>
           </div>
-          {form.frequency !== "one_time" ? <div className={styles.autoRouteStatus}>{routeLoading ? <><i />Checking the newest Airtable route data…</> : route?.eligible ? <><span>Recommended route day</span><strong>{route.recommendedPair || route.recommendedDay || "Review required"}</strong><small>{technicianLabel(route.recommendedTechnician)} · {route.region} · {route.confidence} confidence</small></> : <><span>Automatic route check</span><small>Complete the street, city, and five-digit ZIP. The recommendation will appear automatically.</small></>}</div> : null}
+          {form.frequency !== "one_time" ? <div className={styles.autoRouteStatus}>{routeLoading ? <><i />Checking the newest Airtable route data…</> : routeError ? <><span>Route check unavailable</span><small>Retry the route check or confirm the service day with the owner.</small></> : invalidPlan ? <><span>Custom service review required</span><small>Route checking is paused for this dog count and frequency.</small></> : route?.eligible ? <><span>{route.requiresOwnerConfirmation ? "Provisional route day · confirm with owner" : "Recommended route day"}</span><strong>{route.recommendedPair || route.recommendedDay || "Review required"}</strong><small>{route.recommendedPair || route.recommendedDay ? technicianLabel(route.recommendedTechnician) : "Confirm the service day with the owner"} · {route.region} · {route.confidence} confidence</small></> : <><span>Automatic route check</span><small>Complete the street, city, and five-digit ZIP. The recommendation will appear automatically.</small></>}</div> : null}
           {routeError ? <div className={styles.alert}>{routeError}</div> : null}
+          {invalidPlan && form.frequency !== "one_time" ? <div className={styles.alert}>This dog count and frequency require a custom quote. Choose a supported service plan to check the route, or confirm the service day with the owner.</div> : null}
+          {routeWarnings.map((warning) => <div key={warning} role="status" className={styles.alert}>{warning}</div>)}
+          {route?.routePlanCreatedAt ? <small>Route plan: {route.routePlanCreatedAt} UTC · {route.routePlanStatus || "status unavailable"}</small> : null}
+          {route?.guidance ? <div className={styles.routeResult}><span>Why this day fits</span><p>{route.guidance}</p></div> : null}
           <PropertyMap key={resetKey} address={fullAddress(form)} ready={Boolean(form.address.trim() && form.city.trim() && /^\d{5}$/.test(form.zip))} selectedTier={form.yardSize} onTierSelected={(yardSize) => setForm((current) => ({ ...current, yardSize }))} googleMapsKey={googleMapsKey} />
         </Panel>
 
@@ -298,7 +335,8 @@ export default function NewClientCallGuide({ googleMapsKey }) {
             <Script>The current route data recommends {route?.recommendedPair || route?.recommendedDay || "a day that is still being checked"}. I will confirm that day with you before finishing the account.</Script>
             <button type="button" className={styles.routeButton} disabled={routeLoading || !form.address || !form.city || !form.zip || invalidPlan} onClick={() => analyzeRoute()}>{routeLoading ? "Checking newest Airtable data..." : "Refresh route recommendation"}</button>
             {routeError ? <div className={styles.alert}>{routeError}</div> : null}
-            {route?.eligible ? <div className={styles.routeResult}><span>Recommended assignment · newest available Airtable snapshot</span><strong>{route.recommendedPair || route.recommendedDay || "Review required"}</strong><p>{technicianLabel(route.recommendedTechnician)} · {route.region} · {route.confidence} confidence</p></div> : null}
+            {routeWarnings.map((warning) => <div key={warning} role="status" className={styles.alert}>{warning}</div>)}
+            {route?.eligible ? <div className={styles.routeResult}><span>{route.requiresOwnerConfirmation ? "Provisional assignment · road times unavailable" : "Recommended assignment"}</span><strong>{route.recommendedPair || route.recommendedDay || "Review required"}</strong><p>{route.recommendedPair || route.recommendedDay ? technicianLabel(route.recommendedTechnician) : "Confirm the service day with the owner"} · {route.region} · {route.confidence} confidence</p></div> : null}
           </>}
           <div className={styles.formGrid}>
             {form.frequency !== "one_time" ? <Field label="Customer-confirmed service day" wide><select value={form.serviceDay} onChange={update("serviceDay")}><option value="">Not confirmed</option>{DAYS.map((day) => <option key={day}>{day}</option>)}{route?.recommendedPair ? <option value={route.recommendedPair}>{route.recommendedPair}</option> : null}</select></Field> : null}
@@ -309,12 +347,13 @@ export default function NewClientCallGuide({ googleMapsKey }) {
         </Panel>
 
         <Panel id="call-invoice" eyebrow="Step 5" title="Walk through the initial invoice">
-          <Script>Before we finish, let me show you what the first invoice is expected to look like. Your regular recurring rate is {form.frequency === "one_time" ? "not recurring" : `${money(monthlyTotal)} per month`}, and this first invoice covers the initial cleanup and selected first-visit add-ons.</Script>
-          {cleanupRange ? <MockInvoice form={form} cleanupRange={cleanupRange} addonLines={invoiceAddonLines} invoiceRange={invoiceRange} /> : <div className={styles.alert}>Choose the dog count and last-cleaned condition to build the initial invoice preview.</div>}
+          <Script>Before we finish, let me show you what the first invoice is expected to look like. Your regular recurring rate is {form.frequency === "one_time" ? "not recurring" : `${money(monthlyTotal)} per month`}, and this first invoice covers the initial cleanup, selected first-visit add-ons{form.frequency !== "one_time" ? ", and remaining prorated cleanups this month" : ""}.</Script>
+          {cleanupRange ? <MockInvoice form={form} cleanupRange={cleanupRange} addonLines={invoiceAddonLines} invoiceRange={invoiceRange} proration={proration} monthlyTotal={monthlyTotal} /> : <div className={styles.alert}>Choose the dog count and last-cleaned condition to build the initial invoice preview.</div>}
         </Panel>
 
-        <Panel id="call-finish" eyebrow="Step 6" title="Read back, payment, and finish">
+        <Panel id="call-finish" eyebrow="Step 6" title={onSaveDraft ? 'Read back and save intake' : 'Read back, payment, and finish'}>
           <Script>{readback}</Script>
+          {onSaveDraft ? <><p>Save these details, then review the service day and prepare the secure signup link from the lead. The customer confirms terms and payment during signup.</p><button type="button" disabled={savingDraft} onClick={()=>onSaveDraft({...form,addons})}>{savingDraft?'Saving…':'Save intake and return to lead'}</button></> : <>
           <div className={styles.confirmations}>
             <label><input type="checkbox" checked={form.termsConfirmed} onChange={update("termsConfirmed")} /><span><strong>Customer confirmed the setup and billing terms</strong><small>Complete only after reading the service summary aloud.</small></span></label>
             <Field label="Secure payment status"><select value={form.paymentStatus} onChange={update("paymentStatus")}><option value="pending">Not handled yet</option><option value="link_sent">Secure SNG payment link sent</option><option value="confirmed">Payment method confirmed in SNG</option><option value="not_required">No payment required yet</option></select></Field>
@@ -328,6 +367,7 @@ export default function NewClientCallGuide({ googleMapsKey }) {
             </div>
             <div className={styles.cardSafety}><strong>Enter the full card number, expiration, and CVV directly in Sweep &amp; Go.</strong><span>These temporary handoff fields stay only in this open call-guide session and are cleared by the Reset button or a page refresh.</span><a href="https://client.sweepandgo.com/login" target="_blank" rel="noreferrer">Open Sweep &amp; Go securely ↗</a></div>
           </div>
+          </>}
         </Panel>
       </div>
 
@@ -343,6 +383,7 @@ export default function NewClientCallGuide({ googleMapsKey }) {
               <div className={styles.perCleanup}><span>Effective rate per cleanup</span><b>{money(selectedCleanupRate)}</b></div>
               {perTreatmentTotal ? <div><span>Includes selected treatment(s)</span><b>{money(perTreatmentTotal)}</b></div> : null}
               <div><span>Initial cleanup estimate</span><b>{range(quote.initialRange)}</b></div>
+              <div><span>Remaining monthly cleanups{proration.pending ? "" : ` (${proration.quantity})`}</span><b>{proration.pending ? "Pending" : money(proration.amount)}</b></div>
               <div><span>Mock initial invoice total</span><b>{range(invoiceRange)}</b></div>
             </> : <><div className={styles.total}><span>One-time cleanup estimate</span><b>{range(quote.oneTimeRange)}</b></div>{selectedAddons.map((item) => <div key={item.id}><span>{item.name}</span><b>{money(addonPrice(item))}</b></div>)}<div><span>Mock invoice total</span><b>{range(invoiceRange)}</b></div></>}
           </div>
@@ -351,14 +392,14 @@ export default function NewClientCallGuide({ googleMapsKey }) {
         </Panel>
 
         <Panel eyebrow="Completion check" title={missing.length ? "Still needed" : "Ready to finish"}>
-          {missing.length ? <ul className={styles.missing}>{missing.map((item) => <li key={item}>{item}</li>)}</ul> : <div className={styles.ready}>All required information has been confirmed. Review SNG before sending the welcome message.</div>}
+          {missing.length ? <ul className={styles.missing}>{missing.map((item) => <li key={item}>{item}</li>)}</ul> : <div className={styles.ready}>{onSaveDraft ? 'Intake details are complete. Save, then review the service day before signup.' : 'All required information has been confirmed. Review SNG before sending the welcome message.'}</div>}
         </Panel>
 
-        <Panel eyebrow="Customer message" title="Welcome text">
+        {onSaveDraft ? <Panel eyebrow="Next step" title="Continue from the lead"><p>Save progress to keep the quote, property details and conversation together. Service-day approval and secure signup happen from the lead record.</p><button type="button" disabled={savingDraft} onClick={()=>onSaveDraft({...form,addons})}>Save intake to lead</button></Panel> : <Panel eyebrow="Customer message" title="Welcome text">
           <div className={styles.message}>{welcome}</div>
           <div className={styles.messageActions}><button type="button" onClick={() => copyText("welcome", welcome)}>{copied === "welcome" ? "Copied" : "Copy welcome text"}</button><a className={!phoneDigits ? styles.disabled : ""} href={phoneDigits ? `sms:${phoneDigits}?body=${encodeURIComponent(welcome)}` : undefined}>Open SMS</a></div>
           <small className={styles.messageNote}>Preview only. Confirm the service day, first date, price, notification settings, and payment status in SNG before sending.</small>
-        </Panel>
+        </Panel>}
       </aside>
     </div>
   </div>;

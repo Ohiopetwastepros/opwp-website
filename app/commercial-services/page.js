@@ -13,10 +13,10 @@ export const metadata = {
       "Commercial Pet Waste Services for HOAs & Apartments | Ohio Pet Waste Pros",
     description:
       "Pet waste stations, recurring cleanups & sanitizing for HOAs, apartments and businesses across Greater Toledo.",
-    url: "https://ohiopetwastepros.com/commercial-services/",
+    url: "https://www.ohiopetwastepros.com/commercial-services/",
     siteName: "Ohio Pet Waste Pros",
     images: [
-      "https://ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
+      "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
     ],
   },
   twitter: { card: "summary_large_image" },

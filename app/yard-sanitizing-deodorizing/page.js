@@ -11,10 +11,10 @@ export const metadata = {
     title: "Yard Sanitizing & Deodorizing | Ohio Pet Waste Pros",
     description:
       "Pet-safe odor and bacteria control for NW Ohio yards — an add-on to any dog waste removal plan.",
-    url: "https://ohiopetwastepros.com/yard-sanitizing-deodorizing/",
+    url: "https://www.ohiopetwastepros.com/yard-sanitizing-deodorizing/",
     siteName: "Ohio Pet Waste Pros",
     images: [
-      "https://ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
+      "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
     ],
   },
   twitter: { card: "summary_large_image" },

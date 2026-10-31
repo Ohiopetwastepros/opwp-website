@@ -1,3 +1,5 @@
+import AdminWorkspace from "./AdminWorkspace";
+import {recordDestination} from '@/lib/admin-record-policy.mjs';
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifyAdminRequest } from "@/lib/admin-auth";
@@ -5,8 +7,14 @@ import { getAirtableBusinessCockpit } from "@/lib/airtable";
 import { getBriaRouteAllocation, getSngInvoiceMetrics, getSubscriptionCancellationMetrics, getSubscriptionStatusReviews, getSubscriptionSyncHealth, getSubscriptionTruth, listSngEvents, listSubmissions } from "@/lib/db";
 import { buildSubscriptionReconciliation, getSngAdminSnapshot, sngConfigured, sngRows } from "@/lib/sweepandgo";
 import { getQuickBooksFinancialSnapshot } from "@/lib/quickbooks";
+import { getRouteProfitabilityData } from "@/lib/route-profitability";
+import { selectRouteWindow, summarizeRouteProfit } from "@/lib/route-profitability-calculations.mjs";
+import { applyQuickBooksRouteCosts } from "@/lib/quickbooks-route-costs.mjs";
 import { stripeConfigured } from "@/lib/stripe";
-import GoogleReviewTable from "./GoogleReviewTable";
+import GoogleReviewSection from "./GoogleReviewSection";
+import { getGoogleReviewHealth } from "@/lib/google-review-state.mjs";
+import { getDb } from "@/lib/db";
+import { getRuntimeEnv } from "@/lib/cloudflare";
 import styles from "./dashboard.module.css";
 
 export const dynamic = "force-dynamic";
@@ -83,9 +91,6 @@ function MiniMetric({ label, value }) {
   return <div className={styles.miniMetric}><div className={styles.miniLabel}>{label}</div><div className={styles.miniValue}>{value}</div></div>;
 }
 
-function RailItem({ icon, label, href, active = false }) {
-  return <a className={`${styles.railItem} ${active ? styles.railItemActive : ""}`} href={href}><span aria-hidden="true">{icon}</span><b>{label}</b></a>;
-}
 
 function ExecutiveMetric({ icon, label, value, meta, tone = "" }) {
   return <article className={styles.executiveMetric}><span className={`${styles.metricIcon} ${tone ? styles[tone] : ""}`} aria-hidden="true">{icon}</span><div><div className={styles.metricLabel}>{label}</div><strong className={styles.metricValue}>{value}</strong><div className={styles.metricMeta}>{meta}</div></div></article>;
@@ -104,12 +109,6 @@ function Badge({ children, tone = "" }) {
   return <span className={`${styles.badge} ${tone ? styles[tone] : ""}`}>{children}</span>;
 }
 
-function NavGroup({ number: navNumber, label, href, active = false, children }) {
-  return <details className={styles.navGroup} open={active || undefined}>
-    <summary><a className={`${styles.navLink} ${active ? styles.active : ""}`} href={href}><span>{navNumber}</span><b>{label}</b></a><i aria-hidden="true">⌄</i></summary>
-    <div className={styles.subnav}>{children}</div>
-  </details>;
-}
 
 function Table({ columns, rows = [], empty = "No records" }) {
   return <div className={styles.tableWrap}><table className={styles.table}><thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead><tbody>{rows.length ? rows.map((row, index) => <tr key={row.id || index}>{columns.map((column) => <td key={column.key}>{column.render ? column.render(row) : row[column.key] ?? "—"}</td>)}</tr>) : <tr><td className={styles.empty} colSpan={columns.length}>{empty}</td></tr>}</tbody></table></div>;
@@ -125,7 +124,7 @@ function KpiScorecard({ rows = [] }) {
   })}</div>;
 }
 
-function attentionItems(opwp, dogFood, cockpitOk, recurringSngCount, events = [], submissions = [], subscriptionReconciliation = null, subscriptionSyncHealth = null, cancellationMetrics = null, subscriptionStatusReviews = null) {
+function attentionItems(opwp, dogFood, cockpitOk, recurringSngCount, events = [], submissions = [], subscriptionReconciliation = null, subscriptionSyncHealth = null, cancellationMetrics = null, subscriptionStatusReviews = null, revenueReconciliation = null, routeEconomics = null) {
   const items = [];
   const eventFailures = events.filter((event) => event.status === "needs_attention");
   const submissionFailures = submissions.filter((submission) => submission.status === "needs_attention");
@@ -133,10 +132,11 @@ function attentionItems(opwp, dogFood, cockpitOk, recurringSngCount, events = []
   const subscriptionSyncAge = latestSubscriptionSync?.completed_at ? Date.now() - Date.parse(`${latestSubscriptionSync.completed_at.replace(" ", "T")}Z`) : null;
   if (latestSubscriptionSync?.status === "failed") items.push({ title: "Daily subscription refresh failed", detail: latestSubscriptionSync.error || "The prior valid snapshot was preserved.", tone: "bad", href: "#systems" });
   else if (subscriptionSyncAge !== null && subscriptionSyncAge > 36 * 3600000) items.push({ title: "Daily subscription data is stale", detail: "The last successful SNG subscription refresh is more than 36 hours old; the prior valid snapshot is still being used.", tone: "bad", href: "#systems" });
-  if (opwp.unmatchedLiveSubscriptionClients > 0) items.push({ title: `${opwp.unmatchedLiveSubscriptionClients} active subscription customer${opwp.unmatchedLiveSubscriptionClients === 1 ? " is" : "s are"} missing revenue baselines`, detail: "They are included in the active customer count, but their MRR needs a finalized invoice or baseline update before financial totals are complete.", tone: "bad", href: "#subscription-reconciliation" });
+  const revenueQuestions = (revenueReconciliation?.pending || []).filter(row => row.ownerActionRequired);
+  if (revenueQuestions.length) items.push({ title: `${revenueQuestions.length} recurring rate${revenueQuestions.length === 1 ? " needs" : "s need"} an answer`, detail: "Automatic checks exhausted the connected records without finding unambiguous recurring terms. Review the specific question and evidence.", tone: "warn", href: "#revenue-reconciliation" });
   if (subscriptionStatusReviews?.openCount > 0) items.push({ title: `${subscriptionStatusReviews.openCount} subscription status review${subscriptionStatusReviews.openCount === 1 ? "" : "s"} open`, detail: `${money(subscriptionStatusReviews.coreMrrAtRisk)} of scooping MRR is preserved pending confirmation; these records are not counted as churn.`, tone: "warn", href: "#subscription-status-reviews" });
   if (opwp.churnReasonReviewCount > 0) items.push({ title: `${opwp.churnReasonReviewCount} churn detail record${opwp.churnReasonReviewCount === 1 ? " needs" : "s need"} review`, detail: "The confirmed cancellation is missing either its standardized reason or required comment. Complete the Airtable Churn Log.", tone: "warn", href: "#churn-reason-review" });
-  if (opwp.churnEligibilityReviewCount > 0) items.push({ title: `${opwp.churnEligibilityReviewCount} cancellation${opwp.churnEligibilityReviewCount === 1 ? " needs" : "s need"} eligibility validation`, detail: "These records have no completed-service or paid-invoice evidence and are excluded from churn until the office confirms a paid customer relationship.", tone: "warn", href: "#churn-eligibility-review" });
+  if (opwp.churnEligibilityReviewCount > 0) items.push({ title: `${opwp.churnEligibilityReviewCount} cancellation${opwp.churnEligibilityReviewCount === 1 ? " needs" : "s need"} eligibility validation`, detail: "These records have an unpaid invoice or incomplete service/invoice history. They are excluded from churn pending review. Cancellations with no service or finalized invoice close automatically as Never Started.", tone: "warn", href: "#churn-eligibility-review" });
   if (opwp.googleReviewRecentOneTimeCount > 0) items.push({ title: `${opwp.googleReviewRecentOneTimeCount} recent one-time client${opwp.googleReviewRecentOneTimeCount === 1 ? "" : "s"} has not reviewed`, detail: "A completed one-time job from the last 30 days is highlighted for manual review-request follow-up.", tone: "warn", href: "#google-reviews" });
   if (eventFailures.length > 0) items.push({ title: `${eventFailures.length} backend event${eventFailures.length === 1 ? "" : "s"} need attention`, detail: "Automatic recovery is active and will retry these records when the next SNG event arrives.", tone: "bad", href: "/admin/events/" });
   if (!cockpitOk) items.push({ title: "Airtable metrics unavailable", detail: "The cockpit could not refresh its operating data.", tone: "bad", href: "#systems" });
@@ -144,8 +144,8 @@ function attentionItems(opwp, dogFood, cockpitOk, recurringSngCount, events = []
   else if (opwp.airtableSnapshot?.status === "partial") items.push({ title: "Airtable reporting table unavailable", detail: opwp.airtableSnapshot.error || "Core customer and route data refreshed; an optional reporting table retained its prior snapshot.", tone: "warn", href: "#systems" });
   else if (opwp.airtableSnapshot?.stale) items.push({ title: "Airtable snapshot is stale", detail: `The dashboard is using its last valid snapshot from ${opwp.airtableSnapshot.capturedAt}; the hourly refresh will retry automatically.`, tone: "warn", href: "#systems" });
   if (submissionFailures.length > 0) items.push({ title: `${submissionFailures.length} website submission${submissionFailures.length === 1 ? "" : "s"} failed to sync`, detail: "The records are preserved in D1 and need review.", tone: "bad", href: "#systems" });
-  if (subscriptionReconciliation && !subscriptionReconciliation.reconciled) items.push({ title: `${subscriptionReconciliation.issueRows.length} client routing record${subscriptionReconciliation.issueRows.length === 1 ? " needs" : "s need"} completion`, detail: `${subscriptionReconciliation.missingFromAirtable.length} SNG client${subscriptionReconciliation.missingFromAirtable.length === 1 ? " is" : "s are"} missing from Airtable and ${subscriptionReconciliation.missingSngId.length} active Airtable record${subscriptionReconciliation.missingSngId.length === 1 ? " lacks" : "s lack"} an SNG ID.`, tone: "bad", href: "#subscription-reconciliation" });
-  if (!opwp.technicianEconomicsReady) items.push({ title: "Route efficiency needs more source data", detail: `The route ledger is ${percent(opwp.jobRevenueCoverage30)} complete across visit value and technician assignment. Rates are withheld until coverage reaches 90%.`, tone: "bad", href: "#route-efficiency" });
+  if (subscriptionReconciliation && !subscriptionReconciliation.reconciled) items.push({ title: `${subscriptionReconciliation.issueRows.length} client routing record${subscriptionReconciliation.issueRows.length === 1 ? " conflicts" : "s conflict"} with SNG`, detail: `${subscriptionReconciliation.missingFromAirtable.length} SNG client${subscriptionReconciliation.missingFromAirtable.length === 1 ? " is" : "s are"} missing from Airtable and ${subscriptionReconciliation.missingSngId.length} active Airtable record${subscriptionReconciliation.missingSngId.length === 1 ? " needs" : "s need"} an SNG match or status correction.`, tone: "bad", href: "#subscription-reconciliation" });
+  if (!(routeEconomics?.ready ?? opwp.technicianEconomicsReady)) items.push({ title: "Route efficiency needs more source data", detail: `Eligible visits have ${percent(routeEconomics?.coverage ?? opwp.jobRevenueCoverage30)} value coverage. Rates require recorded value for every included visit and valid shift hours for every included service day.`, tone: "bad", href: "#route-efficiency" });
   if (opwp.serviceTimeCoverage30 < 90) items.push({ title: "Some service durations are missing", detail: `${percent(opwp.actualTimeCoverage30)} of completed visits have an actual duration. Route $/hour remains valid, but customer estimate coaching is provisional.`, tone: "warn", href: "#estimate-reviews" });
   if (opwp.suspiciousMileageRecords > 0) items.push({ title: `${opwp.suspiciousMileageRecords} mileage record${opwp.suspiciousMileageRecords === 1 ? "" : "s"} look invalid`, detail: "A shift contains more than 500 miles and is excluded from routing decisions until corrected.", tone: "warn", href: "#systems" });
   if (opwp.estimateReviewCount > 0) items.push({ title: `${opwp.estimateReviewCount} service estimate${opwp.estimateReviewCount === 1 ? "" : "s"} need review`, detail: "Repeated job durations are running materially above the current estimate.", tone: "warn", href: "#estimate-reviews" });
@@ -166,14 +166,14 @@ export default async function AdminPage({ searchParams }) {
 
   const params = await searchParams;
   const requestedView = String(params?.view || "overview");
-  const view = ["overview", "operations", "customers", "food", "scorecard", "systems"].includes(requestedView) ? requestedView : "overview";
+  if (requestedView === "operations") redirect("/admin/operations/");
+  const view = ["overview", "customers", "food", "scorecard", "systems"].includes(requestedView) ? requestedView : "overview";
   const churnRange = resolveChurnRange(params);
   const viewConfig = {
     overview: { eyebrow: "Enterprise performance", title: "Executive Dashboard", subtitle: "High-level performance across the business, with live operating priorities." },
-    operations: { eyebrow: "Operating leverage", title: "Route operations", subtitle: "Technician productivity, paid-hour economics, service execution, and route data confidence." },
-    customers: { eyebrow: "Customer economics", title: "Growth & retention", subtitle: "Recurring revenue, pipeline, one-time demand, churn, pauses, and reactivation opportunities." },
+    customers: { eyebrow: "Customer economics", title: "Customers & retention", subtitle: "Recurring revenue, pipeline, one-time demand, churn, pauses, and reactivation opportunities." },
     food: { eyebrow: "Growth platform", title: "Extreme Dog Fuel", subtitle: "Sales, recurring demand, fulfillment economics, churn, and inventory exposure." },
-    scorecard: { eyebrow: "Accountability", title: "Management scorecard", subtitle: "The operating targets that convert strategy into weekly management behavior." },
+    scorecard: { eyebrow: "Operations", title: "Management scorecard", subtitle: "The operating targets that convert strategy into weekly management behavior." },
     systems: { eyebrow: "Data governance", title: "Systems & controls", subtitle: "Feed health, reconciliation, event processing, and exceptions that can distort decisions." },
   }[view];
 
@@ -183,24 +183,34 @@ export default async function AdminPage({ searchParams }) {
   ]);
   const cockpit = await getAirtableBusinessCockpit({ briaRouteAllocation, sngInvoiceMetrics, subscriptionTruth, cancellationMetrics, churnRange });
   const seededSnapshot = Boolean(cockpit.snapshot?.seeded);
-  const [submissions, events, sng, quickBooks] = await Promise.all([
+  const [submissions, events, sng, quickBooks, routeProfitability] = await Promise.all([
     listSubmissions(30),
     listSngEvents(100),
     seededSnapshot ? Promise.resolve({ clients: { rows: [] }, clientsWithoutSubscription: { rows: [] }, recurringClients: [], jobs: null }) : getSngAdminSnapshot(today),
     seededSnapshot ? Promise.resolve({ ok: false, connected: true, configured: true }) : getQuickBooksFinancialSnapshot(),
+    getRouteProfitabilityData(),
   ]);
   const opwp = cockpit.opwp ?? {};
   opwp.airtableSnapshot = cockpit.snapshot ? { ...cockpit.snapshot, error: cockpit.error || "" } : null;
   const dogFood = cockpit.dogFood ?? {};
+  const googleReviewHealth = view === 'customers' ? await getGoogleReviewHealth(getDb(), getRuntimeEnv()) : null;
   const jobsToday = sngRows(sng.jobs);
   const activeSngClientCount = sng.clients?.rows?.length || 0;
   const recurringSngCount = sng.recurringClients?.length || 0;
   const currentRecurringCount = opwp.activeSubscriptionCustomers ?? recurringSngCount;
   const subscriptionReconciliation = buildSubscriptionReconciliation(opwp.customerLedger ?? [], sng.clients?.rows ?? [], sng.clientsWithoutSubscription?.rows ?? []);
+  const routeHistory = routeProfitability?.history;
+  const routeEconomics = routeHistory?.throughDate ? (() => {
+    const pricedRows = applyQuickBooksRouteCosts(routeHistory.rows ?? [], routeProfitability.costs, { coveredFrom: routeHistory.fromDate, coveredThrough: routeHistory.throughDate });
+    const rows = selectRouteWindow(pricedRows, shiftDate(routeHistory.throughDate, -29), routeHistory.throughDate);
+    const summary = summarizeRouteProfit(rows);
+    const coverage = summary.jobs ? ((summary.jobs - summary.missingValues) / summary.jobs) * 100 : 0;
+    return { ready: summary.revenuePerHour !== null && summary.missingValues === 0, coverage, revenuePerHour: summary.revenuePerHour };
+  })() : { ready: opwp.technicianEconomicsReady, coverage: opwp.jobRevenueCoverage30, revenuePerHour: opwp.routeRevenuePerHour30 };
   const completedToday = jobsToday.filter((job) => String(job.status_name).toLowerCase() === "completed" || Number(job.status_id) === 2).length;
   const todayCompletionRate = jobsToday.length ? (completedToday / jobsToday.length) * 100 : 0;
   const trustedTargets = (opwp.targets ?? []).filter((row) => !/\$\/hr|route load|recurring \$\/clocked hr|active recurring customers|active recurring mrr/i.test(row.metric));
-  const alerts = attentionItems(opwp, dogFood, cockpit.ok, currentRecurringCount, events.rows, submissions.rows, subscriptionReconciliation, subscriptionSyncHealth, cancellationMetrics, subscriptionStatusReviews);
+  const alerts = attentionItems(opwp, dogFood, cockpit.ok, currentRecurringCount, events.rows, submissions.rows, subscriptionReconciliation, subscriptionSyncHealth, cancellationMetrics, subscriptionStatusReviews, subscriptionTruth.reconciliation, routeEconomics);
   const primaryAlert = alerts[0];
   const dataAsOf = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }).format(new Date());
   const invoiceFeedSince = opwp.oneTimeInvoiceFeedSince
@@ -210,11 +220,12 @@ export default async function AdminPage({ searchParams }) {
     if (href.startsWith("/")) return href;
     const destinations = {
       "#google-reviews": "/admin/?view=customers#google-reviews",
+      "#revenue-reconciliation": "/admin/?view=customers#revenue-reconciliation",
       "#subscription-reconciliation": "/admin/?view=customers#subscription-reconciliation",
       "#subscription-status-reviews": "/admin/?view=customers#subscription-status-reviews",
       "#churn-reason-review": "/admin/?view=customers#churn-reason-review",
       "#churn-eligibility-review": "/admin/?view=customers#churn-eligibility-review",
-      "#route-efficiency": "/admin/?view=operations#route-efficiency",
+      "#route-efficiency": "/admin/financials/routes/",
       "#estimate-reviews": "/admin/?view=customers#estimate-reviews",
       "#food": "/admin/?view=food#food",
       "#dog-food-churn": "/admin/?view=food#dog-food-churn",
@@ -224,28 +235,9 @@ export default async function AdminPage({ searchParams }) {
   };
 
   return (
-    <main className={`${styles.shell} opwp-admin-shell`}>
-      <aside className={styles.rail}>
-        <div className={styles.railBrand}><span className={styles.mark}><img src="/assets/opwp-logo.png" alt="" /></span><div><strong>OPWP</strong><small>Operating Group</small></div></div>
-        <nav className={styles.railNav} aria-label="Executive navigation">
-          <RailItem icon="⌂" label="Overview" href="/admin/" active={view === "overview"} />
-          <div className={styles.railSection}>Performance</div>
-          <RailItem icon="$" label="Financials" href="/admin/financials/" />
-          <RailItem icon="C" label="Customers" href="/admin/?view=customers" active={view === "customers"} />
-          <div className={styles.railSection}>Operations</div>
-          <RailItem icon="O" label="Operations" href="/admin/?view=operations" active={view === "operations"} />
-          <RailItem icon="R" label="Route Intelligence" href="/admin/routes/" />
-          <RailItem icon="P" label="Route Partner" href="/admin/route-partner/" />
-          <div className={styles.railSection}>Growth</div>
-          <RailItem icon="↗" label="Growth" href="/admin/?view=scorecard" active={view === "scorecard"} />
-          <RailItem icon="Y" label="YardOps Pipeline" href="/admin/quote-funnel/" />
-          <RailItem icon="D" label="Dog Food" href="/admin/dog-food/" />
-          <div className={styles.railSection}>Systems</div>
-          <RailItem icon="S" label="Systems & Integrations" href="/admin/system-health/" active={view === "systems"} />
-        </nav>
-        <a className={styles.ownerCard} href="/admin/routes/?manage=office-access#office-access"><span className={styles.ownerAvatar}>O</span><div><strong>{auth.email || "OPWP Owner"}</strong><small>Owner access</small></div><b>›</b></a>
-      </aside>
-      <div className={styles.workspace}><div className={styles.wrap}>
+    <AdminWorkspace section={view} email={auth.email}><main className={`${styles.shell} opwp-admin-shell`}>
+
+      <div className={styles.workspace} data-admin-content><div className={styles.wrap}>
         <header className={styles.topbar}>
           <div><h1 className={styles.title}>{viewConfig.title}</h1><div className={styles.subtle}>{viewConfig.subtitle}</div></div>
           <div className={styles.headerControls}><div className={styles.periodChip}>Trailing 30 days</div><a className={styles.headerButton} href="/admin/system-health/" aria-label="Open system health">Controls</a><div className={styles.asof}><span className={styles.live} />Data updated <b>{dataAsOf} ET</b></div></div>
@@ -261,7 +253,7 @@ export default async function AdminPage({ searchParams }) {
             <ExecutiveMetric icon="↻" label="Monthly recurring revenue" value={money(opwp.mrr)} meta={`${number(currentRecurringCount)} paying cleanup customers`} />
             <ExecutiveMetric icon="↗" label="Net income MTD" value={quickBooks.ok ? money(quickBooks.netIncome) : "Unavailable"} meta={quickBooks.ok ? `${percent(quickBooks.netMargin)} net margin` : "QuickBooks sync required"} />
             <ExecutiveMetric icon="C" label="Paying customers" value={number(currentRecurringCount)} meta={`${number(opwp.pausedCustomers)} paused customers`} />
-            <ExecutiveMetric icon="R" label="Route revenue per paid hour" value={opwp.technicianEconomicsReady ? moneyOrDash(opwp.routeRevenuePerHour30, 2) : "Pending"} meta={`${percent(opwp.jobRevenueCoverage30)} data confidence`} tone={opwp.technicianEconomicsReady ? "" : "warn"} />
+            <ExecutiveMetric icon="R" label="Route revenue per paid hour" value={routeEconomics.ready ? moneyOrDash(routeEconomics.revenuePerHour, 2) : "Pending"} meta={`${percent(routeEconomics.coverage)} data confidence`} tone={routeEconomics.ready ? "" : "warn"} />
           </section>
 
           <section className={styles.overviewMiddle}>
@@ -276,7 +268,7 @@ export default async function AdminPage({ searchParams }) {
 
           <section id="owner-actions" className={styles.overviewLower}>
             <div className={styles.dashboardPanel}><div className={styles.dashboardPanelHead}><div><h2>Executive Action Center</h2><p>Exceptions requiring owner attention</p></div><Badge tone={alerts.some((alert) => alert.tone) ? "warn" : ""}>{alerts.some((alert) => alert.tone) ? `${alerts.length} priorities` : "Clear"}</Badge></div><div className={styles.actionList}>{alerts.map((alert, index) => <a href={alertDestination(alert.href)} key={alert.title}><span className={`${styles.actionIcon} ${alert.tone ? styles[alert.tone] : ""}`}>{index + 1}</span><div><strong>{alert.title}</strong><small>{alert.detail}</small></div><b>Review</b></a>)}</div></div>
-            <div className={styles.dashboardPanel}><div className={styles.dashboardPanelHead}><div><h2>Operating Pulse <small>(Today)</small></h2><p>Current-day service execution</p></div><a href="/admin/?view=operations">View details</a></div><div className={styles.pulseGrid}><MiniMetric label="Scheduled visits" value={number(jobsToday.length)} /><MiniMetric label="Completion rate" value={percent(todayCompletionRate)} /><MiniMetric label="Paused customers" value={number(opwp.pausedCustomers)} /><MiniMetric label="Held MRR" value={money(opwp.pausedMrr)} /><MiniMetric label="Completed visits" value={number(completedToday)} /><MiniMetric label="Open quoted MRR" value={money(opwp.quotedPipeline)} /></div></div>
+            <div className={styles.dashboardPanel}><div className={styles.dashboardPanelHead}><div><h2>Operating Pulse <small>(Today)</small></h2><p>Current-day service execution</p></div><a href="/admin/operations/">View details</a></div><div className={styles.pulseGrid}><MiniMetric label="Scheduled visits" value={number(jobsToday.length)} /><MiniMetric label="Completion rate" value={percent(todayCompletionRate)} /><MiniMetric label="Paused customers" value={number(opwp.pausedCustomers)} /><MiniMetric label="Held MRR" value={money(opwp.pausedMrr)} /><MiniMetric label="Completed visits" value={number(completedToday)} /><MiniMetric label="Open quoted MRR" value={money(opwp.quotedPipeline)} /></div></div>
             <div className={styles.dashboardPanel}><div className={styles.dashboardPanelHead}><div><h2>System Health</h2><p>Production integrations and storage</p></div><a href="/admin/system-health/">View all</a></div><div className={styles.healthGrid}>
               <SystemTile icon="S" name="Sweep & Go" detail={sngConfigured() ? "Operational" : "Not configured"} healthy={sngConfigured()} />
               <SystemTile icon="Q" name="QuickBooks" detail={quickBooks.ok ? "Operational" : quickBooks.connected ? "Sync needs attention" : "Not connected"} healthy={quickBooks.ok} />
@@ -284,24 +276,9 @@ export default async function AdminPage({ searchParams }) {
               <SystemTile icon="$" name="Stripe" detail={stripeConfigured() ? "Operational" : "Not configured"} healthy={stripeConfigured()} />
               <SystemTile icon="D1" name="Cloudflare D1" detail={submissions.configured ? "Operational" : "Not configured"} healthy={submissions.configured} href="/admin/events/" />
               <SystemTile icon="P" name="Field Photos" detail="Private R2 storage" healthy />
-            </div><div className={styles.healthFooter}><div><span>Route efficiency</span><strong>{opwp.technicianEconomicsReady ? moneyOrDash(opwp.routeRevenuePerHour30) : "Pending"}</strong></div><div><span>Churn · 30d</span><strong>{number(opwp.grossChurnCount30)} · {money(opwp.grossLostMrr30)}</strong></div></div></div>
+            </div><div className={styles.healthFooter}><div><span>Route efficiency</span><strong>{routeEconomics.ready ? moneyOrDash(routeEconomics.revenuePerHour) : "Pending"}</strong></div><div><span>Churn · 30d</span><strong>{number(opwp.grossChurnCount30)} · {money(opwp.grossLostMrr30)}</strong></div></div></div>
           </section>
         </div> : null}
-
-        {view === "operations" ? <section id="route-efficiency" className={styles.section}>
-          <div className={styles.sectionHead}><div><div className={styles.eyebrow}>Primary operating constraint</div><h2 className={styles.sectionTitle}>Route efficiency command center</h2></div><div className={styles.sectionNote}>Target: at least $100 of allocated recurring route value per paid route hour. Office, training, and administrative time must be separated from route time.</div></div>
-          <div className={styles.scoreGrid}>
-            <ScoreCard tone="primary" label="Route value / paid hour" value={opwp.technicianEconomicsReady ? moneyOrDash(opwp.routeRevenuePerHour30) : "Pending"} meta="Tony full-time + Craig relief benchmark" />
-            <ScoreCard label="Route target" value="$100/hr+" meta="Minimum technician operating standard" />
-            <ScoreCard label="Gap to target" value={opwp.technicianEconomicsReady ? moneyOrDash(Math.max(opwp.routeRevenueGap30 || 0, 0)) : "Pending"} meta="Additional route value required per paid hour" />
-            <ScoreCard label="Route data confidence" value={percent(opwp.jobRevenueCoverage30)} meta="Visit value and technician assignment coverage" />
-          </div>
-          <div className={`${styles.panel} ${styles.section}`}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Technician route accountability</h3><div className={styles.panelSub}>Allocated subscription value · paid route hours · trailing 30 days</div></div><Badge tone={opwp.technicianEconomicsReady ? "" : "bad"}>{opwp.technicianEconomicsReady ? "Decision-ready" : "Data repair in progress"}</Badge></div><Table rows={opwp.technicians} empty="Route accountability appears after completed jobs and shifts are matched." columns={[{ key: "name", label: "Technician", render: (row) => <div>{row.name}{row.temporarySplit ? <div className={styles.subtle}>Temporary split · {row.measurementDays} matched day{row.measurementDays === 1 ? "" : "s"} · {number(row.officeHours, 1)} office hrs</div> : null}</div> }, { key: "jobs", label: "Completed visits" }, { key: "revenue", label: "Allocated route value", render: (row) => money(row.revenue) }, { key: "jobHours", label: "Active service hours" }, { key: "clockedHours", label: "Paid route hours", render: (row) => row.clockedHours ? number(row.clockedHours, 1) : "No matched shifts" }, { key: "revenuePerClockedHour", label: "Route value / hour", render: (row) => row.mixedDuty ? <Badge tone="warn">Awaiting matched day</Badge> : !opwp.technicianEconomicsReady ? "Pending data repair" : moneyOrDash(row.revenuePerClockedHour) }, { key: "target", label: "$100 target", render: (row) => row.mixedDuty ? "Pending route cutoff" : row.revenuePerClockedHour === null || !opwp.technicianEconomicsReady ? "Pending" : <Badge tone={row.revenuePerClockedHour >= 100 ? "" : "bad"}>{row.revenuePerClockedHour >= 100 ? "On target" : `${money(100 - row.revenuePerClockedHour)}/hr gap`}</Badge> }]} /></div>
-          <div className={`${styles.equalCol} ${styles.section}`}>
-            <div className={styles.panel}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>What to work on first</h3><div className={styles.panelSub}>Management sequence for route cost</div></div></div><div className={styles.drivers}><div className={styles.driver}><div><div className={styles.driverName}>1. Close the route-density gap</div><div className={styles.driverMeta}>Review each day below $100/hour by ZIP cluster; move isolated stops only after owner approval.</div></div></div><div className={styles.driver}><div><div className={styles.driverName}>2. Keep Tony&apos;s route within capacity</div><div className={styles.driverMeta}>Tony is the sole full-time route owner. Use Craig only for Monday relief while approved day changes bring Monday toward a one-person route.</div></div></div><div className={styles.driver}><div><div className={styles.driverName}>3. Review repeat service overruns</div><div className={styles.driverMeta}>Adjust a customer estimate only after at least three comparable visits consistently exceed it.</div></div></div></div></div>
-            <div className={styles.panel}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Source confidence</h3><div className={styles.panelSub}>The dashboard will not promote incomplete inputs as KPIs</div></div></div><div className={styles.miniGrid}><MiniMetric label="Visit value matched" value={percent(opwp.routeValueCoverage30)} /><MiniMetric label="Technician assigned" value={percent(opwp.assignedTechCoverage30)} /><MiniMetric label="Estimated time" value={percent(opwp.estimatedTimeCoverage30)} /><MiniMetric label="Actual time" value={percent(opwp.actualTimeCoverage30)} /></div></div>
-          </div>
-        </section> : null}
 
         {view === "customers" ? <section id="service" className={styles.section}>
           <div className={styles.sectionHead}><div><div className={styles.eyebrow}>Service business</div><h2 className={styles.sectionTitle}>Growth, execution, retention</h2></div><div className={styles.sectionNote}>Route value allocates each active subscription&apos;s MRR across its expected monthly visits; accounting revenue remains in QuickBooks.</div></div>
@@ -312,7 +289,7 @@ export default async function AdminPage({ searchParams }) {
           </div>
           <div className={styles.twoCol}>
             <div className={styles.panel}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>5-week allocated route value</h3><div className={styles.panelSub}>Subscription value assigned to completed visits by week</div></div><div className={styles.legend}>{money(opwp.jobRevenue30)} · 30d</div></div><TrendChart data={opwp.revenueTrend} /></div>
-            <div className={styles.panel}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Operating leverage</h3><div className={styles.panelSub}>Route productivity and current execution</div></div></div><div className={styles.miniGrid}><MiniMetric label="Route value / paid hour" value={opwp.technicianEconomicsReady ? moneyOrDash(opwp.routeRevenuePerHour30) : "Pending"} /><MiniMetric label="Route data confidence" value={percent(opwp.jobRevenueCoverage30)} /><MiniMetric label="Today completed" value={`${completedToday}/${jobsToday.length} · ${percent(todayCompletionRate)}`} /><MiniMetric label="Clocked hours · 30d" value={number(opwp.clockedHours30, 1)} /></div></div>
+            <div className={styles.panel}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Operating leverage</h3><div className={styles.panelSub}>Route productivity and current execution</div></div></div><div className={styles.miniGrid}><MiniMetric label="Route value / paid hour" value={routeEconomics.ready ? moneyOrDash(routeEconomics.revenuePerHour) : "Pending"} /><MiniMetric label="Route data confidence" value={percent(routeEconomics.coverage)} /><MiniMetric label="Today completed" value={`${completedToday}/${jobsToday.length} · ${percent(todayCompletionRate)}`} /><MiniMetric label="Clocked hours · 30d" value={number(opwp.clockedHours30, 1)} /></div></div>
           </div>
           <div className={`${styles.equalCol} ${styles.section}`}>
             <div className={styles.panel}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Growth engine</h3><div className={styles.panelSub}>Current demand and conversion</div></div></div><div className={styles.drivers}>
@@ -322,10 +299,8 @@ export default async function AdminPage({ searchParams }) {
             </div></div>
             <div className={styles.panel}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Retention</h3><div className={styles.panelSub}>{opwp.churnSource} · {opwp.churnPeriodLabel} · one-time jobs and add-ons excluded</div></div><Badge tone={opwp.churnRate30 > 3 ? "bad" : opwp.grossChurnCount30 ? "warn" : ""}>{opwp.grossChurnCount30 ? "Monitor" : "Healthy"}</Badge></div><div className={styles.miniGrid}><MiniMetric label="Gross churn" value={number(opwp.grossChurnCount30)} /><MiniMetric label="Reactivations" value={number(opwp.reactivations30)} /><MiniMetric label="Net churn" value={number(opwp.netChurnCount30)} /><MiniMetric label="Net lost MRR" value={money(opwp.netLostMrr30)} /></div></div>
           </div>
-          <div id="google-reviews" className={`${styles.panel} ${styles.section}`}>
-            <div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Google review tracking</h3><div className={styles.panelSub}>Google reviewer names match client names or saved aliases · manual completion remains available · recent one-time means trailing 30 days</div></div><a className={styles.button} href="https://airtable.com/appcAWPBQB8GmOrcT/tblzRg9DZKdIRQDrn" target="_blank" rel="noreferrer">Open in Airtable</a></div>
-            <GoogleReviewTable initialRows={opwp.googleReviewRows} />
-            {opwp.googleReviewUnmatched ? <div className={styles.subtle} style={{ marginTop: 10 }}>{number(opwp.googleReviewUnmatched)} review names are preserved as unmatched records for manual alias verification; they are marked do not contact.</div> : null}
+          <div id="google-reviews" className={`${styles.panel} ${styles.section} ${styles.collapsiblePanel}`}>
+            <GoogleReviewSection initialRows={opwp.googleReviewRows} unmatchedCount={opwp.googleReviewUnmatched} health={googleReviewHealth} />
           </div>
           <div className={`${styles.panel} ${styles.section}`}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Paused customer return schedule</h3><div className={styles.panelSub}>Paused accounts are excluded from active route capacity and churn; actual duration closes when an unpause event arrives.</div></div><Badge tone={(opwp.pausedAccounts ?? []).length ? "warn" : ""}>{(opwp.pausedAccounts ?? []).length ? `${opwp.pausedAccounts.length} paused · ${money(opwp.pausedMrr)} held MRR` : "Clear"}</Badge></div><Table rows={opwp.pausedAccounts} empty="No primary scooping customers are currently paused." columns={[{ key: "customer", label: "Customer" }, { key: "paused", label: "Paused" }, { key: "plannedResume", label: "Planned return", render: (row) => row.plannedResume || "Not scheduled" }, { key: "reason", label: "Reason" }, { key: "mrr", label: "Held MRR", render: (row) => money(row.mrr) }]} /></div>
           <div className={`${styles.equalCol} ${styles.section}`}>
@@ -333,11 +308,15 @@ export default async function AdminPage({ searchParams }) {
             <div className={styles.panel}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Seasonal restart pipeline</h3><div className={styles.panelSub}>Seasonal cancellations awaiting reactivation</div></div><Badge tone={(opwp.seasonalFollowUps ?? []).length ? "warn" : ""}>{(opwp.seasonalFollowUps ?? []).length ? `${opwp.seasonalFollowUps.length} follow-up` : "Clear"}</Badge></div><Table rows={opwp.seasonalFollowUps} empty="No seasonal customers currently require restart follow-up." columns={[{ key: "customer", label: "Customer" }, { key: "canceled", label: "Canceled" }, { key: "lostMrr", label: "MRR opportunity", render: (row) => money(row.lostMrr) }, { key: "comment", label: "Context", render: (row) => row.comment || "No comment required" }]} /></div>
           </div>
           <div className={`${styles.panel} ${styles.section}`}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Validated churn log</h3><div className={styles.panelSub}>{opwp.churnPeriodLabel} · service or payment eligibility required</div></div><Badge>{number(opwp.churnRows?.length)} records</Badge></div><Table rows={opwp.churnRows} empty="No validated churn in the selected period." columns={[{ key: "date", label: "Canceled" }, { key: "customer", label: "Customer" }, { key: "plan", label: "Plan" }, { key: "reason", label: "Reason" }, { key: "lostMrr", label: "Lost MRR", render: (row) => money(row.lostMrr) }]} /></div>
-          {opwp.churnEligibilityReviewCount > 0 ? <div id="churn-eligibility-review" className={`${styles.panel} ${styles.section}`}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Cancellation eligibility review</h3><div className={styles.panelSub}>Why: no completed-service or paid-invoice evidence was found, so the record is excluded from churn until the office verifies it.</div></div><Badge tone="warn">{opwp.churnEligibilityReviewCount} open</Badge></div><Table rows={opwp.churnEligibilityReviews} columns={[{ key: "customer", label: "Customer" }, { key: "date", label: "Canceled" }, { key: "plan", label: "Plan" }, { key: "reason", label: "Reason" }, { key: "potentialMrr", label: "Potential MRR", render: (row) => money(row.potentialMrr) }, { key: "evidence", label: "Why it needs review" }, { key: "action", label: "Correction", render: () => <a className={styles.button} href="https://airtable.com/appcAWPBQB8GmOrcT/tblyhWKl99rwpiIRI" target="_blank" rel="noreferrer">Correct in Airtable</a> }]} /></div> : null}
-          <div id="subscription-reconciliation" className={`${styles.panel} ${styles.section}`}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Client routing data coverage</h3><div className={styles.panelSub}>Why: these clients are missing from Airtable or lack the Sweep &amp; Go ID needed to connect scheduling data to the correct customer.</div></div><Badge tone={subscriptionReconciliation.reconciled ? "" : "bad"}>{subscriptionReconciliation.reconciled ? "Complete" : `${subscriptionReconciliation.issueRows.length} issues`}</Badge></div><div className={styles.miniGrid}><MiniMetric label="SNG schedule feed returned" value={number(subscriptionReconciliation.recurringCount)} /><MiniMetric label="Airtable active records" value={number(subscriptionReconciliation.airtableActiveCount)} /><MiniMetric label="Missing from Airtable" value={number(subscriptionReconciliation.missingFromAirtable.length)} /><MiniMetric label="Missing SNG ID" value={number(subscriptionReconciliation.missingSngId.length)} /></div><div style={{ marginTop: 18 }}><Table rows={subscriptionReconciliation.issueRows.slice(0, 20)} empty="All returned SNG routing records are represented in Airtable." columns={[{ key: "name", label: "Customer" }, { key: "sngClientId", label: "SNG Client ID", render: (row) => row.sngClientId || "Missing" }, { key: "issue", label: "Why it needs review" }, { key: "action", label: "Recommended correction" }, { key: "correct", label: "Open record source", render: () => <a className={styles.button} href="https://airtable.com/appcAWPBQB8GmOrcT/tblhi8MGUOsWNmd37" target="_blank" rel="noreferrer">Open Airtable clients</a> }]} /></div>{subscriptionReconciliation.issueRows.length > 20 ? <div className={styles.subtle} style={{ marginTop: 10 }}>Showing the first 20 of {subscriptionReconciliation.issueRows.length} issues.</div> : null}</div>
+          {opwp.churnEligibilityReviewCount > 0 ? <div id="churn-eligibility-review" className={`${styles.panel} ${styles.section}`}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Cancellation eligibility review</h3><div className={styles.panelSub}>An unpaid invoice or incomplete history needs review. Accounts with no completed service or finalized invoice are automatically classified as Never Started and excluded from churn.</div></div><Badge tone="warn">{opwp.churnEligibilityReviewCount} open</Badge></div><Table rows={opwp.churnEligibilityReviews} columns={[{ key: "customer", label: "Customer" }, { key: "date", label: "Canceled" }, { key: "plan", label: "Plan" }, { key: "reason", label: "Reason" }, { key: "potentialMrr", label: "Potential MRR", render: (row) => money(row.potentialMrr) }, { key: "evidence", label: "Why it needs review" }, { key: "action", label: "Correction", render: (row) => <a className={styles.button} href={recordDestination('appcAWPBQB8GmOrcT','tblyhWKl99rwpiIRI',row.id)}>Inspect and correct</a> }]} /></div> : null}
+          <div id="revenue-reconciliation" className={styles.panel}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Automatic revenue reconciliation</h3><div className={styles.panelSub}>Current subscription terms establish recurring revenue before an invoice is issued. Unresolved records are checked against Airtable, invoice history, QuickBooks and available Quo history. Source failures retry hourly.</div></div><Badge tone={opwp.unmatchedLiveSubscriptionClients ? "warn" : ""}>{opwp.unmatchedLiveSubscriptionClients ? opwp.unmatchedLiveSubscriptionClients + " checking" : "Complete"}</Badge></div>
+          <p className={styles.subtle}>{opwp.unmatchedLiveSubscriptionClients ? "Revenue totals remain partial while these records are being reconciled. Follow-up appears only after the source checks finish without an answer." : (subscriptionTruth.reconciliation?.resolved?.length || 0) + " revenue baselines resolved automatically. All active subscription customers have a revenue baseline."}</p>
+          {(subscriptionTruth.reconciliation?.pending || []).length ? <Table rows={subscriptionTruth.reconciliation.pending} columns={[{ key: "customer", label: "Customer" }, { key: "state", label: "Status", render: row => row.ownerActionRequired ? "Answer needed" : "Automatic checks / retry" }, { key: "checks", label: "Source checks", render: row => Object.entries(row.checks || {}).map(([source, state]) => source + ": " + state).join(" · ") || "Queued" }, { key: "reason", label: "Finding", render: row => row.question || row.reason || "Queued for the next automatic check" }, { key: "communications", label: "Conversation evidence", render: row => (row.communications?.excerpts || []).map(item => item.text).join(" | ") || row.communications?.status || "Pending" }]} /> : null}</div>
+          <div id="subscription-reconciliation" className={`${styles.panel} ${styles.section}`}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Client routing data coverage</h3><div className={styles.panelSub}>Why: these clients are missing from Airtable, have an exact SNG match whose ID can be copied, or are active in Airtable without a matching SNG client.</div></div><Badge tone={subscriptionReconciliation.reconciled ? "" : "bad"}>{subscriptionReconciliation.reconciled ? "Complete" : `${subscriptionReconciliation.issueRows.length} issues`}</Badge></div><div className={styles.miniGrid}><MiniMetric label="SNG schedule feed returned" value={number(subscriptionReconciliation.recurringCount)} /><MiniMetric label="Airtable active records" value={number(subscriptionReconciliation.airtableActiveCount)} /><MiniMetric label="Missing from Airtable" value={number(subscriptionReconciliation.missingFromAirtable.length)} /><MiniMetric label="Needs SNG match or status fix" value={number(subscriptionReconciliation.missingSngId.length)} /></div><div style={{ marginTop: 18 }}><Table rows={subscriptionReconciliation.issueRows.slice(0, 20)} empty="All returned SNG routing records are represented in Airtable." columns={[{ key: "name", label: "Customer" }, { key: "sngClientId", label: "SNG Client ID", render: (row) => row.sngClientId || "No match" }, { key: "issue", label: "Why it needs review" }, { key: "action", label: "Recommended correction" }, { key: "correct", label: "Open record source", render: (row) => <a className={styles.button} href={recordDestination('appcAWPBQB8GmOrcT','tblhi8MGUOsWNmd37','',row.name)}>Manage customer record</a> }]} /></div>{subscriptionReconciliation.issueRows.length > 20 ? <div className={styles.subtle} style={{ marginTop: 10 }}>Showing the first 20 of {subscriptionReconciliation.issueRows.length} issues.</div> : null}</div>
           {subscriptionStatusReviews.openCount > 0 ? <div id="subscription-status-reviews" className={`${styles.panel} ${styles.section}`}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Event-driven subscription review</h3><div className={styles.panelSub}>Why: a subscription lifecycle event left the customer status ambiguous. Inspect the source event before changing the customer record.</div></div><Badge tone="warn">{subscriptionStatusReviews.openCount} open</Badge></div><Table rows={subscriptionStatusReviews.rows} columns={[{ key: "customer", label: "Customer" }, { key: "address", label: "Address" }, { key: "coreMrr", label: "Scooping MRR", render: (row) => money(row.coreMrr) }, { key: "firstMissing", label: "Event date" }, { key: "evidence", label: "Why it needs review" }, { key: "action", label: "Correction source", render: () => <a className={styles.button} href="/admin/events/">Inspect source events</a> }]} /></div> : null}
-          <div id="churn-reason-review" className={`${styles.panel} ${styles.section}`}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Churn detail review</h3><div className={styles.panelSub}>Comments are required only for Don&apos;t need service anymore, Dissatisfied, and Other</div></div><Badge tone={opwp.churnReasonReviewCount ? "warn" : ""}>{opwp.churnReasonReviewCount ? `${opwp.churnReasonReviewCount} open` : "Complete"}</Badge></div><Table rows={opwp.churnReasonReviews} empty="Every confirmed cancellation satisfies its reason and comment rules." columns={[{ key: "customer", label: "Customer" }, { key: "date", label: "Canceled" }, { key: "plan", label: "Plan" }, { key: "reason", label: "Reason", render: (row) => row.reason || "Needs reason" }, { key: "comment", label: "Comment", render: (row) => row.comment || "Not required" }, { key: "lostMrr", label: "Lost MRR", render: (row) => money(row.lostMrr) }, { key: "action", label: "Action", render: () => <a className={styles.button} href="https://airtable.com/appcAWPBQB8GmOrcT/tblyhWKl99rwpiIRI" target="_blank" rel="noreferrer">Complete in Airtable</a> }]} /></div>
-          <div id="estimate-reviews" className={`${styles.panel} ${styles.section}`}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Service-time review queue</h3><div className={styles.panelSub}>Why: at least 3 comparable visits show actual service time materially above the current estimate; verify job durations, then correct the estimate in Airtable if needed.</div></div><Badge tone={opwp.estimateReviewCount ? "warn" : ""}>{opwp.estimateReviewCount ? `${opwp.estimateReviewCount} review` : "Within range"}</Badge></div><Table rows={opwp.estimateReviews} empty="No repeated service-time overruns currently meet the review threshold." columns={[{ key: "customer", label: "Customer" }, { key: "tech", label: "Technician" }, { key: "jobs", label: "Visits" }, { key: "estimated", label: "Median estimate", render: (row) => `${number(row.estimated, 1)} min` }, { key: "actual", label: "Median actual", render: (row) => `${number(row.actual, 1)} min` }, { key: "varianceMinutes", label: "Why it needs review", render: (row) => <Badge tone="warn">+{number(row.varianceMinutes, 1)} min · {percent(row.variancePercent)}</Badge> }, { key: "overrunRate", label: "Visits over", render: (row) => percent(row.overrunRate) }, { key: "action", label: "Correction", render: () => <a className={styles.button} href="https://airtable.com/appcAWPBQB8GmOrcT/tbls15v5OYexAIULc" target="_blank" rel="noreferrer">Correct jobs in Airtable</a> }]} /></div>
+          {cancellationMetrics?.continuityQuestions?.length > 0 ? <div className={`${styles.panel} ${styles.section}`}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Customer identity question</h3><div className={styles.panelSub}>Automatic subscription checks found continuing service but could not identify one matching Airtable record.</div></div><Badge tone="warn">{cancellationMetrics.continuityQuestions.length} open</Badge></div><Table rows={cancellationMetrics.continuityQuestions} columns={[{ key: "customer", label: "Customer" }, { key: "question", label: "Question" }]} /></div> : null}
+          <div id="churn-reason-review" className={`${styles.panel} ${styles.section}`}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Churn detail review</h3><div className={styles.panelSub}>Comments are required only for Don&apos;t need service anymore, Dissatisfied, and Other</div></div><Badge tone={opwp.churnReasonReviewCount ? "warn" : ""}>{opwp.churnReasonReviewCount ? `${opwp.churnReasonReviewCount} open` : "Complete"}</Badge></div><Table rows={opwp.churnReasonReviews} empty="Every confirmed cancellation satisfies its reason and comment rules." columns={[{ key: "customer", label: "Customer" }, { key: "date", label: "Canceled" }, { key: "plan", label: "Plan" }, { key: "reason", label: "Reason", render: (row) => row.reason || "Needs reason" }, { key: "comment", label: "Comment", render: (row) => row.comment || (row.commentRequired ? "Required — missing" : "Not required") }, { key: "lostMrr", label: "Lost MRR", render: (row) => money(row.lostMrr) }, { key: "action", label: "Action", render: (row) => <a className={styles.button} href={recordDestination('appcAWPBQB8GmOrcT','tblyhWKl99rwpiIRI',row.id)}>Complete review</a> }]} /></div>
+          <div id="estimate-reviews" className={`${styles.panel} ${styles.section}`}><div className={styles.panelHead}><div><h3 className={styles.panelTitle}>Service-time review queue</h3><div className={styles.panelSub}>Why: at least 3 comparable visits show actual service time materially above the current estimate; verify job durations, then correct the estimate in the record editor if needed.</div></div><Badge tone={opwp.estimateReviewCount ? "warn" : ""}>{opwp.estimateReviewCount ? `${opwp.estimateReviewCount} review` : "Within range"}</Badge></div><Table rows={opwp.estimateReviews} empty="No repeated service-time overruns currently meet the review threshold." columns={[{ key: "customer", label: "Customer" }, { key: "tech", label: "Technician" }, { key: "jobs", label: "Visits" }, { key: "estimated", label: "Median estimate", render: (row) => `${number(row.estimated, 1)} min` }, { key: "actual", label: "Median actual", render: (row) => `${number(row.actual, 1)} min` }, { key: "varianceMinutes", label: "Why it needs review", render: (row) => <Badge tone="warn">+{number(row.varianceMinutes, 1)} min · {percent(row.variancePercent)}</Badge> }, { key: "overrunRate", label: "Visits over", render: (row) => percent(row.overrunRate) }, { key: "action", label: "Correction", render: (row) => <a className={styles.button} href={recordDestination('appcAWPBQB8GmOrcT','tbls15v5OYexAIULc','',row.customer)}>Inspect and correct jobs</a> }]} /></div>
         </section> : null}
 
         {view === "food" ? <section id="food" className={styles.section}>
@@ -367,6 +346,6 @@ export default async function AdminPage({ searchParams }) {
 
         <div className={styles.subtle} style={{ marginTop: 18 }}>Signed in as {auth.email}. Financial metrics are management indicators based on current Airtable records and are not a substitute for reconciled accounting statements.</div>
       </div></div>
-    </main>
+    </main></AdminWorkspace>
   );
 }

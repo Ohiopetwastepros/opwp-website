@@ -12,11 +12,19 @@ export const metadata = {
     title: "Dog Poop Removal Toledo, OH | Ohio Pet Waste Pros",
     description:
       "Family-owned dog waste removal in Greater Toledo & SE Michigan. Gate photos, hauled-away waste, eco-friendly sanitizing. Get your exact price with our instant quote.",
-    url: "https://ohiopetwastepros.com/",
+    url: "https://www.ohiopetwastepros.com/",
     siteName: "Ohio Pet Waste Pros",
-    images: ["https://ohiopetwastepros.com/assets/photos/hero-craig-driveway.webp"],
+    images: [{
+      url: "https://www.ohiopetwastepros.com/assets/photos/opwp-social-share.webp",
+      width: 1200,
+      height: 630,
+      alt: "Dixie beside an Ohio Pet Waste Pros dog poop removal yard sign",
+    }],
   },
-  twitter: { card: "summary_large_image" },
+  twitter: {
+    card: "summary_large_image",
+    images: ["https://www.ohiopetwastepros.com/assets/photos/opwp-social-share.webp"],
+  },
   other: {
     "geo.region": "US-OH",
     "geo.placename": "Holland, Ohio",
@@ -26,14 +34,14 @@ export const metadata = {
 const localBusinessJsonLd = {
   "@context": "https://schema.org",
   "@type": "LocalBusiness",
-  "@id": "https://ohiopetwastepros.com/#business",
+  "@id": "https://www.ohiopetwastepros.com/#business",
   name: "Ohio Pet Waste Pros",
-  image: "https://ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
+  image: "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
   description:
     "Family-owned dog poop removal and pet waste cleanup serving Toledo, Sylvania, Perrysburg and Southeast Michigan.",
   telephone: "+14192622371",
   email: "Craig@ohiopetwastepros.com",
-  url: "https://ohiopetwastepros.com/",
+  url: "https://www.ohiopetwastepros.com/",
   priceRange: "$$",
   address: { "@type": "PostalAddress", addressLocality: "Holland", addressRegion: "OH", addressCountry: "US" },
   areaServed: ["Toledo OH", "Sylvania OH", "Perrysburg OH", "Maumee OH", "Holland OH", "Whitehouse OH", "Waterville OH", "Monclova OH", "Rossford OH", "Oregon OH", "Ottawa Hills OH", "Temperance MI", "Lambertville MI", "Bedford Township MI"],
@@ -51,8 +59,8 @@ const websiteJsonLd = {
   "@context": "https://schema.org",
   "@type": "WebSite",
   name: "Ohio Pet Waste Pros",
-  url: "https://ohiopetwastepros.com/",
-  publisher: { "@id": "https://ohiopetwastepros.com/#business" },
+  url: "https://www.ohiopetwastepros.com/",
+  publisher: { "@id": "https://www.ohiopetwastepros.com/#business" },
 };
 
 const faqJsonLd = {
@@ -176,7 +184,7 @@ export default function HomePage() {
       <section style={{ background: "#fff", padding: "84px 0" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px", display: "grid", gridTemplateColumns: "0.95fr 1.05fr", gap: 56, alignItems: "center" }} className="opwp-gsplit">
           <div style={{ position: "relative" }}>
-            <img src="/assets/photos/team-new-sign-360.webp" srcSet="/assets/photos/team-new-sign-360.webp 360w, /assets/photos/team-new-sign.webp 440w" sizes="(max-width: 768px) calc(100vw - 56px), 500px" alt="The family team behind Ohio Pet Waste Pros with their We Scoop Dog Poop sign" width="440" height="586" loading="lazy" decoding="async" style={{ width: "100%", height: "auto", objectFit: "cover", borderRadius: 22, boxShadow: "0 24px 48px -24px rgba(20,48,74,.4)" }} />
+            <img src="/assets/photos/team-founders-sign-640.webp" srcSet="/assets/photos/team-founders-sign-360.webp 360w, /assets/photos/team-founders-sign-640.webp 640w, /assets/photos/team-founders-sign.webp 960w" sizes="(max-width: 768px) calc(100vw - 56px), 500px" alt="The Ohio Pet Waste Pros founders in branded shirts beside their residential dog waste cleanup sign" width="960" height="1280" loading="lazy" decoding="async" style={{ width: "100%", height: "auto", objectFit: "cover", borderRadius: 22, boxShadow: "0 24px 48px -24px rgba(20,48,74,.4)" }} />
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#4D6F49", marginBottom: 12 }}>Family-run &amp; dog-loving</div>

@@ -1,0 +1,51 @@
+PRAGMA foreign_keys=ON;
+ALTER TABLE dog_food_accounts ADD COLUMN profile_completed_at TEXT;
+UPDATE dog_food_accounts SET profile_completed_at=(SELECT MAX(created_at) FROM dog_food_portal_audit WHERE account_id=dog_food_accounts.id AND action='profile_saved');
+ALTER TABLE dog_food_accounts ADD COLUMN preferred_fulfillment TEXT NOT NULL DEFAULT 'delivery' CHECK(preferred_fulfillment IN ('delivery','pickup'));
+ALTER TABLE dog_food_orders ADD COLUMN fulfillment_method TEXT NOT NULL DEFAULT 'delivery' CHECK(fulfillment_method IN ('delivery','pickup'));
+ALTER TABLE dog_food_orders ADD COLUMN requested_route_weekday INTEGER CHECK(requested_route_weekday BETWEEN 1 AND 5);
+ALTER TABLE dog_food_orders ADD COLUMN route_source_at TEXT;
+ALTER TABLE dog_food_subscriptions ADD COLUMN fulfillment_method TEXT NOT NULL DEFAULT 'delivery' CHECK(fulfillment_method IN ('delivery','pickup'));
+ALTER TABLE dog_food_delivery_capacity ADD COLUMN fulfillment_method TEXT NOT NULL DEFAULT 'delivery' CHECK(fulfillment_method IN ('delivery','pickup'));
+ALTER TABLE dog_food_delivery_capacity ADD COLUMN pickup_instructions TEXT;
+CREATE TABLE dog_food_pickups (
+  order_id TEXT PRIMARY KEY REFERENCES dog_food_orders(id), scheduled_date TEXT NOT NULL,
+  instructions TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'ready' CHECK(status IN ('ready','collected','cancelled')),
+  confirmed_by TEXT NOT NULL, collected_by TEXT, received_by TEXT, collected_at TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TRIGGER food_pickup_insert_guard BEFORE INSERT ON dog_food_pickups BEGIN
+  SELECT CASE WHEN NEW.status<>'ready' OR NOT EXISTS(SELECT 1 FROM dog_food_orders o JOIN dog_food_payments p ON p.order_id=o.id
+    WHERE o.id=NEW.order_id AND o.fulfillment_method='pickup' AND o.deleted_at IS NULL AND o.status IN ('paid','scheduled') AND p.status='captured')
+    THEN RAISE(ABORT,'Paid pickup order required') END;
+END;
+CREATE TRIGGER food_pickup_collect_guard BEFORE UPDATE OF status ON dog_food_pickups WHEN NEW.status='collected' AND OLD.status<>'collected' BEGIN
+  SELECT CASE WHEN OLD.status<>'ready' OR NEW.collected_at IS NULL OR length(trim(COALESCE(NEW.collected_by,'')))=0 OR length(trim(COALESCE(NEW.received_by,'')))=0
+    OR NOT EXISTS(SELECT 1 FROM dog_food_orders o JOIN dog_food_payments p ON p.order_id=o.id WHERE o.id=NEW.order_id AND o.fulfillment_method='pickup'
+      AND o.deleted_at IS NULL AND o.status IN ('paid','scheduled') AND p.status='captured')
+    OR EXISTS(SELECT 1 FROM dog_food_order_items i WHERE i.order_id=NEW.order_id AND i.quantity<>COALESCE((SELECT SUM(a.quantity) FROM dog_food_lot_allocations a JOIN dog_food_stock_lots l ON l.id=a.lot_id
+      WHERE a.order_id=i.order_id AND l.product_id=i.product_id AND a.released_at IS NULL AND a.consumed_at IS NULL AND l.best_before>=date(NEW.collected_at)),0))
+    THEN RAISE(ABORT,'Paid order, actual handoff and valid allocated bags required') END;
+END;
+CREATE TRIGGER food_pickup_collected_immutable BEFORE UPDATE ON dog_food_pickups WHEN OLD.status='collected' BEGIN
+  SELECT RAISE(ABORT,'Collected pickup history is immutable');
+END;
+CREATE TRIGGER food_pickup_collected AFTER UPDATE OF status ON dog_food_pickups WHEN NEW.status='collected' AND OLD.status<>'collected' BEGIN
+  UPDATE dog_food_stock_lots SET usable_bags=usable_bags-(SELECT quantity FROM dog_food_lot_allocations a WHERE a.order_id=NEW.order_id AND a.lot_id=dog_food_stock_lots.id)
+    WHERE id IN (SELECT lot_id FROM dog_food_lot_allocations WHERE order_id=NEW.order_id AND consumed_at IS NULL AND released_at IS NULL);
+  UPDATE dog_food_lot_allocations SET consumed_at=NEW.collected_at WHERE order_id=NEW.order_id AND consumed_at IS NULL AND released_at IS NULL;
+  UPDATE dog_food_orders SET status='fulfilled',automation_review=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=NEW.order_id;
+  INSERT OR IGNORE INTO dog_food_transactional_outbox(event_key,customer_id,order_id,template) SELECT 'picked_up:'||id,customer_id,id,'picked_up' FROM dog_food_orders WHERE id=NEW.order_id;
+END;
+CREATE TRIGGER food_pickup_ready AFTER INSERT ON dog_food_pickups BEGIN
+  INSERT OR IGNORE INTO dog_food_transactional_outbox(event_key,customer_id,order_id,template) SELECT 'pickup_ready:'||id,customer_id,id,'pickup_ready' FROM dog_food_orders WHERE id=NEW.order_id;
+END;
+CREATE TRIGGER food_pickup_terminal AFTER UPDATE OF status,deleted_at ON dog_food_orders WHEN NEW.status IN ('cancelled','refunded') OR NEW.deleted_at IS NOT NULL BEGIN
+  UPDATE dog_food_pickups SET status='cancelled',updated_at=CURRENT_TIMESTAMP WHERE order_id=NEW.id AND status='ready';
+END;
+CREATE TRIGGER food_no_pickup_driver BEFORE INSERT ON dog_food_deliveries WHEN EXISTS(SELECT 1 FROM dog_food_orders WHERE id=NEW.order_id AND fulfillment_method='pickup') BEGIN
+  SELECT RAISE(ABORT,'Pickup orders cannot create driver deliveries');
+END;
+
+CREATE INDEX idx_food_capacity_method_date ON dog_food_delivery_capacity(fulfillment_method,postal_code,service_date);
+CREATE INDEX idx_food_pickups_ready ON dog_food_pickups(status,scheduled_date);

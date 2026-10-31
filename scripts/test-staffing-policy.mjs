@@ -1,3 +1,4 @@
+import staffPrivate from '../lib/staff-private.json' with {type:'json'};
 import assert from "node:assert/strict";
 import {
   calculateTonyWeeklyStaffing,
@@ -14,13 +15,13 @@ import {
 
 assert.equal(TONY_MINIMUM_WEEKLY_HOURS, 40);
 assert.equal(TONY_WEEKLY_HOURS_CUTOFF, 45);
-assert.equal(PRIMARY_FIELD_TECHNICIAN, "Tony Bridgman");
-assert.equal(RELIEF_FIELD_TECHNICIAN, "Craig Bridgman");
-assert.deepEqual(INACTIVE_FIELD_TECHNICIANS, ["Bria Mahaney"]);
-assert.equal(isInactiveFieldTechnician("Bria Mahaney"), true);
+assert.equal(PRIMARY_FIELD_TECHNICIAN, staffPrivate.primaryName);
+assert.equal(RELIEF_FIELD_TECHNICIAN, staffPrivate.reliefName);
+assert.deepEqual(INACTIVE_FIELD_TECHNICIANS, [staffPrivate.inactiveNames[0]]);
+assert.equal(isInactiveFieldTechnician(staffPrivate.inactiveNames[0]), true);
 assert.equal(isInactiveFieldTechnician("bria-mahaney"), true);
-assert.equal(isInactiveFieldTechnician("Tony Bridgman"), false);
-assert.equal(onboardingRouteTechnician(), "Tony Bridgman");
+assert.equal(isInactiveFieldTechnician(staffPrivate.primaryName), false);
+assert.equal(onboardingRouteTechnician(), staffPrivate.primaryName);
 assert.equal(enforceTonyMinimumWeeklyHours(32), 40);
 assert.equal(enforceTonyMinimumWeeklyHours(40), 40);
 assert.equal(enforceTonyMinimumWeeklyHours(42), 42);
@@ -28,7 +29,7 @@ assert.throws(() => validateTonyMinimumWeeklyHours(39.99), /cannot be below 40/)
 assert.equal(validateTonyMinimumWeeklyHours(40), 40);
 
 assert.deepEqual(calculateTonyWeeklyStaffing(35.1 * 60), {
-  technician: "Tony Bridgman",
+  technician: staffPrivate.primaryName,
   minimumPaidHours: 40,
   weeklyHoursCutoff: 45,
   modeledRouteHours: 35.1,
@@ -40,4 +41,4 @@ assert.equal(calculateTonyWeeklyStaffing(42 * 60).paidOperationalHoursToMinimum,
 assert.equal(calculateTonyWeeklyStaffing(42 * 60).hoursBeforeCutoff, 3);
 assert.equal(calculateTonyWeeklyStaffing(46 * 60).cutoffExceeded, true);
 
-console.log("Tony's 40-hour guarantee and 45-hour cutoff policy is enforced.");
+console.log("Configured minimum-hours and cutoff policy is enforced.");

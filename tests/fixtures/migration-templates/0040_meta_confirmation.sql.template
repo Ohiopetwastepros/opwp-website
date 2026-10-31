@@ -1,0 +1,153 @@
+ALTER TABLE lead_airtable_sync ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+CREATE TABLE meta_automation_releases (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL,
+  policy_version TEXT NOT NULL,
+  approved_by TEXT NOT NULL,
+  evidence TEXT NOT NULL,
+  approved_at TEXT NOT NULL,
+  revoked_at TEXT
+);
+
+CREATE TABLE meta_lead_intakes (
+  submission_id TEXT PRIMARY KEY REFERENCES submissions(id) ON DELETE CASCADE,
+  organization_id TEXT NOT NULL,
+  meta_lead_id TEXT NOT NULL,
+  form_id TEXT NOT NULL,
+  page_id TEXT NOT NULL,
+  source_url TEXT NOT NULL,
+  phone_hash TEXT,
+  duplicate_of TEXT REFERENCES submissions(id),
+  review_reason TEXT NOT NULL,
+  reply_branch TEXT,
+  response_state TEXT NOT NULL DEFAULT '{}',
+  route_guidance TEXT,
+  route_audited_by TEXT,
+  route_audited_at TEXT,
+  confirmed_at TEXT,
+  qualified_at TEXT,
+  quoted_at TEXT,
+  signup_invited_at TEXT,
+  signed_up_at TEXT,
+  onboarding_submission_id TEXT,
+  sng_client_ref TEXT,
+  paid_at TEXT,
+  conversion_checked_at TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(organization_id,meta_lead_id)
+);
+CREATE INDEX meta_conversion_due ON meta_lead_intakes(organization_id,conversion_checked_at,created_at);
+
+CREATE TABLE meta_sms_jobs (
+  id TEXT PRIMARY KEY,
+  purpose TEXT NOT NULL CHECK(purpose IN ('confirmation','reply','follow_up','signup')),
+  trigger_id TEXT NOT NULL,
+  due_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  sequence_step INTEGER,
+  submission_id TEXT NOT NULL REFERENCES submissions(id) ON DELETE CASCADE,
+  organization_id TEXT NOT NULL,
+  conversation_id TEXT NOT NULL REFERENCES lead_conversations(id),
+  message_body TEXT NOT NULL CHECK(length(message_body) BETWEEN 1 AND 1000),
+  status TEXT NOT NULL CHECK(status IN ('queued','blocked','sending','sent','delivered','failed','unknown','cancelled')),
+  block_reason TEXT,
+  provider_message_id TEXT UNIQUE,
+  error_message TEXT,
+  attempted_at TEXT,
+  sent_at TEXT,
+  delivered_at TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX idx_meta_sms_trigger ON meta_sms_jobs(organization_id,purpose,trigger_id);
+CREATE INDEX idx_meta_confirmation_due ON meta_sms_jobs(organization_id,status,created_at);
+CREATE INDEX idx_meta_intake_phone ON meta_lead_intakes(organization_id,phone_hash);
+
+
+CREATE TABLE meta_sms_daily_usage (
+  organization_id TEXT NOT NULL,
+  usage_date TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(organization_id,usage_date)
+);
+
+CREATE TABLE meta_reply_decisions (
+  provider_message_id TEXT PRIMARY KEY,
+  submission_id TEXT NOT NULL REFERENCES submissions(id),
+  organization_id TEXT NOT NULL,
+  branch TEXT NOT NULL,
+  response_body TEXT NOT NULL,
+  state_json TEXT NOT NULL,
+  prior_state_json TEXT NOT NULL DEFAULT '{}',
+  policy_version TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TRIGGER meta_reply_state_guard BEFORE INSERT ON meta_reply_decisions
+WHEN NEW.prior_state_json != COALESCE((SELECT response_state FROM meta_lead_intakes
+  WHERE submission_id=NEW.submission_id AND organization_id=NEW.organization_id),'')
+BEGIN
+  SELECT RAISE(ABORT, 'meta_reply_state_conflict');
+END;
+CREATE TABLE meta_response_library (
+  response_key TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL,
+  body TEXT NOT NULL,
+  policy_version TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE quo_delivery_receipts (
+  provider_message_id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('delivered','failed')),
+  received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE meta_verified_payments (
+  event_id TEXT PRIMARY KEY,
+  client_ref TEXT NOT NULL,
+  reference TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL CHECK(amount_cents>0),
+  received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TRIGGER meta_cancel_closed_growth AFTER UPDATE OF stage ON growth_leads
+WHEN NEW.stage IN ('won','lost','not_qualified')
+BEGIN
+  UPDATE meta_sms_jobs SET status='cancelled',block_reason='lead_closed',updated_at=CURRENT_TIMESTAMP
+    WHERE submission_id=NEW.submission_id AND organization_id=NEW.organization_id AND status IN ('queued','blocked');
+END;
+CREATE TRIGGER meta_cancel_closed_submission AFTER UPDATE OF status,lifecycle_stage ON submissions
+WHEN NEW.status IN ('deleted','converted') OR NEW.lifecycle_stage='converted'
+BEGIN
+  UPDATE meta_sms_jobs SET status='cancelled',block_reason='lead_closed',updated_at=CURRENT_TIMESTAMP
+    WHERE submission_id=NEW.id AND status IN ('queued','blocked');
+END;
+
+CREATE TRIGGER meta_record_pipeline_milestones AFTER UPDATE OF stage ON growth_leads
+BEGIN
+  UPDATE meta_lead_intakes SET
+    qualified_at=CASE WHEN NEW.stage='qualified' THEN COALESCE(qualified_at,CURRENT_TIMESTAMP) ELSE qualified_at END,
+    quoted_at=CASE WHEN NEW.stage='quoted' THEN COALESCE(quoted_at,CURRENT_TIMESTAMP) ELSE quoted_at END
+    WHERE submission_id=NEW.submission_id AND organization_id=NEW.organization_id;
+END;
+
+
+CREATE TRIGGER meta_cancel_on_inbound AFTER INSERT ON lead_messages
+WHEN NEW.direction='inbound'
+BEGIN
+  UPDATE meta_sms_jobs SET status='cancelled',block_reason='customer_replied',updated_at=CURRENT_TIMESTAMP
+  WHERE organization_id=NEW.organization_id AND status IN ('queued','blocked','sending') AND submission_id IN (
+    SELECT related.submission_id FROM meta_lead_intakes related WHERE related.organization_id=NEW.organization_id AND related.phone_hash IN (
+      SELECT original.phone_hash FROM meta_lead_intakes original JOIN lead_conversations c ON c.submission_id=original.submission_id
+      WHERE c.id=NEW.conversation_id AND original.organization_id=NEW.organization_id
+    )
+  );
+END;
+CREATE TRIGGER meta_cancel_on_suppression AFTER INSERT ON lead_suppressions
+BEGIN
+  UPDATE meta_sms_jobs SET status='cancelled',block_reason='phone_suppressed',updated_at=CURRENT_TIMESTAMP
+    WHERE organization_id=NEW.organization_id AND status IN ('queued','blocked','sending') AND submission_id IN (
+      SELECT submission_id FROM meta_lead_intakes WHERE organization_id=NEW.organization_id AND phone_hash=NEW.phone_hash
+    );
+END;

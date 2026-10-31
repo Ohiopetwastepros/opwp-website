@@ -1,0 +1,15 @@
+CREATE TABLE failed_payment_reconciliation (
+  sms_id TEXT PRIMARY KEY REFERENCES failed_payment_sms(id),
+  payment_state TEXT NOT NULL DEFAULT 'needs_review',
+  evidence TEXT NOT NULL DEFAULT 'No confirmed invoice evidence',
+  evidence_at TEXT,
+  checked_at TEXT,
+  sng_checked_at TEXT,
+  remaining REAL,
+  airtable_record_id TEXT,
+  airtable_fingerprint TEXT,
+  airtable_confirmed_at TEXT,
+  sync_error TEXT,
+  next_check_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_failed_payment_reconciliation_check ON failed_payment_reconciliation(next_check_at);

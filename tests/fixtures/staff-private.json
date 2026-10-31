@@ -1,0 +1,33 @@
+{
+  "primaryName": "Primary Example",
+  "reliefName": "Owner Example",
+  "inactiveNames": [
+    "Inactive Example"
+  ],
+  "primaryKey": "primaryexample",
+  "reliefKey": "ownerexample",
+  "inactiveKeys": [
+    "inactiveexample"
+  ],
+  "primaryShort": "Primary",
+  "reliefShort": "Owner",
+  "primaryShortKey": "primary",
+  "reliefShortKey": "owner",
+  "bindings": {
+    "B001": "2024-01-01",
+    "B002": "Synthetic staffing policy for isolated tests; no operational payroll facts.",
+    "B018": "staff-map-owner-sng",
+    "B019": "Owner Example",
+    "B020": "staff-map-primary-sng",
+    "B021": "Primary Example",
+    "B022": "fixture-inactive-provider-map",
+    "B023": "Inactive Example",
+    "B025": "Absolutely. I will pause automated replies and flag this conversation for Owner to review.",
+    "B026": "[\"person\",\"human\",\"owner\",\"call me\",\"talk to someone\",\"representative\"]"
+  },
+  "providerIds": {
+    "owner": "900001",
+    "primary": "900002",
+    "inactive": "900003"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "exportedAt": "2026-04-30",
+  "reportingStart": "2026-01-01",
+  "reportingEnd": "2026-04-30",
+  "accountId": "synthetic",
+  "currency": "USD",
+  "attribution": "7-day click or 1-day view",
+  "includesDeleted": true,
+  "daily": [
+    {"date":"2026-01-01","adId":"fixture-ad","name":"Synthetic ad","campaignId":"fixture-campaign","campaign":"Synthetic campaign","adSet":"Synthetic audience","spend":10,"leads":1,"impressions":100,"clicks":5,"video3s":0,"thruplays":0,"videoPlays":0,"landingViews":0,"comments":0,"shares":0},
+    {"date":"2026-04-01","adId":"fixture-ad","name":"Synthetic ad","campaignId":"fixture-campaign","campaign":"Synthetic campaign","adSet":"Synthetic audience","spend":20,"leads":2,"impressions":200,"clicks":10,"video3s":0,"thruplays":0,"videoPlays":0,"landingViews":0,"comments":0,"shares":0}
+  ],
+  "ads": [
+    {"date":"2026-04-30","adId":"fixture-ad","name":"Synthetic ad","campaignId":"fixture-campaign","campaign":"Synthetic campaign","adSet":"Synthetic audience","spend":30,"leads":3,"impressions":300,"clicks":15,"video3s":0,"thruplays":0,"videoPlays":0,"landingViews":0,"comments":0,"shares":0,"reach":250,"frequency":1.2,"delivery":"Synthetic","attribution":"7-day click or 1-day view","quality":"Synthetic","engagement":"Synthetic","conversionRanking":"Synthetic"}
+  ],
+  "breakdowns": {"placement":[],"demographics":[]},
+  "findings": {"summary":[],"timeTrend":[],"audience":[],"form":[],"leadExport":[],"scope":[]}
+}

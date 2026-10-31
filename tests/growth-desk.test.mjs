@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeGrowthSubmissionId, quoteSummary, sourceStage, validateGrowthMutation } from "../lib/growth-desk.mjs";
+import { buildLeadAnalytics, leadOrigin, leadSourceBucket, normalizeGrowthSubmissionId, quoteSummary, sourceStage, validateGrowthMutation } from "../lib/growth-desk.mjs";
 
 test("YardOps Pipeline accepts only UUID submission identifiers", () => {
-  assert.equal(normalizeGrowthSubmissionId("123e4567-e89b-12d3-a456-426614174000"), "123e4567-e89b-12d3-a456-426614174000");
+  assert.equal(normalizeGrowthSubmissionId("20000000-0000-1000-a000-000000000009"), "20000000-0000-1000-a000-000000000009");
   assert.equal(normalizeGrowthSubmissionId("../another-record"), "");
   assert.equal(normalizeGrowthSubmissionId("123"), "");
 });
@@ -22,6 +22,22 @@ test("YardOps Pipeline state updates are bounded and require a complete next act
   assert.equal(validateGrowthMutation({ ...valid.value, action: "save_state", nextActionAt: "" }).ok, false);
   assert.equal(validateGrowthMutation({ ...valid.value, action: "save_state", stage: "deleted" }).ok, false);
   assert.equal(validateGrowthMutation({ ...valid.value, action: "save_state", owner: "someone@example.com" }).ok, false);
+});
+
+test("closed-lost leads require a structured reason and bounded context", () => {
+  const base = { action: "save_state", stage: "lost", priority: "normal", owner: "unassigned", nextAction: "", nextActionAt: "" };
+  assert.equal(validateGrowthMutation(base).ok, false);
+  assert.equal(validateGrowthMutation({ ...base, outcomeReason: "price", outcomeNote: "The customer chose not to move forward at this price." }).ok, true);
+  assert.equal(validateGrowthMutation({ ...base, outcomeReason: "made_up" }).ok, false);
+  assert.equal(validateGrowthMutation({ ...base, outcomeReason: "other", outcomeNote: "x".repeat(501) }).ok, false);
+});
+
+test("not-qualified leads require a no-response or opt-out reason", () => {
+  const base = { action: "save_state", stage: "not_qualified", priority: "normal", owner: "unassigned", nextAction: "", nextActionAt: "" };
+  assert.equal(validateGrowthMutation(base).ok, false);
+  assert.equal(validateGrowthMutation({ ...base, outcomeReason: "no_response" }).ok, true);
+  assert.equal(validateGrowthMutation({ ...base, outcomeReason: "opted_out" }).ok, true);
+  assert.equal(validateGrowthMutation({ ...base, outcomeReason: "price" }).ok, false);
 });
 
 test("YardOps Pipeline notes reject empty and oversized content", () => {
@@ -54,4 +70,34 @@ test("provider conversion remains authoritative over an office stage", () => {
   assert.equal(sourceStage({ growth_stage: "lost", lifecycle_stage: "converted" }), "won");
   assert.equal(sourceStage({ growth_stage: "quoted", lifecycle_stage: "details_started" }), "quoted");
   assert.equal(sourceStage({ growth_stage: "invalid" }), "new");
+});
+
+test("lead sources map to separate YardOps queues", () => {
+  assert.equal(leadSourceBucket({ source: "facebook", kind: "question" }), "meta");
+  assert.equal(leadSourceBucket({ source: "quo", kind: "question" }), "quo");
+  assert.equal(leadSourceBucket({ source: "website", kind: "partial_quote" }), "website_quotes");
+  assert.equal(leadSourceBucket({ source: "website", kind: "question" }), "other");
+});
+
+test("lead origin returns bounded provenance without exposing arbitrary payload fields", () => {
+  const origin = leadOrigin(JSON.stringify({ meta_lead_id: "lead-123", meta_form_id: "form-9", secret: "ignore" }), { source: "facebook", kind: "question" });
+  assert.deepEqual(origin, { bucket: "meta", name: "Meta lead form", externalId: "lead-123", formId: "form-9", pageId: "", channel: "facebook" });
+  assert.equal("secret" in origin, false);
+});
+
+test("lead analytics reports outcomes, source performance, and quoted monthly value", () => {
+  const analytics = buildLeadAnalytics([
+    { stage: "won", source: "website", kind: "partial_quote", quote: { monthly: 90 } },
+    { stage: "lost", source: "facebook", kind: "question", outcomeReason: "price", quote: { monthly: 110 } },
+    { stage: "quoted", source: "quo", kind: "question", quote: { monthly: 75 } },
+    { stage: "not_qualified", source: "quo", kind: "question", outcomeReason: "opted_out", quote: { monthly: 120 } },
+  ]);
+  assert.equal(analytics.total, 4);
+  assert.equal(analytics.conversionRate, 50);
+  assert.equal(analytics.openQuotedMonthly, 75);
+  assert.equal(analytics.wonMonthly, 90);
+  assert.equal(analytics.notQualified, 1);
+  assert.equal(analytics.sources.find((item) => item.source === "quo").notQualified, 1);
+  assert.deepEqual(analytics.lossReasons, [{ reason: "price", label: "Price / budget", count: 1 }]);
+  assert.deepEqual(analytics.notQualifiedReasons, [{ reason: "opted_out", label: "Opted out", count: 1 }]);
 });

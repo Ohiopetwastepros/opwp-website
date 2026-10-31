@@ -18,6 +18,7 @@ assert.throws(() => validatedDateRange("2025-01-01", "2026-01-01", 186));
 assert.ok(CLEANUP_ENTITIES.includes("Payment"));
 assert.ok(CLEANUP_REPORTS.includes("GeneralLedgerDetail"));
 assert.equal(safeExportName("../../ar", "2026-01-01", "2026-01-31"), "opwp-qbo-------ar-2026-01-01-to-2026-01-31.json");
+assert.equal(safeExportName("report", "2026-01-01", "2026-01-31", "TrialBalance"), "opwp-qbo-report-trialbalance-2026-01-01-to-2026-01-31.json");
 
 const diagnostics = buildArDiagnostics({
   customers: [{ Id: "1", DisplayName: "Test Customer" }],

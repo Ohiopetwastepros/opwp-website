@@ -11,11 +11,11 @@ export const metadata = {
   robots: { index: true, follow: true },
   openGraph: {
     type: "website",
-    url: "https://ohiopetwastepros.com/service-areas/",
+    url: "https://www.ohiopetwastepros.com/service-areas/",
     siteName: "Ohio Pet Waste Pros",
     title: "Service Areas | Ohio Pet Waste Pros",
     images: [
-      "https://ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
+      "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
     ],
   },
 };

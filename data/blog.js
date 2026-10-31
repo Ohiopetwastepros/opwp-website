@@ -4,6 +4,82 @@
 
 export const posts = [
   {
+    slug: "can-dog-poop-be-used-as-fertilizer",
+    title: "Can Dog Poop Be Used as Fertilizer? No—Here’s Why",
+    category: "Health & Environment",
+    date: "September 22, 2026",
+    image: "/assets/photos/dixie-frisbee.webp",
+    imagePosition: "50% 28%",
+    alt: "A dog relaxing on a healthy green lawn in Northwest Ohio",
+    excerpt:
+      "Dog poop may look natural, but it is not safe lawn fertilizer. Here’s what it can leave behind—and what to do with it instead.",
+    quickAnswer:
+      "No. Dog poop is waste—not fertilizer. It can carry harmful bacteria and parasites, create bare spots in the lawn, and wash into storm drains and waterways when it rains.",
+    comparison: [
+      {
+        label: "Dog poop",
+        tone: "warning",
+        items: [
+          "May carry bacteria and parasites",
+          "Can contaminate soil and damage grass",
+          "Can wash into storm drains and waterways",
+        ],
+      },
+      {
+        label: "Lawn fertilizer",
+        tone: "safe",
+        items: [
+          "Made for plants and lawns",
+          "Applied in a measured amount",
+          "Used according to label directions",
+        ],
+      },
+    ],
+    sections: [
+      {
+        title: "Why does dog poop belong in the trash?",
+        paragraphs: [
+          "Dog poop does not feed your lawn safely. It can damage grass and may contain bacteria and parasites that do not belong in your yard.",
+          "Those germs may remain in the soil and can be carried to other parts of the yard on shoes, paws, rainwater, or melting snow.",
+        ],
+      },
+      {
+        title: "But farmers use manure. What’s different?",
+        paragraphs: [
+          "Manure used on farms is managed for that purpose. It may be tested, treated, composted, and applied at a planned rate. A pile of fresh dog poop sitting in one spot has none of those controls.",
+          "Dog waste is not a lawn-care product. Never spread it on grass, flower beds, gardens, or around trees and shrubs.",
+        ],
+      },
+      {
+        title: "Can dog poop go in a compost pile?",
+        paragraphs: [
+          "No. Do not put dog poop in your backyard compost pile. Home compost piles may not remove harmful bacteria and parasites.",
+          "Do not use dog waste or compost made from dog waste on lawns, flower beds, gardens, trees, shrubs, or food crops. Scoop it, seal it in a bag, and place it in the trash according to local rules.",
+        ],
+      },
+      {
+        title: "What should you do instead?",
+        bullets: [
+          "Pick it up regularly—before rain or snowmelt can carry it away.",
+          "Seal it in a bag and place it in the trash, following local rules.",
+          "Never sweep or rinse dog waste into a street or storm drain.",
+          "Wash your hands after cleanup, and keep scooping tools clean.",
+        ],
+      },
+    ],
+    tip: "The simple rule: dog poop is waste, not fertilizer. Scoop it, bag it, and trash it.",
+    sources: [
+      {
+        label: "U.S. EPA: Pet Waste Management",
+        href: "https://www.epa.gov/system/files/documents/2023-01/bmp-pet-waste-management.pdf",
+      },
+      {
+        label: "U.S. EPA: Preventing Nutrient Pollution at Home",
+        href: "https://www.epa.gov/nutrientpollution/sources-and-solutions-and-around-home",
+      },
+    ],
+  },
+  {
     slug: "dog-poop-removal-cost-toledo",
     title: "How Much Does Dog Poop Removal Cost in Toledo & the Surrounding Area?",
     category: "Pet Waste Removal",
@@ -219,7 +295,7 @@ export const posts = [
       "Bagged waste goes in your regular trash; parks have waste stations. Here’s how to dispose of pet waste properly at home and out in Toledo.",
     paragraphs: [
       "For most people, the simplest method is to bag pet waste and place it in your regular trash. Toledo’s waste collection allows bagged pet waste in household garbage bins as long as it’s sealed properly, which helps prevent odors and keeps pests away.",
-      "Some residents use a dedicated pet waste bin with a tight lid for added convenience. There are also composting options — but pet waste should never go into compost used for growing food.",
+      "Some residents use a dedicated pet waste bin with a tight lid for added convenience. Do not add pet waste to a backyard compost pile or use it as fertilizer. Bag it and place it in the trash instead.",
       "On walks or at parks, look for pet waste stations or bag dispensers. Glass City Dog Park, for instance, features waste disposal stations alongside amenities like water fountains and shaded seating.",
       "For apartment complexes, HOA communities, or business properties, managing pet waste takes more planning. Our team works with property managers and community boards to set up regular cleaning and install pet waste stations that keep shared spaces pleasant for everyone.",
       "Proper disposal helps prevent harmful bacteria from entering our waterways, reduces neighborhood odors, and keeps lawns and public spaces more enjoyable. It’s a small effort that makes a big difference.",

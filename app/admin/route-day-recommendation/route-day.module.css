@@ -1,0 +1,22 @@
+.tool { max-width:1100px; margin:0 auto; color:#163b40; }
+.search,.result,.empty { border:1px solid #d9e5df; border-radius:16px; background:#fff; padding:28px; margin-bottom:20px; }
+.search>label,.controls label { display:block; font-size:13px; font-weight:700; }
+.search input { width:100%; box-sizing:border-box; margin-top:10px; padding:16px; font-size:17px; border:1px solid #b9cfc5; border-radius:9px; background:#fbfdfc; color:#163b40; }
+.search input:focus,.controls select:focus { outline:3px solid #dcebd3; outline-offset:2px; }
+.search p,.details p { color:#526b65; font-size:13px; line-height:1.6; }
+.controls { display:flex; gap:20px; justify-content:space-between; align-items:end; margin-top:20px; }
+.controls select { display:block; padding:12px; margin-top:8px; border:1px solid #b9cfc5; border-radius:8px; font-size:14px; color:#163b40; background:#fff; }
+.controls button { padding:14px 23px; background:#174f43; color:white; font:inherit; font-size:14px; font-weight:700; border:0; border-radius:9px; cursor:pointer; }
+.controls button:disabled { opacity:.6; cursor:wait; }
+.resultHead { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:12px; font-weight:700; }
+.resultHead b { font-size:11px; border:1px solid #b8cdb3; padding:7px 10px; border-radius:20px; background:#f0f6ea; }
+.result h2 { margin:17px 0 10px; font-size:42px; line-height:1.2; color:#174f43; }
+.result p { font-size:14px; line-height:1.7; }
+.address { color:#526b65; }.assignment { font-weight:700; }
+.notice { padding:14px 17px; border-radius:8px; background:#f3f6ee; font-size:13px; line-height:1.6; }
+.tableWrap { overflow-x:auto; margin-top:24px; } .tableWrap table { width:100%; border-collapse:collapse; text-align:left; font-size:13px; }
+.tableWrap caption { text-align:left; font-weight:700; margin-bottom:12px; }.tableWrap td,.tableWrap th { padding:13px 10px; border-bottom:1px solid #e0e8e3; line-height:1.5; }.tableWrap thead { color:#526b65; }.chosen { background:#eff5eb; }
+.details { margin-top:22px; font-size:13px; }.details summary { cursor:pointer; font-weight:700; }
+.empty { background:#f8fbf8; color:#526b65; font-size:14px; line-height:1.7; }.empty strong { color:#174f43; font-size:19px; }.empty p { margin-bottom:0; }
+.error { padding:18px; border:1px solid #e5b3a8; border-radius:10px; color:#8d3124; background:#fff5f2; margin-bottom:20px; font-size:14px; }
+@media(max-width:650px) { .search,.result,.empty { padding:20px; }.controls { align-items:stretch; flex-direction:column; gap:14px; }.controls select { width:100%; }.resultHead { align-items:start; flex-direction:column; }.result h2 { font-size:34px; }.search input { font-size:16px; } }

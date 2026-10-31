@@ -1,0 +1,43 @@
+CREATE TABLE dog_food_customer_reviews (
+  customer_id TEXT PRIMARY KEY REFERENCES dog_food_customers(id),
+  revision INTEGER NOT NULL DEFAULT 1 CHECK(revision>0),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','reviewed')),
+  relationship TEXT CHECK(relationship IN ('food_only','linked')),
+  opwp_record_id TEXT UNIQUE,
+  profile_json TEXT NOT NULL,
+  reviewed_by TEXT, reviewed_at TEXT, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO dog_food_customer_reviews(customer_id,profile_json)
+  SELECT a.customer_id,json_object('firstName',c.first_name,'lastName',c.last_name,'email',a.email,'phone',c.phone,'address',d.line1,'city',d.city,'state',d.state,'zip',d.postal_code,'placement',d.placement_preference,'placementOther',d.placement_other,'fulfillment',a.preferred_fulfillment)
+  FROM dog_food_accounts a JOIN dog_food_customers c ON c.id=a.customer_id LEFT JOIN dog_food_addresses d ON d.customer_id=c.id AND d.is_primary=1 WHERE a.profile_completed_at IS NOT NULL;
+CREATE TRIGGER food_profile_customer_review AFTER UPDATE OF profile_completed_at,preferred_fulfillment ON dog_food_accounts BEGIN
+  INSERT INTO dog_food_customer_reviews(customer_id,profile_json)
+    SELECT NEW.customer_id,json_object('firstName',c.first_name,'lastName',c.last_name,'email',NEW.email,'phone',c.phone,'address',d.line1,'city',d.city,'state',d.state,'zip',d.postal_code,'placement',d.placement_preference,'placementOther',d.placement_other,'fulfillment',NEW.preferred_fulfillment)
+    FROM dog_food_customers c LEFT JOIN dog_food_addresses d ON d.customer_id=c.id AND d.is_primary=1 WHERE c.id=NEW.customer_id
+  ON CONFLICT(customer_id) DO UPDATE SET revision=revision+1,status='pending',profile_json=excluded.profile_json,reviewed_by=NULL,reviewed_at=NULL,updated_at=CURRENT_TIMESTAMP
+    WHERE profile_json IS NOT excluded.profile_json;
+END;
+CREATE TRIGGER food_customer_review_insert AFTER INSERT ON dog_food_customer_reviews BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES('customer:'||NEW.customer_id,'customer',NEW.customer_id)
+  ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+CREATE TRIGGER food_customer_review_update AFTER UPDATE ON dog_food_customer_reviews BEGIN
+  INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id) VALUES('customer:'||NEW.customer_id,'customer',NEW.customer_id)
+  ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+END;
+INSERT INTO dog_food_sync_outbox(entity_key,kind,entity_id)
+  SELECT 'customer:'||customer_id,'customer',customer_id FROM dog_food_customer_reviews WHERE 1
+  ON CONFLICT(entity_key) DO UPDATE SET revision=revision+1,attempts=0,next_attempt_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP;
+
+CREATE TRIGGER food_task_draft_route BEFORE INSERT ON route_partner_tasks
+WHEN NEW.source_provider='dog_food_automation' AND NOT EXISTS (
+  SELECT 1 FROM route_partner_route_plans p WHERE p.id=NEW.route_plan_id AND p.organization_id=NEW.organization_id AND p.organization_id='org-opwp' AND p.status='draft'
+) BEGIN SELECT RAISE(ABORT,'Food route is already released or belongs to another organization'); END;
+CREATE TRIGGER food_cancelled_task_allowance AFTER UPDATE OF status ON route_partner_tasks
+WHEN NEW.source_provider='dog_food_automation' AND NEW.status='cancelled' AND OLD.status<>'cancelled' BEGIN
+  UPDATE route_partner_locations SET estimated_service_minutes=MAX(0,estimated_service_minutes-CASE WHEN EXISTS(SELECT 1 FROM route_partner_tasks t WHERE t.location_id=NEW.location_id AND t.source_provider='dog_food_automation' AND t.status<>'cancelled') THEN 0 ELSE OLD.estimated_minutes END),
+    arrival_status=CASE WHEN arrival_status='pending' AND NOT EXISTS(SELECT 1 FROM route_partner_tasks t WHERE t.location_id=NEW.location_id AND t.status<>'cancelled') THEN 'skipped' ELSE arrival_status END,
+    updated_at=CURRENT_TIMESTAMP WHERE id=NEW.location_id AND organization_id='org-opwp';
+  UPDATE route_partner_tasks SET estimated_minutes=estimated_minutes+OLD.estimated_minutes WHERE id=(SELECT id FROM route_partner_tasks t WHERE t.location_id=NEW.location_id AND t.organization_id='org-opwp' AND t.source_provider='dog_food_automation' AND t.status<>'cancelled' ORDER BY id LIMIT 1);
+  UPDATE route_partner_route_plans SET food_task_count=MAX(0,food_task_count-1),updated_at=CURRENT_TIMESTAMP WHERE id=NEW.route_plan_id AND organization_id='org-opwp';
+END;

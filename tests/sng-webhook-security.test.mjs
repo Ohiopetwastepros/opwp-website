@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { authenticateSngWebhook, constantTimeSecretMatch, validateSngWebhookBody } from "../lib/sng-webhook-security.mjs";
 
-const request = (url = "https://ohiopetwastepros.com/api/sng-webhooks", headers = {}) => new Request(url, { method: "POST", headers });
+const request = (url = "https://www.ohiopetwastepros.com/api/sng-webhooks", headers = {}) => new Request(url, { method: "POST", headers });
 
 test("missing webhook secret is rejected", () => {
   const result = authenticateSngWebhook(request(), { SNG_WEBHOOK_SECRET: "expected" }, "production");
@@ -25,7 +25,7 @@ test("correct webhook secret is accepted with constant-time digest comparison", 
 test("local smoke bypass is restricted", () => {
   const env = { ADMIN_DEV_BYPASS: "true" };
   assert.equal(authenticateSngWebhook(request("http://localhost/api/sng-webhooks", { "x-opwp-local-smoke": "true" }), env, "development").authorized, true);
-  assert.equal(authenticateSngWebhook(request("https://ohiopetwastepros.com/api/sng-webhooks", { "x-opwp-local-smoke": "true" }), env, "development").authorized, false);
+  assert.equal(authenticateSngWebhook(request("https://www.ohiopetwastepros.com/api/sng-webhooks", { "x-opwp-local-smoke": "true" }), env, "development").authorized, false);
   assert.equal(authenticateSngWebhook(request("http://localhost/api/sng-webhooks", { "x-opwp-local-smoke": "true" }), env, "production").authorized, false);
 });
 

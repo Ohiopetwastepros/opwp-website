@@ -26,7 +26,7 @@ export async function generateMetadata({ params }) {
       description: `Reliable, family-owned dog waste removal serving ${c.city}, ${c.state} and the Greater Toledo area.`,
       url,
       siteName: "Ohio Pet Waste Pros",
-      images: ["https://ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png"],
+      images: ["https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png"],
     },
     twitter: { card: "summary_large_image" },
     other: {
@@ -50,12 +50,12 @@ export default async function Page({ params }) {
     name: `Dog Poop Removal in ${c.city}, ${c.stateAbbr}`,
     provider: {
       "@type": "LocalBusiness",
-      "@id": "https://ohiopetwastepros.com/#business",
+      "@id": "https://www.ohiopetwastepros.com/#business",
       name: "Ohio Pet Waste Pros",
-      image: "https://ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
+      image: "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
       telephone: "+14192622371",
       email: "Craig@ohiopetwastepros.com",
-      url: "https://ohiopetwastepros.com/",
+      url: "https://www.ohiopetwastepros.com/",
       priceRange: "$$",
       address: { "@type": "PostalAddress", addressLocality: "Holland", addressRegion: "OH", addressCountry: "US" },
       sameAs: ["https://www.facebook.com/profile.php?id=61575239054687", "https://www.instagram.com/ohio.pet.waste.pros.llc"],
@@ -96,8 +96,8 @@ export default async function Page({ params }) {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: "https://ohiopetwastepros.com/" },
-      { "@type": "ListItem", position: 2, name: "Service Areas", item: "https://ohiopetwastepros.com/service-areas/" },
+      { "@type": "ListItem", position: 1, name: "Home", item: "https://www.ohiopetwastepros.com/" },
+      { "@type": "ListItem", position: 2, name: "Service Areas", item: "https://www.ohiopetwastepros.com/service-areas/" },
       { "@type": "ListItem", position: 3, name: `${c.city}, ${c.state}`, item: url },
     ],
   };

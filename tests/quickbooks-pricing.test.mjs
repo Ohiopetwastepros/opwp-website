@@ -9,7 +9,7 @@ const section = (label, children, total) => ({
 });
 const line = (label, amount) => ({ ColData: [{ value: label }, { value: String(amount) }] });
 
-test("derives Tony-only burden and fixed overhead from a QuickBooks P&L", () => {
+test("derives primary technician-only burden and fixed overhead from a QuickBooks P&L", () => {
   const report = { Rows: { Row: [
     section("Cost of Goods Sold", [line("Scooping supplies", 1000)], 1000),
     section("Expenses", [

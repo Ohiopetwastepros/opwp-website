@@ -1,0 +1,13 @@
+.preview { max-width: 1100px; margin: 0 auto; font-size: 16px; line-height: 1.6; }
+.preview button, .preview select, .preview input { font: inherit; border: 1px solid #b9c9c2; border-radius: 8px; }
+.preview button { padding: 9px 15px; color: #164739; background: #f1f8f4; cursor: pointer; font-weight: 600; }
+.preview button:hover:not(:disabled) { background: #dfeee5; }
+.preview button:disabled { opacity: .5; cursor: default; }
+.preview button[type="submit"] { background: #225e48; color: white; }
+.preview input, .preview select { background: white; color: #183d35; }
+.preview button:focus-visible, .preview input:focus-visible, .preview select:focus-visible { outline: 3px solid #6eac86; outline-offset: 2px; }
+.preview .bubble p { font-size: 16px; line-height: 1.65; color: #263e38; }
+.preview .bubble strong { font-size: 14px; }
+.preview details { margin-top: 18px; padding: 14px; border-radius: 8px; background: #f4f7f5; }
+.preview summary { cursor: pointer; font-weight: 600; }
+@media (max-width: 640px) { .preview { font-size: 15px; } .preview .bubble p { font-size: 15px; } .preview select { width: 100%; margin-bottom: 10px; } }

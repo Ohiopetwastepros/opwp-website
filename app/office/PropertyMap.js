@@ -12,6 +12,7 @@ const TIERS = [
 ];
 
 let googleMapsLoader;
+const GOOGLE_MAPS_AUTH_ERROR = "Google Maps rejected this site's API key. Confirm its website and API restrictions, then try again.";
 
 function measuredTier(squareFeet) {
   return TIERS.find((tier) => squareFeet <= tier.maximum) || TIERS.at(-1);
@@ -35,6 +36,14 @@ function loadGoogleMaps(apiKey) {
       delete window[callbackName];
       if (window.google?.maps?.geometry?.spherical) resolve(window.google.maps);
       else reject(new Error("Google Maps loaded without the measuring tools."));
+    };
+
+    window.gm_authFailure = () => {
+      window.clearTimeout(timeout);
+      delete window[callbackName];
+      googleMapsLoader = undefined;
+      window.dispatchEvent(new CustomEvent("opwp-google-maps-auth-error", { detail: { message: GOOGLE_MAPS_AUTH_ERROR } }));
+      reject(new Error(GOOGLE_MAPS_AUTH_ERROR));
     };
 
     const params = new URLSearchParams({
@@ -63,13 +72,25 @@ function loadGoogleMaps(apiKey) {
 
 function geocodeAddress(maps, address) {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (callback) => (value) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      callback(value);
+    };
+    const succeed = finish(resolve);
+    const fail = finish(reject);
+    const timeout = window.setTimeout(() => {
+      fail(new Error("Google Maps did not finish locating this address. Check the connection and API-key restrictions, then try again."));
+    }, 15000);
     const geocoder = new maps.Geocoder();
     geocoder.geocode(
       { address, componentRestrictions: { country: "US" }, region: "US" },
       (results, status) => {
-        if (status === "OK" && results?.[0]) resolve(results[0]);
-        else if (status === "ZERO_RESULTS") reject(new Error("Google could not find that complete address. Check the house number, city, and ZIP."));
-        else reject(new Error("Google could not map that address right now. Please try again."));
+        if (status === "OK" && results?.[0]) succeed(results[0]);
+        else if (status === "ZERO_RESULTS") fail(new Error("Google could not find that complete address. Check the house number, city, and ZIP."));
+        else fail(new Error("Google could not map that address right now. Please try again."));
       },
     );
   });
@@ -91,6 +112,7 @@ export default function PropertyMap({ address, ready, selectedTier, onTierSelect
   const [touchMode, setTouchMode] = useState(false);
   const [points, setPoints] = useState([]);
   const [squareFeet, setSquareFeet] = useState(0);
+  const [retryToken, setRetryToken] = useState(0);
 
   function clearMapMeasurement() {
     if (shapeRef.current) {
@@ -162,7 +184,16 @@ export default function PropertyMap({ address, ready, selectedTier, onTierSelect
   }, [points, measuring]);
 
   useEffect(() => {
+    // An incomplete address unmounts the canvas. Never reuse a map attached to
+    // that removed element when the next complete address mounts a new canvas.
+    setLocation(null);
+    clearMeasurement();
+    clearMapMeasurement();
     if (!ready) {
+      if (addressMarkerRef.current) addressMarkerRef.current.setMap(null);
+      addressMarkerRef.current = null;
+      if (mapsRef.current && mapRef.current) mapsRef.current.event.clearInstanceListeners(mapRef.current);
+      mapRef.current = null;
       setLocation(null);
       setError("");
       setLoading(false);
@@ -170,13 +201,21 @@ export default function PropertyMap({ address, ready, selectedTier, onTierSelect
     }
 
     let active = true;
+    let authenticationFailed = false;
+    const handleAuthenticationFailure = (event) => {
+      authenticationFailed = true;
+      if (!active) return;
+      setLoading(false);
+      setError(event.detail?.message || GOOGLE_MAPS_AUTH_ERROR);
+    };
+    window.addEventListener("opwp-google-maps-auth-error", handleAuthenticationFailure);
     const timer = window.setTimeout(async () => {
       setLoading(true);
       setError("");
       try {
         const maps = await loadGoogleMaps(googleMapsKey);
         const result = await geocodeAddress(maps, address);
-        if (!active || !containerRef.current) return;
+        if (!active || authenticationFailed || !containerRef.current) return;
 
         mapsRef.current = maps;
         touchModeRef.current = window.matchMedia?.("(pointer: coarse)")?.matches || false;
@@ -228,7 +267,7 @@ export default function PropertyMap({ address, ready, selectedTier, onTierSelect
           partialMatch: Boolean(result.partial_match),
         });
       } catch (requestError) {
-        if (active) setError(requestError instanceof Error ? requestError.message : "The property could not be mapped.");
+        if (active && !authenticationFailed) setError(requestError instanceof Error ? requestError.message : "The property could not be mapped.");
       } finally {
         if (active) setLoading(false);
       }
@@ -237,8 +276,9 @@ export default function PropertyMap({ address, ready, selectedTier, onTierSelect
     return () => {
       active = false;
       window.clearTimeout(timer);
+      window.removeEventListener("opwp-google-maps-auth-error", handleAuthenticationFailure);
     };
-  }, [address, ready, googleMapsKey]);
+  }, [address, ready, googleMapsKey, retryToken]);
 
   useEffect(() => () => {
     clearMapMeasurement();
@@ -337,7 +377,9 @@ export default function PropertyMap({ address, ready, selectedTier, onTierSelect
       </div> : null}
     </> : null}
 
-    {error ? <div className={styles.alert}>{error}</div> : null}
+    {error ? <div className={styles.alert}>
+      {error} <button type="button" onClick={() => setRetryToken((current) => current + 1)}>Try again</button>
+    </div> : null}
     <small className={styles.mapDisclaimer}>Google imagery and boundary tracing provide an operational estimate, not a survey. Confirm the visible house and trace only the area OPWP will service.</small>
   </div>;
 }

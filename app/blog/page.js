@@ -1,51 +1,76 @@
 import Link from "next/link";
 import { posts } from "@/data/blog";
+import { site } from "@/lib/site";
 
 export const metadata = {
-  title: { absolute: "Dog Waste & Pet Care Blog | Ohio Pet Waste Pros" },
+  title: { absolute: "Dog Poop & Yard Care Advice | Ohio Pet Waste Pros" },
   description:
-    "Toledo dog waste removal blog: poop-scooping tips, pricing guides, local pet guides, dog parks and pet health from Ohio Pet Waste Pros, serving Toledo, Sylvania, Perrysburg & SE Michigan.",
+    "Simple, practical answers about dog poop cleanup, yard health, pricing, and pet-friendly places from local NW Ohio pet waste professionals.",
   alternates: { canonical: "/blog/" },
   robots: { index: true, follow: true },
   openGraph: {
     type: "website",
-    url: "https://ohiopetwastepros.com/blog/",
+    url: `${site.url}/blog/`,
     siteName: "Ohio Pet Waste Pros",
-    title: "Dog Waste & Pet Care Blog | Ohio Pet Waste Pros",
+    title: "Dog Poop & Yard Care Advice | Ohio Pet Waste Pros",
     description:
-      "Poop-scooping tips, pricing guides and local pet guides from your local Toledo-area pros.",
-    images: [
-      "https://ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
-    ],
+      "Clear answers and local advice for cleaner, healthier yards across NW Ohio and SE Michigan.",
+    images: [`${site.url}/assets/photos/we-scoop-banner.webp`],
   },
-};
-
-const blogJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "Blog",
-  name: "Ohio Pet Waste Pros Blog",
-  description:
-    "Poop-scooping tips, pricing guides, local pet guides and pet health.",
-  publisher: { "@type": "Organization", name: "Ohio Pet Waste Pros" },
+  twitter: {
+    card: "summary_large_image",
+    title: "Dog Poop & Yard Care Advice | Ohio Pet Waste Pros",
+    description: "Clear answers and local advice for cleaner, healthier yards.",
+    images: [`${site.url}/assets/photos/we-scoop-banner.webp`],
+  },
 };
 
 const toSrc = (image) =>
   image && image.startsWith("assets/") ? "/" + image : image;
 
+const toId = (value) =>
+  value.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+const toIsoDate = (date) => {
+  const value = new Date(date);
+  return Number.isNaN(value.valueOf()) ? undefined : value.toISOString().slice(0, 10);
+};
+
 export default function BlogPage() {
   const all = posts || [];
   const featured = all[0] || null;
   const rest = all.slice(1);
+  const categories = [...new Set(all.map((post) => post.category))];
+
+  const blogJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Blog",
+    name: "Ohio Pet Waste Pros Blog",
+    description:
+      "Practical dog waste cleanup, yard health, pricing, and local pet advice for NW Ohio and SE Michigan.",
+    url: `${site.url}/blog/`,
+    publisher: {
+      "@type": "Organization",
+      name: "Ohio Pet Waste Pros",
+      url: site.url,
+    },
+    blogPost: all.map((post) => ({
+      "@type": "BlogPosting",
+      headline: post.title,
+      url: `${site.url}/blog/${post.slug}/`,
+      ...(toIsoDate(post.date) ? { datePublished: toIsoDate(post.date) } : {}),
+    })),
+  };
 
   const itemListJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: "Ohio Pet Waste Pros Blog",
-    itemListElement: all.map((a, i) => ({
+    name: "Ohio Pet Waste Pros articles",
+    itemListElement: all.map((post, index) => ({
       "@type": "ListItem",
-      position: i + 1,
-      url: "https://ohiopetwastepros.com/blog/" + a.slug + "/",
-      name: a.title,
+      position: index + 1,
+      url: `${site.url}/blog/${post.slug}/`,
+      name: post.title,
     })),
   };
 
@@ -60,277 +85,106 @@ export default function BlogPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
       />
 
-      <section
-        style={{
-          background: "linear-gradient(160deg,#1F4566,#1A3C5A 55%,#14304A)",
-          color: "#fff",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "920px",
-            margin: "0 auto",
-            padding: "60px 28px 56px",
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              border: "1px solid rgba(255,255,255,.22)",
-              borderRadius: "99px",
-              padding: "7px 15px",
-              fontSize: "12.5px",
-              fontWeight: 700,
-              letterSpacing: "0.05em",
-              textTransform: "uppercase",
-              color: "#cdd8e2",
-              marginBottom: "20px",
-            }}
-          >
-            From the blog
+      <header className="opwp-blog-hero">
+        <div style={{ maxWidth: "980px", margin: "0 auto", padding: "62px 28px 58px" }}>
+          <div style={{ color: "#9FD586", fontSize: "13px", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: "17px" }}>
+            Advice from your local scoop crew
           </div>
-          <h1
-            style={{
-              fontFamily: "'Bricolage Grotesque'",
-              fontWeight: 800,
-              fontSize: "45px",
-              lineHeight: 1.02,
-              letterSpacing: "-0.025em",
-              margin: "0 0 16px",
-            }}
-          >
-            Toledo dog scoop blog: tips, pricing &amp; local guides
+          <h1 style={{ maxWidth: "760px", fontSize: "clamp(38px, 5.5vw, 62px)", lineHeight: 1.01, letterSpacing: "-.035em", margin: "0 0 19px" }}>
+            Straight answers for cleaner, healthier yards.
           </h1>
-          <p
-            style={{
-              fontSize: "18px",
-              lineHeight: 1.55,
-              color: "#c4d2df",
-              margin: "0 auto",
-              maxWidth: "580px",
-            }}
-          >
-            Your go-to space for pet waste removal tips, service pricing guides,
-            and local scooping insights across NW Ohio &amp; SE Michigan.
+          <p style={{ maxWidth: "690px", fontSize: "18px", lineHeight: 1.65, color: "#C8D6E2", margin: 0 }}>
+            Simple dog poop cleanup advice, local service guides, and yard-care answers from the family behind Ohio Pet Waste Pros.
           </p>
         </div>
-      </section>
+      </header>
 
-      {/* FEATURED */}
-      {featured && (
-        <section style={{ background: "#fff", padding: "64px 0 30px" }}>
-          <div
-            style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 28px" }}
-          >
-            <Link
-              href={"/blog/" + featured.slug + "/"}
-              className="opwp-gsplit"
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1.05fr 0.95fr",
-                gap: "40px",
-                alignItems: "center",
-                textDecoration: "none",
-                color: "inherit",
-                background: "#F6F5EF",
-                borderRadius: "22px",
-                overflow: "hidden",
-              }}
-            >
-              <img
-                src={toSrc(featured.image)}
-                alt={featured.alt || featured.title}
-                style={{
-                  width: "100%",
-                  height: "340px",
-                  objectFit: "cover",
-                  display: "block",
-                }}
-              />
-              <div style={{ padding: "10px 36px 10px 0" }}>
-                <div
-                  style={{
-                    fontSize: "12.5px",
-                    fontWeight: 700,
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    color: "#4F9E3A",
-                    marginBottom: "12px",
-                  }}
-                >
-                  Featured &middot; {featured.category}
-                </div>
-                <h2
-                  style={{
-                    fontFamily: "'Bricolage Grotesque'",
-                    fontWeight: 700,
-                    fontSize: "29px",
-                    lineHeight: 1.12,
-                    letterSpacing: "-0.02em",
-                    margin: "0 0 14px",
-                  }}
-                >
-                  {featured.title}
-                </h2>
-                <p
-                  style={{
-                    fontSize: "15.5px",
-                    lineHeight: 1.6,
-                    color: "#475259",
-                    margin: "0 0 18px",
-                  }}
-                >
-                  {featured.excerpt}
-                </p>
-                <span
-                  style={{
-                    color: "#1A3C5A",
-                    fontWeight: 700,
-                    fontSize: "15px",
-                    borderBottom: "2px solid #4F9E3A",
-                    paddingBottom: "3px",
-                  }}
-                >
-                  Read article &rarr;
-                </span>
+      <div className="opwp-blog-main">
+        {featured && (
+          <section aria-labelledby="featured-article" style={{ padding: "64px 0 44px" }}>
+            <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "0 28px" }}>
+              <div style={{ color: "#658461", fontSize: "12.5px", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: "16px" }}>
+                New from the blog
               </div>
-            </Link>
-          </div>
-        </section>
-      )}
+              <article>
+                <Link href={`/blog/${featured.slug}/`} className="opwp-blog-feature" style={{ color: "inherit", textDecoration: "none" }}>
+                  <img src={toSrc(featured.image)} alt={featured.alt || featured.title} style={{ objectPosition: featured.imagePosition || "center" }} />
+                  <div className="opwp-blog-feature-copy">
+                    <div className="opwp-blog-meta">
+                      <span>{featured.category}</span>
+                      <span aria-hidden="true">·</span>
+                      <time dateTime={toIsoDate(featured.date)}>{featured.date}</time>
+                    </div>
+                    <h2 id="featured-article">{featured.title}</h2>
+                    <p>{featured.excerpt}</p>
+                    <span className="opwp-blog-read">Get the answer <span aria-hidden="true">→</span></span>
+                  </div>
+                </Link>
+              </article>
+            </div>
+          </section>
+        )}
 
-      {/* GRID */}
-      <section style={{ background: "#fff", padding: "30px 0 84px" }}>
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 28px" }}>
-          <div
-            className="opwp-g3"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3,1fr)",
-              gap: "26px 26px",
-            }}
-          >
-            {rest.map((a) => (
-              <Link
-                key={a.slug}
-                href={"/blog/" + a.slug + "/"}
-                style={{
-                  textDecoration: "none",
-                  color: "inherit",
-                  display: "block",
-                }}
-              >
-                <img
-                  src={toSrc(a.image)}
-                  alt={a.alt || a.title}
-                  style={{
-                    width: "100%",
-                    height: "200px",
-                    objectFit: "cover",
-                    borderRadius: "16px",
-                    marginBottom: "16px",
-                    display: "block",
-                  }}
-                />
-                <div
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    color: "#658461",
-                    marginBottom: "8px",
-                  }}
-                >
-                  {a.category}
-                </div>
-                <h3
-                  style={{
-                    fontFamily: "'Bricolage Grotesque'",
-                    fontWeight: 700,
-                    fontSize: "19px",
-                    lineHeight: 1.22,
-                    margin: "0 0 8px",
-                  }}
-                >
-                  {a.title}
-                </h3>
-                <p
-                  style={{
-                    fontSize: "14px",
-                    lineHeight: 1.55,
-                    color: "#5b6770",
-                    margin: 0,
-                  }}
-                >
-                  {a.excerpt}
-                </p>
-              </Link>
+        <nav aria-label="Browse blog topics" className="opwp-blog-topics">
+          <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "0 28px" }}>
+            <span>Browse by topic</span>
+            {categories.map((category) => (
+              <a key={category} href={`#${toId(category)}`}>{category}</a>
             ))}
           </div>
-        </div>
-      </section>
+        </nav>
 
-      <section
-        style={{
-          background: "linear-gradient(160deg,#1F4566,#14304A)",
-          color: "#fff",
-          padding: "70px 0",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "820px",
-            margin: "0 auto",
-            padding: "0 28px",
-            textAlign: "center",
-          }}
-        >
-          <h2
-            style={{
-              fontFamily: "'Bricolage Grotesque'",
-              fontWeight: 800,
-              fontSize: "34px",
-              lineHeight: 1.05,
-              letterSpacing: "-0.02em",
-              margin: "0 0 14px",
-            }}
-          >
-            Spend less time scooping, more time with your dog.
-          </h2>
-          <p
-            style={{
-              fontSize: "17px",
-              lineHeight: 1.55,
-              color: "#c4d2df",
-              margin: "0 0 28px",
-            }}
-          >
-            Get your free quote and let our family keep your yard clean
-            year-round.
-          </p>
-          <Link
-            href="/free-quote/"
-            className="hov-cta"
-            style={{
-              display: "inline-block",
-              background: "#4F9E3A",
-              color: "#fff",
-              textDecoration: "none",
-              padding: "16px 32px",
-              borderRadius: "12px",
-              fontWeight: 800,
-              fontSize: "16.5px",
-              boxShadow: "0 14px 28px -12px rgba(79,158,58,.7)",
-            }}
-          >
-            Get My Free Quote
-          </Link>
-        </div>
-      </section>
+        <section aria-labelledby="all-articles" style={{ padding: "54px 0 82px" }}>
+          <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "0 28px" }}>
+            <div className="opwp-blog-directory-heading">
+              <div>
+                <div style={{ color: "#658461", fontSize: "12.5px", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: "8px" }}>
+                  Practical help, organized
+                </div>
+                <h2 id="all-articles">Explore all articles</h2>
+              </div>
+              <p>Choose a question below for a short, useful answer—without the fluff.</p>
+            </div>
+
+            {categories.map((category) => {
+              const categoryPosts = rest.filter((post) => post.category === category);
+              if (!categoryPosts.length) return null;
+
+              return (
+                <section key={category} id={toId(category)} className="opwp-blog-topic-section" aria-labelledby={`${toId(category)}-heading`}>
+                  <div className="opwp-blog-topic-label">
+                    <h3 id={`${toId(category)}-heading`}>{category}</h3>
+                    <span>{categoryPosts.length} {categoryPosts.length === 1 ? "article" : "articles"}</span>
+                  </div>
+                  <div>
+                    {categoryPosts.map((post) => (
+                      <article key={post.slug} className="opwp-blog-row">
+                        <Link href={`/blog/${post.slug}/`} aria-label={`Read: ${post.title}`}>
+                          <img src={toSrc(post.image)} alt={post.alt || ""} loading="lazy" style={{ objectPosition: post.imagePosition || "center" }} />
+                          <div className="opwp-blog-row-copy">
+                            <time dateTime={toIsoDate(post.date)}>{post.date}</time>
+                            <h4>{post.title}</h4>
+                            <p>{post.excerpt}</p>
+                          </div>
+                          <span className="opwp-blog-arrow" aria-hidden="true">→</span>
+                        </Link>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="opwp-blog-cta">
+          <div>
+            <p>Prefer a clean yard without the reading?</p>
+            <h2>We’ll handle the dirty work.</h2>
+            <Link href="/free-quote/" className="hov-cta">Get My Free Quote</Link>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

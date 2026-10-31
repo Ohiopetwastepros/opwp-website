@@ -1,6 +1,9 @@
+import operationalPrivate from '../lib/operational-private.json' with {type:'json'};
+import {validateBuildInputs} from './prepare-build-inputs.mjs';
 import { readFile } from "node:fs/promises";
 
 const APPLY = process.argv.includes("--apply");
+validateBuildInputs({production:APPLY});
 const BASE_ID = "appcAWPBQB8GmOrcT";
 const TABLES = {
   customers: "tblhi8MGUOsWNmd37",
@@ -41,29 +44,18 @@ async function findCustomer(name) {
   return result.records[0];
 }
 
-const customerChanges = [
-  { name: "Michelle Bostater", fields: { Status: "Inactive", "MRR ($)": 0, "Subscription Name": "", "Date Churned": null, "Churn MRR ($)": 0, "Churn Reason": "" } },
-  { name: "Lee Warren", fields: { Status: "Paused", "Date Churned": null, "Churn MRR ($)": 0, "Churn Reason": "" } },
-  { name: "Cortia French", fields: { Status: "Inactive", "Date Churned": "2026-07-14", "Churn MRR ($)": 90, "Churn Reason": "Paused no response/Unresponsive" } },
-  { name: "Karl & Nikole Landrum", fields: { Status: "Paused", "Date Churned": null, "Churn MRR ($)": 0, "Churn Reason": "" } },
-  { name: "Joe Wichman", fields: { Status: "Inactive", "Date Churned": "2026-07-14", "Churn MRR ($)": 146, "Churn Reason": "Don't need service anymore" } },
-];
+const customerChanges = operationalPrivate.lifecycle.customerChanges;
 
-const churnRows = [
-  { "Event ID": "OFFICE-PAUSE-195331-20260714", "Client Name": "Lee Warren", "Event Type": "Paused", "Event Date": "2026-07-14", "Lost MRR ($)": 0, Reason: "Reducing expenses", "Reason Category": "Reducing expenses", Comment: "Paused due to financial reasons.", Plan: "Regular Plan - 1d-1xW", "Business Line": "Scooping", "Review Status": "Complete", "Subscription ID": "OFFICE-LEE-195331", "Is Churn": false, Source: "Owner validated 2026-07-14" },
-  { "Event ID": "OFFICE-CHURN-188289-20260714", "Client Name": "Cortia French", "Event Type": "Canceled", "Event Date": "2026-07-14", "Deactivated Date": "2026-07-14", "Lost MRR ($)": 90, Reason: "Paused no response/Unresponsive", "Reason Category": "Paused no response/Unresponsive", Comment: "Customer stopped responding to text messages; account deactivated after no response.", Plan: "Regular Plan - 1d-1xW", "Business Line": "Scooping", "Review Status": "Complete", "Subscription ID": "OFFICE-CORTIA-188289", "Is Churn": true, Source: "Owner validated 2026-07-14" },
-  { "Event ID": "OFFICE-PAUSE-167540-20260714", "Client Name": "Karl & Nikole Landrum", "Event Type": "Paused", "Event Date": "2026-07-14", "Planned Resume Date": "2026-08-01", "Lost MRR ($)": 0, Reason: "Temporary", "Reason Category": "Temporary", Comment: "Service is planned to restart August 1, 2026.", Plan: "Regular Plan - 1d-bW", "Business Line": "Scooping", "Review Status": "Complete", "Subscription ID": "OFFICE-LANDRUM-167540", "Is Churn": false, Source: "Owner validated 2026-07-14" },
-  { "Event ID": "OFFICE-CHURN-175542-20260714", "Client Name": "Joe Wichman", "Event Type": "Canceled", "Event Date": "2026-07-14", "Deactivated Date": "2026-07-14", "Lost MRR ($)": 146, Reason: "Don't need service anymore", "Reason Category": "Don't need service anymore", Comment: "Customer no longer needs service and will perform the work themselves.", Plan: "Regular Plan - 2d-1xW", "Business Line": "Scooping", "Review Status": "Complete", "Subscription ID": "OFFICE-JOE-175542", "Is Churn": true, Source: "Owner validated 2026-07-14" },
-];
+const churnRows = operationalPrivate.lifecycle.churnRows;
 
 const plannedFieldCreated = await ensurePlannedResumeField();
 const customerRecords = await Promise.all(customerChanges.map(async (change) => ({ id: (await findCustomer(change.name)).id, fields: change.fields })));
 if (APPLY) {
   await request(`https://api.airtable.com/v0/${BASE_ID}/${TABLES.customers}`, { method: "PATCH", body: JSON.stringify({ records: customerRecords, typecast: true }) });
-  const jobRecords = ["recfS7sOpAtiszgaV", "recr0IJOP4s952Ee0"].map((id) => ({ id, fields: { "Service Type": "one_time" } }));
+  const jobRecords = operationalPrivate.lifecycle.jobRecordIds.map((id) => ({ id, fields: { "Service Type": "one_time" } }));
   await request(`https://api.airtable.com/v0/${BASE_ID}/${TABLES.jobs}`, { method: "PATCH", body: JSON.stringify({ records: jobRecords, typecast: true }) });
-  await request(`https://api.airtable.com/v0/${BASE_ID}/${TABLES.oneTime}`, { method: "PATCH", body: JSON.stringify({ performUpsert: { fieldsToMergeOn: ["Client Name"] }, records: [{ fields: { "Client Name": "Michelle Bostater", "Onboarded Date": "2026-06-29", "Last Invoice Date": "2026-07-03" } }], typecast: true }) });
+  await request(`https://api.airtable.com/v0/${BASE_ID}/${TABLES.oneTime}`, { method: "PATCH", body: JSON.stringify({ performUpsert: { fieldsToMergeOn: ["Client Name"] }, records: operationalPrivate.lifecycle.oneTimeRecords, typecast: true }) });
   await request(`https://api.airtable.com/v0/${BASE_ID}/${TABLES.churn}`, { method: "PATCH", body: JSON.stringify({ performUpsert: { fieldsToMergeOn: ["Event ID"] }, records: churnRows.map((fields) => ({ fields })), typecast: true }) });
 }
 
-console.log(JSON.stringify({ apply: APPLY, plannedResumeFieldCreated: plannedFieldCreated, customers: customerChanges.map(({ name, fields }) => ({ name, status: fields.Status })), jobsReclassified: 2, oneTimeClientsUpserted: 1, lifecycleRowsUpserted: churnRows.length }, null, 2));
+console.log(JSON.stringify({ apply: APPLY, plannedResumeFieldCreated: plannedFieldCreated, customers: customerChanges.map(({ name, fields }) => ({ name, status: fields.Status })), jobsReclassified: operationalPrivate.lifecycle.jobRecordIds.length, oneTimeClientsUpserted: operationalPrivate.lifecycle.oneTimeRecords.length, lifecycleRowsUpserted: churnRows.length }, null, 2));
