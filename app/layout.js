@@ -1,22 +1,8 @@
-import { Bricolage_Grotesque, Hanken_Grotesk } from "next/font/google";
+import "./fonts.css";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { localBusinessJsonLd, site } from "@/lib/site";
-
-const bricolage = Bricolage_Grotesque({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-bricolage",
-  display: "swap",
-});
-
-const hanken = Hanken_Grotesk({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-hanken",
-  display: "swap",
-});
 
 export const metadata = {
   metadataBase: new URL(site.url),
@@ -50,7 +36,11 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${bricolage.variable} ${hanken.variable}`}>
+    <html lang="en" className="opwp-local-fonts">
+      <head>
+        <link rel="preload" href="/assets/fonts/313510e2713fb214-s.p.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/assets/fonts/9d5a263311222317-s.p.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+      </head>
       <body>
         <script
           type="application/ld+json"
