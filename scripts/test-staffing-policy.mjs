@@ -19,7 +19,7 @@ assert.equal(PRIMARY_FIELD_TECHNICIAN, staffPrivate.primaryName);
 assert.equal(RELIEF_FIELD_TECHNICIAN, staffPrivate.reliefName);
 assert.deepEqual(INACTIVE_FIELD_TECHNICIANS, [staffPrivate.inactiveNames[0]]);
 assert.equal(isInactiveFieldTechnician(staffPrivate.inactiveNames[0]), true);
-assert.equal(isInactiveFieldTechnician("bria-mahaney"), true);
+assert.equal(isInactiveFieldTechnician(staffPrivate.inactiveNames[0].toLowerCase().replace(/\s+/g, "-")), true);
 assert.equal(isInactiveFieldTechnician(staffPrivate.primaryName), false);
 assert.equal(onboardingRouteTechnician(), staffPrivate.primaryName);
 assert.equal(enforceTonyMinimumWeeklyHours(32), 40);
