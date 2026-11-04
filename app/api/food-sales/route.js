@@ -14,14 +14,14 @@ export async function GET(request) {
       return Response.json({ok:true,saved:Boolean(saved),result:saved?JSON.parse(saved.result):null},{headers:salesHeaders});
     }
     const policy=await foodSalesPolicy(db),q=text(url.searchParams.get('q'),100);
-    const customers=q.length>=2?(await db.prepare(`SELECT id,first_name,last_name,email,phone FROM dog_food_customers WHERE deleted_at IS NULL AND status='active'
+    const customers=q.length>=1?(await db.prepare(`SELECT id,first_name,last_name,email,phone FROM dog_food_customers WHERE deleted_at IS NULL AND status='active'
       AND (instr(lower(first_name||' '||last_name),lower(?))>0 OR instr(lower(email),lower(?))>0 OR instr(phone,?)>0) ORDER BY last_name LIMIT 20`).bind(q,q,q).all()).results||[]:[];
     const ids=(await db.prepare('SELECT order_id FROM dog_food_sales_order_metadata WHERE recorded_by=? ORDER BY created_at DESC LIMIT 20').bind(c.auth.member.id).all()).results||[];
     const recent=[];for(const row of ids){try{const o=await foodSalesOrder(db,row.order_id);recent.push({id:o.id,orderNumber:o.order_number,customerName:`${o.first_name} ${o.last_name}`,totalCents:o.total_cents,receivedCents:o.received_cents,balanceCents:o.balance_cents,paymentStatus:o.payment_status,fulfillmentMethod:o.fulfillment_method,fulfillmentStatus:o.handoff_status==='delivered'?'completed':'pending'});}catch(error){if(error.status!==404)throw error;}}
     const products=(await db.prepare('SELECT id,name,color,formula_code,bag_weight_lb,retail_price_cents FROM dog_food_products WHERE is_active=1 AND retail_price_cents>0 ORDER BY formula_code').all()).results||[];
     const addresses=customers.length?(await db.prepare(`SELECT id,customer_id,line1,city,state,postal_code FROM dog_food_addresses WHERE customer_id IN(${customers.map(()=>'?').join(',')}) AND postal_code<>'00000' ORDER BY is_primary DESC LIMIT 60`).bind(...customers.map(c=>c.id)).all()).results||[]:[];
-    const inventory=await db.prepare('SELECT COUNT(*) n FROM dog_food_stock_lots WHERE usable_bags>0 AND quarantined=0 AND expiry_assumed=0 AND best_before>=?').bind(foodDate()).first();
-    return Response.json({ok:true,member:c.auth.member,policy,recordingEnabled:c.env.FOOD_SALES_RECORDING_ENABLED==='true',inventoryConfigured:inventory.n>0,customers,addresses,products,recent},{headers:salesHeaders});
+    const inventory=await foodSalesService.inventory(db);
+    return Response.json({ok:true,member:c.auth.member,policy,recordingEnabled:c.env.FOOD_SALES_RECORDING_ENABLED==='true',inventoryConfigured:inventory.configured,stockBasis:inventory.basis,customers,addresses,products:products.map(p=>({...p,available:inventory.products.find(s=>s.id===p.id)?.available??null})),recent},{headers:salesHeaders});
   }catch(error){return salesError(error);}
 }
 export async function POST(request) {

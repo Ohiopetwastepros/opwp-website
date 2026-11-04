@@ -5,6 +5,11 @@
       "path": "migrations/0060_unified_food_sales.sql",
       "reviewedSource": "schema-proposals/0060_unified_food_sales.sql",
       "sha256": "50f8854d0bed902b108c13b733b2fadc44dc078fc93449df56d09e09bbb0f351"
+    },
+    {
+      "path": "migrations/0061_food_sales_counts_customers.sql",
+      "reviewedSource": "schema-proposals/0061_food_sales_counts_customers.sql",
+      "sha256": "1adb2c40cf42ded43c0c8742801f41c0fd53611be35b2f811c90fd736e45039e"
     }
   ]
 }

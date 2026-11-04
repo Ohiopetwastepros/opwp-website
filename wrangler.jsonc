@@ -40,7 +40,7 @@
   "vars": {
     "APP_ENV": "production",
     "FOOD_SALES_NATIVE_ENABLED": "true",
-    "FOOD_SALES_RECORDING_ENABLED": "false",
+    "FOOD_SALES_RECORDING_ENABLED": "true",
     "FOOD_SALES_LEGACY_WRITES_FROZEN": "false",
     "FOOD_SALES_SNG_RECONCILIATION_ENABLED": "false",
     "DISPATCH_AUTOMATION_ENABLED": "false",

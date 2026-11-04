@@ -18,6 +18,7 @@ export function setup({bags=8}={}) {
   const seed={tables:{Products:[row('recPink',{'Product Name':'Chicken Pink','Formula Code':'22-12','Bag Weight':40,'Retail Price':59,'Active Status':true,'Website Product ID':pink}),row('recBlue',{'Product Name':'Active Blue','Formula Code':'26-14','Bag Weight':40,'Retail Price':59,'Active Status':true,'Website Product ID':blue})],Sales:[],'Inventory Adjustments':[row('count-pink',{Product:['recPink'],'Movement Type':'Stock Count','Counted Quantity':bags,'Movement Date':yesterday}),row('count-blue',{Product:['recBlue'],'Movement Type':'Stock Count','Counted Quantity':bags,'Movement Date':yesterday})]}};
   const f=fixture(seed);
   f.sql.exec(fs.readFileSync(new URL('../../schema-proposals/0060_unified_food_sales.sql',import.meta.url),'utf8'));
+  f.sql.exec(fs.readFileSync(new URL('../../schema-proposals/0061_food_sales_counts_customers.sql',import.meta.url),'utf8'));
   f.sql.exec(`UPDATE dog_food_sales_settings SET enabled=1,pricing_policy='catalog_lucas_775',approved_by='synthetic-owner',approved_at=CURRENT_TIMESTAMP,sng_enabled=1;
     UPDATE dog_food_products SET retail_price_cents=5900 WHERE is_active=1;
     UPDATE dog_food_products SET airtable_record_id='recPink' WHERE id='edf-22-12-pink-40';
