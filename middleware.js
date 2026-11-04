@@ -32,6 +32,9 @@ async function routeMiddleware(request, adminRequestHeaders) {
       { status: 403, headers: { "Cache-Control": "no-store" } },
     );
   }
+  // Public food-sales shell contains no records. Its APIs enforce the dedicated
+  // session, grants, rollout gate, CSRF and rate limits on every request.
+  if(pathname==='/food-sales'||pathname.startsWith('/food-sales/')||pathname.startsWith('/api/food-sales'))return NextResponse.next({request:{headers:adminRequestHeaders}});
   if (PUBLIC_OFFICE_PATHS.has(pathname)) return NextResponse.next();
   if (pathname === "/office" || pathname.startsWith("/office/") || pathname.startsWith("/api/office/")) {
     const auth = await verifyOfficeRequest(request.headers, getDb());
@@ -122,4 +125,4 @@ export async function middleware(request) {
   return response;
 }
 
-export const config = { matcher: ["/admin/:path*", "/api/admin/:path*", "/field/:path*", "/api/field/:path*", "/office/:path*", "/api/office/:path*", "/dog-food/account/:path*", "/api/dog-food/account/:path*", "/api/dog-food/session/:path*", "/api/dog-food/order/:path*"] };
+export const config = { matcher: ["/food-sales/:path*", "/api/food-sales/:path*", "/admin/:path*", "/api/admin/:path*", "/field/:path*", "/api/field/:path*", "/office/:path*", "/api/office/:path*", "/dog-food/account/:path*", "/api/dog-food/account/:path*", "/api/dog-food/session/:path*", "/api/dog-food/order/:path*"] };

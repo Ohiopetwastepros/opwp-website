@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "path": "migrations/0060_unified_food_sales.sql",
+      "reviewedSource": "schema-proposals/0060_unified_food_sales.sql",
+      "sha256": "50f8854d0bed902b108c13b733b2fadc44dc078fc93449df56d09e09bbb0f351"
+    }
+  ]
+}

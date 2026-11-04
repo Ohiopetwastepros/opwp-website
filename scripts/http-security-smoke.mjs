@@ -13,6 +13,11 @@ for (const path of ["/admin/", "/office/", "/field/"]) {
 for (const path of ["/api/admin/operations-audit/", "/api/field/today/", "/api/office/route-assignment/"]) {
   assert.equal(await status(path), 401, path + " should reject unauthenticated requests");
 }
+assert.ok([401,503].includes(await status('/api/food-sales/')));
+assert.equal(await status('/api/admin/dog-food/sales-review/'),401);
+assert.equal(await status('/api/admin/dog-food/staff-access/'),401);
+assert.equal(await status('/api/food-sales/',jsonPost({action:'save'},{origin:'https://attacker.test','sec-fetch-site':'cross-site'})),403);
+assert.equal(await status('/api/food-sales/session/',jsonPost({email:'synthetic@example.test',pin:'000000'},{origin:'https://attacker.test','sec-fetch-site':'cross-site'})),403);
 assert.equal(await status("/api/admin/yardops/settings/", { ...jsonPost({ assistantEnabled: false }), method: "PATCH" }), 401);
 assert.equal(await status("/api/admin/yardops/settings/", { ...jsonPost({}, { origin: "https://attacker.test", "sec-fetch-site": "cross-site" }), method: "PATCH" }), 403);
 assert.equal(await status("/api/admin/yardops/answers/", { ...jsonPost({ answerKey: "test" }), method: "PUT" }), 401);

@@ -22,6 +22,16 @@ export function validateBuildInputs({production=false}={}) {
     const archive=JSON.parse(fs.readFileSync(path.join(root,'private/production-migrations.json'),'utf8'));
     if(!Array.isArray(archive.files)||archive.files.length!==60)throw Error('Original production migration archive is incomplete.');
     for(const file of archive.files)if(!/^migrations\/\d{4}_[a-z0-9_]+\.sql$/.test(file.path)||digest(file.path)!==file.sha256)throw Error('Original production migration bytes changed.');
+    const changeIndex='data/production-schema-changes.json';
+    const additions=fs.existsSync(path.join(root,changeIndex))?JSON.parse(fs.readFileSync(path.join(root,changeIndex),'utf8')):{schemaVersion:1,files:[]};
+    if(additions.schemaVersion!==1||!Array.isArray(additions.files))throw Error('Reviewed production schema change index is invalid.');
+    const known=new Set(archive.files.map(file=>file.path));
+    for(const file of additions.files){
+      if(!/^migrations\/\d{4}_[a-z0-9_]+\.sql$/.test(file.path)||known.has(file.path)||!/^schema-proposals\/\d{4}_[a-z0-9_]+\.sql$/.test(file.reviewedSource))throw Error('New production migration requires a unique reviewed source.');
+      if(digest(file.path)!==file.sha256||digest(file.reviewedSource)!==file.sha256)throw Error('Reviewed production schema change bytes differ.');
+      known.add(file.path);
+    }
+    for(const name of fs.readdirSync(path.join(root,'migrations')).filter(name=>name.endsWith('.sql')))if(!known.has('migrations/'+name))throw Error('Unreviewed production migration file is not allowed.');
   }
   return manifest.mode;
 }

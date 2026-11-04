@@ -1,0 +1,198 @@
+{
+  "mode": "dry-run-only",
+  "dataClass": "synthetic",
+  "asOf": "2026-11-04T12:00:00Z",
+  "inputHash": "2a763d472bb41bfffaf5a66ae97771b6e24aa49dd578a3aa17db8e1a8195b621",
+  "sourceCounts": {
+    "native": {
+      "customers": 1,
+      "products": 1,
+      "orders": 1,
+      "items": 1,
+      "payments": 1,
+      "lots": 1,
+      "subscriptions": 0,
+      "movements": 0
+    },
+    "airtable": {
+      "customers": 1,
+      "products": 1,
+      "sales": 2,
+      "receipts": 1,
+      "subscriptions": 1,
+      "stock": 1
+    },
+    "sng": {
+      "customers": 1,
+      "invoices": 1,
+      "payments": 2,
+      "plans": 1
+    }
+  },
+  "before": {
+    "orders": 1,
+    "salesCents": 6357,
+    "receivedCents": 3000,
+    "balanceCents": 3357
+  },
+  "proposedAfter": {
+    "orders": 2,
+    "salesCents": 18357,
+    "receivedCents": 9000,
+    "balanceCents": 9357
+  },
+  "maps": [
+    {
+      "kind": "customer",
+      "source": "airtable",
+      "sourceId": "airtable-customer-1",
+      "nativeId": "customer-1",
+      "evidence": "source_native_id"
+    },
+    {
+      "kind": "customer",
+      "source": "sng",
+      "sourceId": "sng-customer-1",
+      "nativeId": "customer-1",
+      "evidence": "source_native_id"
+    },
+    {
+      "kind": "product",
+      "source": "airtable",
+      "sourceId": "airtable-pink",
+      "nativeId": "product-pink",
+      "evidence": "source_native_id"
+    },
+    {
+      "kind": "order_line",
+      "source": "airtable",
+      "sourceId": "projected-sale",
+      "nativeId": "line-1",
+      "evidence": "exact_website_line_id"
+    }
+  ],
+  "duplicates": [
+    {
+      "source": "airtable",
+      "sourceId": "projected-sale",
+      "nativeOrderId": "order-1",
+      "nativeLineId": "line-1",
+      "action": "retain_projection_only"
+    },
+    {
+      "source": "sng",
+      "sourceId": "sng-payment-1",
+      "nativePaymentId": "payment-1",
+      "action": "attach_source_evidence_only"
+    }
+  ],
+  "imports": [
+    {
+      "kind": "historical_order",
+      "migrationKey": "historical:airtable:legacy-sale",
+      "customerId": "customer-1",
+      "productId": "product-pink",
+      "original": {
+        "id": "legacy-sale",
+        "customerId": "airtable-customer-1",
+        "productId": "airtable-pink",
+        "quantity": 2,
+        "totalCents": 12000,
+        "openingReceivedCents": 2000,
+        "date": "2026-09-01",
+        "fulfillment": "delivered"
+      },
+      "receipts": [
+        {
+          "id": "legacy-receipt",
+          "saleId": "legacy-sale",
+          "amountCents": 4000,
+          "date": "2026-09-02",
+          "reference": "check-102"
+        }
+      ],
+      "receivedCents": 6000,
+      "balanceCents": 6000,
+      "stockEffect": 0,
+      "lotAllocations": [],
+      "fulfillmentHistoryOnly": true,
+      "billingAction": "none",
+      "requiredSourceTombstone": {
+        "source": "airtable",
+        "id": "legacy-sale",
+        "nativeId": "historical:airtable:legacy-sale"
+      }
+    }
+  ],
+  "exceptions": [
+    {
+      "kind": "sng_payment_requires_exact_link",
+      "id": "ambiguous-payment",
+      "invoiceId": null,
+      "stockEffect": 0
+    },
+    {
+      "kind": "mixed_or_unclassified_invoice",
+      "id": "mixed-invoice"
+    },
+    {
+      "kind": "recurring_plan_overlap_review",
+      "id": "airtable-plan-1"
+    }
+  ],
+  "inventory": [
+    {
+      "sourceId": "pink-checkpoint",
+      "productId": "product-pink",
+      "sourceOnHand": 8,
+      "lotUsableBags": 8,
+      "reservedBags": 1,
+      "proposedHistoricalStockDelta": 0,
+      "matched": true,
+      "lots": [
+        {
+          "id": "lot-1",
+          "productId": "product-pink",
+          "usableBags": 8,
+          "reservedBags": 1,
+          "bestBefore": "2027-05-01",
+          "countedAt": "2026-11-03"
+        }
+      ]
+    }
+  ],
+  "plans": [
+    {
+      "source": "airtable",
+      "original": {
+        "id": "airtable-plan-1",
+        "customerId": "airtable-customer-1",
+        "billingProvider": "sng"
+      },
+      "action": "review_exact_overlap"
+    },
+    {
+      "source": "sng",
+      "original": {
+        "id": "sng-plan-1",
+        "customerId": "sng-customer-1",
+        "amountCents": 12000
+      },
+      "action": "preserve_sng_billing"
+    }
+  ],
+  "productionReady": false,
+  "applySupported": false,
+  "proposedStockDelta": 0,
+  "requiredBeforeApply": [
+    "Verify complete source exports and deployed schema",
+    "Resolve every exception and approve exact mapping evidence",
+    "Snapshot D1, Airtable and source sync cursors",
+    "Disable legacy new-sale writers and establish durable source tombstones",
+    "Separately approve reviewed migration and rollback rehearsal"
+  ],
+  "rollback": {
+    "strategy": "Disable new writers and workers first; retain all source evidence and commands. Restore the pre-migration snapshot only before new live transactions. After new transactions, use reviewed compensating records, never destructive replay.",
+    "historicalInventory": "No current stock decrements or lot reservations are proposed for imported history."
+  }
+}

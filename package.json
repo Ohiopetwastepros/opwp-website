@@ -21,7 +21,7 @@
     "test:http-security": "node scripts/http-security-smoke.mjs",
     "audit:production": "npm audit --omit=dev --audit-level=high",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint app components lib scripts middleware.js next.config.js",
     "deployment:pending": "node scripts/deploy.mjs --pending",
     "deployment:check": "node scripts/deployment-controller.mjs",
     "prebuild": "node scripts/prepare-build-inputs.mjs",
@@ -39,6 +39,8 @@
     "react-dom": "19.0.0"
   },
   "devDependencies": {
+    "eslint": "10.14.0",
+    "eslint-plugin-react-hooks": "7.1.1",
     "wrangler": "4.154.0"
   },
   "overrides": {

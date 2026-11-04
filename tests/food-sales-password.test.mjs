@@ -1,0 +1,98 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import {setup} from './helpers/unified-food-sales-fixture.mjs';
+import * as auth from '../lib/food-sales-auth.mjs';
+import * as staff from '../lib/food-sales-staff.mjs';
+import * as ledger from '../lib/food-sales-ledger.mjs';
+import * as logic from '../lib/dog-food-operations.mjs';
+const password='Synthetic-only!Food2026',origin='https://example.test';
+const body=(extra={})=>({action:'invite',commandId:crypto.randomUUID(),email:'new-staff@example.test',name:'Test Seller',confirm:true,...extra});
+const tokenOf=result=>new URL(result.setupUrl).hash.slice('#setup='.length);
+const source=path=>fs.readFileSync(new URL('../'+path,import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'');
+test('staff identity preparation is read-only; invitation grants only viewer plus food permissions',async()=>{
+  const f=setup(),before=f.sql.prepare('SELECT count(*) n FROM route_partner_members').get().n;
+  const plan=await staff.prepareFoodSalesStaff(f.db,{email:'New-Staff@Example.Test'});assert.equal(plan.newMember,true);assert.equal(plan.baseRole,'viewer');
+  assert.equal(f.sql.prepare('SELECT count(*) n FROM route_partner_members').get().n,before);
+  const request=body(),invited=await staff.inviteFoodSalesStaff(f.db,request,'owner',origin),token=tokenOf(invited);
+  assert.equal(token.length,64);assert.equal(f.sql.prepare('SELECT role FROM route_partner_members WHERE id=?').get(invited.memberId).role,'viewer');
+  assert.equal(f.sql.prepare('SELECT count(*) n FROM route_partner_field_credentials WHERE member_id=?').get(invited.memberId).n,0);
+  assert.equal((await auth.authenticateFoodSales(f.db,request.email,password)).authorized,false);
+  const replay=await staff.inviteFoodSalesStaff(f.db,request,'owner',origin);assert.equal(replay.reused,true);assert.equal(replay.setupUrl,undefined);
+  assert.equal(f.sql.prepare('SELECT count(*) n FROM route_partner_members').get().n,before+1);
+  const stored=JSON.stringify({invitations:f.sql.prepare('SELECT * FROM dog_food_sales_invitations').all(),commands:f.sql.prepare('SELECT * FROM dog_food_sales_commands').all(),audit:f.sql.prepare('SELECT * FROM dog_food_ops_audit').all()});
+  assert.equal(stored.includes(token),false);assert.equal(stored.includes(password),false);
+  await assert.rejects(staff.inviteFoodSalesStaff(f.db,{...request,name:'Other Name'},'owner',origin),/conflict/);
+});
+test('one-time setup enforces password bounds, stores scrypt hashes and supports email/password login',async()=>{
+  const f=setup(),invited=await staff.inviteFoodSalesStaff(f.db,body(),'owner',origin),token=tokenOf(invited);
+  await assert.rejects(auth.activateFoodSalesPassword(f.db,{token,password:'Short1!',passwordConfirm:'Short1!'}),/15 characters/);
+  await assert.rejects(auth.activateFoodSalesPassword(f.db,{token,password,passwordConfirm:'different'}),/match/);
+  await auth.activateFoodSalesPassword(f.db,{token,password,passwordConfirm:password});
+  const stored=f.sql.prepare('SELECT password_hash FROM dog_food_sales_credentials WHERE member_id=?').get(invited.memberId).password_hash;
+  assert.ok(stored.startsWith('scrypt:16384:8:5:'));assert.notEqual(stored,password);
+  const login=await auth.authenticateFoodSales(f.db,'NEW-STAFF@EXAMPLE.TEST',password);assert.equal(login.authorized,true);
+  assert.equal((await auth.authenticateFoodSales(f.db,invited.email,'123456')).authorized,false);
+  await assert.rejects(auth.activateFoodSalesPassword(f.db,{token,password,passwordConfirm:password}),/invalid or expired/);
+  assert.equal((await auth.verifyFoodSalesRequest(new Headers({cookie:auth.FOOD_SALES_COOKIE+'='+login.token}),f.db)).authorized,true);
+});
+test('expired and revoked invitations cannot set passwords',async()=>{
+  const f=setup(),invited=await staff.inviteFoodSalesStaff(f.db,body(),'owner',origin),token=tokenOf(invited);
+  f.sql.exec("UPDATE dog_food_sales_invitations SET expires_at=datetime('now','-1 second')");
+  await assert.rejects(auth.activateFoodSalesPassword(f.db,{token,password,passwordConfirm:password}),/invalid or expired/);
+  const fresh=await staff.inviteFoodSalesStaff(f.db,body(),'owner',origin);await staff.revokeFoodSalesStaff(f.db,fresh.memberId,'owner');
+  await assert.rejects(auth.activateFoodSalesPassword(f.db,{token:tokenOf(fresh),password,passwordConfirm:password}),/invalid or expired/);
+});
+test('reset is explicit, invalidates old sessions and setup links, and never changes field credentials',async()=>{
+  const f=setup(),email='seller@example.test';
+  await assert.rejects(staff.inviteFoodSalesStaff(f.db,body({email}),'owner',origin),/Explicitly confirm/);
+  const pinBefore=f.sql.prepare("SELECT pin_hash FROM route_partner_field_credentials WHERE member_id='seller'").get().pin_hash;
+  const login=await auth.authenticateFoodSales(f.db,email,'synthetic',async()=>true),headers=new Headers({cookie:auth.FOOD_SALES_COOKIE+'='+login.token});
+  const one=await staff.inviteFoodSalesStaff(f.db,body({email,replaceExistingPassword:true}),'owner',origin);
+  assert.equal((await auth.verifyFoodSalesRequest(headers,f.db)).authorized,false);
+  const two=await staff.inviteFoodSalesStaff(f.db,body({email}),'owner',origin);
+  await assert.rejects(auth.activateFoodSalesPassword(f.db,{token:tokenOf(one),password,passwordConfirm:password}),/invalid or expired/);
+  await auth.activateFoodSalesPassword(f.db,{token:tokenOf(two),password,passwordConfirm:password});
+  assert.equal((await auth.authenticateFoodSales(f.db,email,password)).authorized,true);
+  assert.equal(f.sql.prepare("SELECT pin_hash FROM route_partner_field_credentials WHERE member_id='seller'").get().pin_hash,pinBefore);
+});
+test('concurrent redemption and grant revocation cannot leave an unauthorized password/session',async()=>{
+  const f=setup(),invited=await staff.inviteFoodSalesStaff(f.db,body(),'owner',origin),token=tokenOf(invited);
+  const results=await Promise.allSettled([auth.activateFoodSalesPassword(f.db,{token,password,passwordConfirm:password}),auth.activateFoodSalesPassword(f.db,{token,password,passwordConfirm:password})]);
+  assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+  const g=setup(),invite=await staff.inviteFoodSalesStaff(g.db,body(),'owner',origin);
+  const pending=auth.activateFoodSalesPassword(g.db,{token:tokenOf(invite),password,passwordConfirm:password});
+  await staff.revokeFoodSalesStaff(g.db,invite.memberId,'owner');await assert.rejects(pending);
+  assert.equal((await auth.authenticateFoodSales(g.db,invite.email,password)).authorized,false);
+});
+test('owner/manager identities, inactive accounts and ambiguous emails cannot be silently reused',async()=>{
+  const f=setup();f.sql.exec("UPDATE route_partner_members SET role='manager' WHERE id='seller'");
+  await assert.rejects(staff.prepareFoodSalesStaff(f.db,{email:'seller@example.test'}),/separate access review/);
+  f.sql.exec("UPDATE route_partner_members SET role='viewer',status='inactive' WHERE id='seller'");
+  await assert.rejects(staff.prepareFoodSalesStaff(f.db,{email:'seller@example.test'}),/separate access review/);
+  f.sql.exec("UPDATE route_partner_members SET status='active' WHERE id='seller'; INSERT INTO route_partner_members(id,organization_id,email,display_name,role,status) VALUES('duplicate','org-opwp','Seller@Example.Test','Duplicate','viewer','active')");
+  await assert.rejects(staff.prepareFoodSalesStaff(f.db,{email:'seller@example.test'}),/Duplicate staff email/);
+});
+test('technician reuse requires an explicit existing-field-access acknowledgement',async()=>{
+  const f=setup();f.sql.exec("UPDATE route_partner_members SET role='technician' WHERE id='seller'");
+  await assert.rejects(staff.inviteFoodSalesStaff(f.db,body({email:'seller@example.test',replaceExistingPassword:true}),'owner',origin),/field access/);
+  const result=await staff.inviteFoodSalesStaff(f.db,body({email:'seller@example.test',replaceExistingPassword:true,acknowledgeExistingFieldAccess:true}),'owner',origin);
+  assert.equal(result.baseRole,'technician');assert.equal(f.sql.prepare("SELECT role FROM route_partner_members WHERE id='seller'").get().role,'technician');
+});
+test('password API rejects PIN requests and cross-site requests; setup works only through the intended boundary',async()=>{
+  const f=setup();
+  const route=vm.runInNewContext(source('app/api/food-sales/session/route.js')+'\n({POST})',{...auth,foodSalesContext:async r=>r.headers.get('origin')===origin?{env:{DB:f.db}}:{response:Response.json({error:'cross site'},{status:403})},salesHeaders:{'Cache-Control':'no-store'},salesError:error=>Response.json({error:error.message},{status:error.status||400}),checkRateLimit:async()=>({allowed:true}),rateLimitResponse:()=>Response.json({error:'limited'},{status:429}),readBoundedBytes:async r=>new Uint8Array(await r.arrayBuffer()),NextResponse:{json:()=>{throw Error('unexpected login');}},Response,TextEncoder,TextDecoder});
+  const request=(body,site=origin)=>new Request(origin+'/api/food-sales/session/',{method:'POST',headers:{origin:site},body:JSON.stringify(body)});
+  assert.equal((await route.POST(request({email:'seller@example.test',pin:'123456'}))).status,400);
+  assert.equal((await route.POST(request({email:'seller@example.test',password},'https://evil.test'))).status,403);
+  const invite=await staff.inviteFoodSalesStaff(f.db,body(),'owner',origin);
+  assert.equal((await route.POST(request({action:'set_password',token:tokenOf(invite),password,passwordConfirm:password}))).status,200);
+});
+test('food staff sessions cannot administer staff access; owner MFA and same-origin checks are mandatory',async()=>{
+  const f=setup();let owner=false;
+  const route=vm.runInNewContext(source('app/api/admin/dog-food/staff-access/route.js')+'\n({GET,POST})',{...staff,...logic,verifyAdminRequest:async()=>({authorized:owner,email:'owner'}),getRuntimeEnv:()=>({DB:f.db,FOOD_SALES_NATIVE_ENABLED:'true'}),checkRateLimit:async()=>({allowed:true}),rateLimitResponse:()=>Response.json({error:'limited'},{status:429}),readBoundedBytes:async r=>new Uint8Array(await r.arrayBuffer()),salesHeaders:{'Cache-Control':'no-store'},salesError:error=>Response.json({error:error.message},{status:error.status||400}),Response,URL,TextDecoder});
+  assert.equal((await route.GET(new Request(origin+'/api/admin/dog-food/staff-access/'))).status,401);
+  owner=true;const request=new Request(origin+'/api/admin/dog-food/staff-access/',{method:'POST',headers:{origin:'https://evil.test'},body:JSON.stringify(body())});assert.equal((await route.POST(request)).status,403);
+  const result=await route.GET(new Request(origin+'/api/admin/dog-food/staff-access/'));assert.equal(result.status,200);const payload=JSON.stringify(await result.json());assert.equal(payload.includes('password_hash'),false);
+});

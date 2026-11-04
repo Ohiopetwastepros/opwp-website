@@ -1,0 +1,12 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {foodSalesMigrationDryRun} from '../lib/food-sales-migration.mjs';
+const args=process.argv.slice(2);
+if(args.length!==4||args[0]!=='--input'||args[2]!=='--output')throw Error('Usage: node scripts/food-sales-dry-run.mjs --input private/export.json --output private/dry-run.json (no apply mode exists)');
+const input=path.resolve(args[1]),output=path.resolve(args[3]);
+if(input===output)throw Error('The output must not overwrite source evidence.');
+if(fs.statSync(input).size>16*1024*1024)throw Error('Export exceeds 16 MiB reviewed bound.');
+const evidence=JSON.parse(fs.readFileSync(input,'utf8'));
+if(evidence.dataClass!=='synthetic'&&!output.replaceAll('\\','/').includes('/private/'))throw Error('Operational dry runs must remain in ignored private storage.');
+const result=await foodSalesMigrationDryRun(evidence);fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify(result,null,2)+'\n');
+console.log(JSON.stringify({mode:result.mode,dataClass:result.dataClass,inputHash:result.inputHash,before:result.before,proposedAfter:result.proposedAfter,duplicates:result.duplicates.length,exceptions:result.exceptions.length,proposedStockDelta:0,productionReady:false}));

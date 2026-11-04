@@ -115,3 +115,11 @@ META_TEST_FORM_IDS=""
 FIELD_NOTIFICATIONS_ENABLED="false"
 FIELD_SMS_DAILY_LIMIT="100"
 FIELD_QUO_WEBHOOK_SIGNING_KEY=""
+# Native food-sales pilot is disabled until the proposed schema, pricing and grants are approved.
+FOOD_SALES_NATIVE_ENABLED=false
+# Enable new native sales only after inventory verification; also freezes legacy new-sale entry.
+FOOD_SALES_RECORDING_ENABLED=false
+# Keep true after pilot activation if native writers are later paused.
+FOOD_SALES_LEGACY_WRITES_FROZEN=false
+# Separate review of actual SNG evidence is required before replacing legacy reconciliation.
+FOOD_SALES_SNG_RECONCILIATION_ENABLED=false

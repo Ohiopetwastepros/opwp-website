@@ -74,7 +74,7 @@ const nextConfig = {
     }, {
       // Admin middleware owns these headers so global defaults cannot be
       // appended to (and weaken) its DENY / no-referrer policies.
-      source: "/:path((?!field/app(?:/|$)|admin(?:/|$)|api/admin(?:/|$)|dog-food/account(?:/|$)|api/dog-food/(?:account|session|order)(?:/|$)).*)",
+      source: "/:path((?!field/app(?:/|$)|admin(?:/|$)|api/admin(?:/|$)|food-sales(?:/|$)|api/food-sales(?:/|$)|dog-food/account(?:/|$)|api/dog-food/(?:account|session|order)(?:/|$)).*)",
       headers: [
         { key: "X-Frame-Options", value: "SAMEORIGIN" },
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

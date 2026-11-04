@@ -33,8 +33,9 @@ export async function POST(request) {
     else if (body.action === 'checkout') orderId = typeof body.orderId === 'string' ? body.orderId.slice(0, 80) : '';
     else if (body.action === 'payment_method') return reply({ ok: true, ...await createDogFoodPaymentSetup({ db, customerId: account.customer_id, origin: applicationConfig().siteOrigin }) });
     else throw new FoodAccountError('Choose a valid account action.');
-    const order = await db.prepare('SELECT id,status FROM dog_food_orders WHERE id=? AND customer_id=? AND deleted_at IS NULL').bind(orderId, account.customer_id).first();
+    const order = await db.prepare('SELECT id,status,source FROM dog_food_orders WHERE id=? AND customer_id=? AND deleted_at IS NULL').bind(orderId, account.customer_id).first();
     if (!order) throw new FoodAccountError('The order was not found.', 404);
+    if(order.source==='staff_sales')throw new FoodAccountError('Contact the office to pay the remaining balance on this staff-recorded sale.',409);
     const paid = await db.prepare("SELECT id FROM dog_food_payments WHERE order_id=? AND status='captured' LIMIT 1").bind(order.id).first();
     if (paid) throw new FoodAccountError('This order has already been paid. Refresh your order history.', 409);
     const checkout = await createDogFoodCheckout({ db, orderId: order.id, origin: applicationConfig().siteOrigin });
