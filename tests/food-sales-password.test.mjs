@@ -7,7 +7,7 @@ import * as auth from '../lib/food-sales-auth.mjs';
 import * as staff from '../lib/food-sales-staff.mjs';
 import * as ledger from '../lib/food-sales-ledger.mjs';
 import * as logic from '../lib/dog-food-operations.mjs';
-const password='Synthetic-only!Food2026',origin='https://example.test';
+const password='Test-only!26',origin='https://example.test';
 const body=(extra={})=>({action:'invite',commandId:crypto.randomUUID(),email:'new-staff@example.test',name:'Test Seller',confirm:true,...extra});
 const tokenOf=result=>new URL(result.setupUrl).hash.slice('#setup='.length);
 const source=path=>fs.readFileSync(new URL('../'+path,import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'');
@@ -27,7 +27,9 @@ test('staff identity preparation is read-only; invitation grants only viewer plu
 });
 test('one-time setup enforces password bounds, stores scrypt hashes and supports email/password login',async()=>{
   const f=setup(),invited=await staff.inviteFoodSalesStaff(f.db,body(),'owner',origin),token=tokenOf(invited);
-  await assert.rejects(auth.activateFoodSalesPassword(f.db,{token,password:'Short1!',passwordConfirm:'Short1!'}),/15 characters/);
+  await assert.rejects(auth.activateFoodSalesPassword(f.db,{token,password:'Short1!',passwordConfirm:'Short1!'}),/8-12 characters/);
+  for(const invalid of ['Abcdefghijk!x','abcdefghijk!','Abcdefghijk1'])await assert.rejects(auth.activateFoodSalesPassword(f.db,{token,password:invalid,passwordConfirm:invalid}),/8-12 characters/);
+  const shortest=await auth.hashFoodSalesPassword('Test!123');assert.equal(typeof shortest,'string');
   await assert.rejects(auth.activateFoodSalesPassword(f.db,{token,password,passwordConfirm:'different'}),/match/);
   await auth.activateFoodSalesPassword(f.db,{token,password,passwordConfirm:password});
   const stored=f.sql.prepare('SELECT password_hash FROM dog_food_sales_credentials WHERE member_id=?').get(invited.memberId).password_hash;

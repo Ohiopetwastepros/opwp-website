@@ -11,7 +11,7 @@ import * as ledger from '../lib/food-sales-ledger.mjs';
 import * as logic from '../lib/dog-food-operations.mjs';
 const root=process.cwd(),port=4330,origin=`http://127.0.0.1:${port}`,f=setup();
 const source=path=>fs.readFileSync(path,'utf8').replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'');
-await f.db.prepare('UPDATE dog_food_sales_credentials SET password_hash=? WHERE member_id=?').bind(await auth.hashFoodSalesPassword('Demo-only!Sales2026'),'seller').run();
+await f.db.prepare('UPDATE dog_food_sales_credentials SET password_hash=? WHERE member_id=?').bind(await auth.hashFoodSalesPassword('Demo-only!26'),'seller').run();
 const limiter=async()=>({allowed:true}); // Rate-limit persistence is covered by API tests / HTTP smoke.
 const api=vm.runInNewContext(source('lib/food-sales-api.js')+'\n({foodSalesContext,salesError,salesHeaders})',{getRuntimeEnv:()=>({DB:f.db,FOOD_SALES_NATIVE_ENABLED:'true',FOOD_SALES_RECORDING_ENABLED:'true'}),verifyFoodSalesRequest:auth.verifyFoodSalesRequest,checkRateLimit:limiter,rateLimitResponse:()=>Response.json({error:'limited'},{status:429}),FoodError:logic.FoodError,Response,URL});
 const common={...api,...auth,...ledger,...logic,foodSalesService:f.sales,readBoundedBytes:async r=>new Uint8Array(await r.arrayBuffer()),Response,URL,TextEncoder,TextDecoder,JSON,crypto};
@@ -39,4 +39,4 @@ http.createServer(async(req,res)=>{
     if(url.pathname==='/'||url.pathname==='/food-sales/'){res.setHeader('Content-Type','text/html;charset=utf-8');res.end(html);return;}
     res.writeHead(404);res.end();
   }catch(error){res.writeHead(500,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Synthetic preview failed: '+error.message}));}
-}).listen(port,'127.0.0.1',()=>console.log(`Synthetic integrated preview: ${origin}/food-sales/ (seller@example.test / Demo-only!Sales2026). Disposable SQLite; no external providers.`));
+}).listen(port,'127.0.0.1',()=>console.log(`Synthetic integrated preview: ${origin}/food-sales/ (seller@example.test / Demo-only!26). Disposable SQLite; no external providers.`));

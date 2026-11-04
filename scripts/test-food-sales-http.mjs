@@ -6,7 +6,7 @@ async function send(path,{body,method,extraHeaders={},expected=200}={}) {
   assert.equal(r.status,expected,await r.clone().text());return {response:r,data:await r.json()};
 }
 await send('/api/food-sales/',{expected:401});
-const login=await send('/api/food-sales/session/',{body:{email:'seller@example.test',password:'Demo-only!Sales2026'}});cookie=login.response.headers.get('set-cookie').split(';')[0];
+const login=await send('/api/food-sales/session/',{body:{email:'seller@example.test',password:'Demo-only!26'}});cookie=login.response.headers.get('set-cookie').split(';')[0];
 assert.ok(login.response.headers.get('set-cookie').includes('HttpOnly'));
 const found=(await send('/api/food-sales/?q=Synthetic')).data;assert.equal(found.customers[0].id,'buyer');
 const items=[{productId:'edf-22-12-pink-40',quantity:1},{productId:'edf-26-14-blue-40',quantity:1}],quote=(await send('/api/food-sales/',{body:{action:'quote',items}})).data.result;
