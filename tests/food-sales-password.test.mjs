@@ -27,9 +27,9 @@ test('staff identity preparation is read-only; invitation grants only viewer plu
 });
 test('one-time setup enforces password bounds, stores scrypt hashes and supports email/password login',async()=>{
   const f=setup(),invited=await staff.inviteFoodSalesStaff(f.db,body(),'owner',origin),token=tokenOf(invited);
-  await assert.rejects(auth.activateFoodSalesPassword(f.db,{token,password:'Short1!',passwordConfirm:'Short1!'}),/8-12 characters/);
-  for(const invalid of ['Abcdefghijk!x','abcdefghijk!','Abcdefghijk1'])await assert.rejects(auth.activateFoodSalesPassword(f.db,{token,password:invalid,passwordConfirm:invalid}),/8-12 characters/);
-  const shortest=await auth.hashFoodSalesPassword('Test!123');assert.equal(typeof shortest,'string');
+  await assert.rejects(auth.activateFoodSalesPassword(f.db,{token,password:'Short1!',passwordConfirm:'Short1!'}),/12 characters/);
+  for(const invalid of ['Test-only!2','abcdefghijk!','Abcdefghijk1','A!'+ 'x'.repeat(255)])await assert.rejects(auth.activateFoodSalesPassword(f.db,{token,password:invalid,passwordConfirm:invalid}),/12 characters/);
+  const longer=await auth.hashFoodSalesPassword('A!'+ 'x'.repeat(254));assert.equal(typeof longer,'string');
   await assert.rejects(auth.activateFoodSalesPassword(f.db,{token,password,passwordConfirm:'different'}),/match/);
   await auth.activateFoodSalesPassword(f.db,{token,password,passwordConfirm:password});
   const stored=f.sql.prepare('SELECT password_hash FROM dog_food_sales_credentials WHERE member_id=?').get(invited.memberId).password_hash;
