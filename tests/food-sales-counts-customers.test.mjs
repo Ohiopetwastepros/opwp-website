@@ -45,6 +45,12 @@ test('count evidence cannot bypass lot requirements on other orders or be edited
   f.sql.exec("UPDATE dog_food_sales_settings SET stock_basis='lots'");
   await assert.rejects(f.save(),/lot counts/);
 });
+test('ambiguous shared product mappings cannot exclude a native sale from stock accounting',async()=>{
+  const f=counts(),snapshot=JSON.parse(f.sql.prepare("SELECT payload FROM dog_food_ops_snapshots WHERE id='initial'").get().payload);
+  snapshot.tables.Products.push({...snapshot.tables.Products[0],id:'duplicate-mapping'});
+  f.sql.prepare("UPDATE dog_food_ops_snapshots SET payload=? WHERE id='initial'").run(JSON.stringify(snapshot));
+  await assert.rejects(f.save(),/inventory/);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM dog_food_orders').get().n,0);
+});
 test('directory import retains missing contact information, merges exact source names, and is replay-safe',async()=>{
   const f=setup(),existing=await readFoodSalesCustomerDirectory(f.db),before=f.sql.prepare('SELECT COUNT(*) n FROM dog_food_accounts').get().n;
   const snapshot={tables:{Customers:[{id:'contact-1',fields:{'Customer Name':'Known Buyer',Email:'known@example.test',Phone:'4195550123'}},{id:'contact-2',fields:{'Customer Name':'Name Only'}}],Sales:[{id:'sale-1',fields:{'Sold To':' Name   Only '}},{id:'sale-2',fields:{'Sold To':'Another Buyer'}}]}};
