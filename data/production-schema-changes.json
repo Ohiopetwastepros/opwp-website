@@ -20,6 +20,11 @@
       "path": "migrations/0063_food_sale_intake.sql",
       "reviewedSource": "schema-proposals/0063_food_sale_intake.sql",
       "sha256": "bf822ddce2b3572e92686e08d92de0d6695f18604f3af92e4954a94d55ea529d"
+    },
+    {
+      "path": "migrations/0064_independent_food_backend.sql",
+      "reviewedSource": "schema-proposals/0064_independent_food_backend.sql",
+      "sha256": "113be82d56e654e7cd812412f846e25cf4dcaf246096a5ae42f28a23cc4b535c"
     }
   ]
 }

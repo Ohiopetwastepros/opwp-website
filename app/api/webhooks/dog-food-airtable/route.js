@@ -3,9 +3,11 @@ import { readBoundedBytes } from '@/lib/bounded-body.mjs';
 import { verifyFoodWebhook } from '@/lib/dog-food-ops-automation';
 import { foodSchema, syncFoodOperations } from '@/lib/dog-food-ops-store';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
+import {foodWebsiteState} from '@/lib/dog-food-website-store.mjs';
 export const dynamic='force-dynamic';
 export async function POST(request) {
   const env=getRuntimeEnv();if(!env.DB)return new Response(null,{status:503});
+  if((await foodWebsiteState(env.DB)).backend==='website')return new Response(null,{status:204});
   try {
     const state=await env.DB.prepare("SELECT webhook_id FROM dog_food_ops_state WHERE id='org-opwp'").first();
     if(!state?.webhook_id||!env.DOG_FOOD_AIRTABLE_WEBHOOK_MAC)return new Response(null,{status:503});

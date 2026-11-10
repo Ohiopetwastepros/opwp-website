@@ -82,7 +82,7 @@ test('new direct sales require a saved customer, preserve actual cash/payment st
   assert.equal(f.sql.prepare('SELECT count(*) n FROM dog_food_payments').get().n,0);assert.equal(f.sql.prepare('SELECT count(*) n FROM dog_food_orders').get().n,0);
   await f.service.syncFoodOperations(f.env,{force:true});
   const portalSource=fs.readFileSync(new URL('../lib/dog-food-portal.js',import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'');
-  const portal=runPrivateInNewContext(portalSource+'\n({readFoodPortal})',{...checkout,...profile,readFoodOperations:f.service.readFoodOperations,readFoodDeliveryChoices:async()=>({})});
+  const portal=runPrivateInNewContext(portalSource+'\n({readFoodPortal})',{...f.service,...checkout,...profile,readFoodOperations:f.service.readFoodOperations,readFoodDeliveryChoices:async()=>({})});
   const mine=await portal.readFoodPortal(f.db,f.account),other=await portal.readFoodPortal(f.db,{id:'other-account',customer_id:'other'});
   assert.equal(mine.orders.length,1);assert.equal(mine.orders[0].source,'direct');assert.equal(mine.orders[0].paid_provider,null);assert.equal(mine.orders[0].fulfillment_method,'pickup');assert.equal(mine.orders[0].balance_cents,6000);
   assert.equal(other.orders.length,1);assert.equal(other.orders[0].balance_cents,0);assert.notEqual(other.orders[0].id,mine.orders[0].id,'Durable customer IDs scope direct history; matching names are never used');

@@ -14,7 +14,7 @@ test('sales planning and shared reviews require an admin, same origin, bounded b
     Response,URL,TextDecoder,JSON,RangeError,SyntaxError,crypto,readBoundedBytes,FoodError,console:{error:()=>{}},
     verifyAdminRequest:async()=>({authorized,email:'office'}),getRuntimeEnv:()=>({DB:{}}),
     checkRateLimit:async()=>({allowed}),rateLimitResponse:()=>Response.json({ok:false},{status:429}),
-    runFoodCommand:async(env,body,actor,execute)=>{assert.equal(actor,'office');calls++;return execute();},
+    runFoodCommand:async(env,body,actor,execute)=>{assert.equal(actor,'office');calls++;return execute(env);},
     saveInventoryCost:async()=>({message:'Cost evidence saved'}),saveFoodPlanning:async()=>({message:'Planning saved'}),foodCustomerReview:async()=>({message:'Review saved'}),readFoodOperations:async()=>({}),
   });
   const request=(origin,body)=>new Request('https://example.test/api/admin/dog-food/operations/',{method:'POST',headers:{'Content-Type':'application/json',...(origin?{Origin:origin}:{})},body});
@@ -34,7 +34,7 @@ test('email recovery preserves the original request and blocks retry after the s
   const api=runPrivateInNewContext(source('app/api/admin/dog-food/automation/route.js')+'\n({POST})',{
     Response,URL,TextDecoder,JSON,RangeError,SyntaxError,crypto,readBoundedBytes,FoodError,
     verifyAdminRequest:async()=>({authorized:true,email:'owner'}),getRuntimeEnv:()=>f.env,checkRateLimit:async()=>({allowed:true}),
-    runFoodCommand:async(env,body,actor,execute)=>execute(),readFoodWorkflow:async()=>({}),
+    runFoodCommand:async(env,body,actor,execute)=>execute(env),readFoodWorkflow:async()=>({}),
   });
   const req=()=>new Request('https://example.test/api/admin/dog-food/automation/',{method:'POST',headers:{Origin:'https://example.test'},body:JSON.stringify({action:'retry_email',key:'paid:retry-order'})});
   assert.equal((await api.POST(req())).status,200);

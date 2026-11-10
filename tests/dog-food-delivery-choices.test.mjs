@@ -22,7 +22,7 @@ const roster={status:'success',stale:false,capturedAt:now.toISOString(),clients:
 ]};
 function setup() {
   const f=fixture(undefined,{routes:true});let current=structuredClone(roster);
-  const routing=runPrivateInNewContext(source('dog-food-routing.js')+'\n({foodRouteRecommendation,readFoodDeliveryChoices,locateFoodAddress})',{Date,Number,String,Map,crypto,TextEncoder,DENSITY_DAYS,densityDistance,densityAddressHash,localReliableGeocode,...cadence,readLiveDensity:async()=>current});
+  const routing=runPrivateInNewContext(source('dog-food-routing.js')+'\n({foodRouteRecommendation,readFoodDeliveryChoices,locateFoodAddress})',{...f.service,Date,Number,String,Map,crypto,TextEncoder,DENSITY_DAYS,densityDistance,densityAddressHash,localReliableGeocode,...cadence,readLiveDensity:async()=>current});
   const model={native:true,sync:{dirty:0,last_success_at:new Date().toISOString()},products:[{websiteId:'edf-22-12-pink-40',confirmed:true,onHand:8,reserved:0}]};
   const context={...logic,...food,...checkout,...cadence,...profile,...routing,...f.service,readFoodPlanning,crypto,TextEncoder,Date,Uint8Array,Map,URL,URLSearchParams,JSON,workflowSchema,getDb:()=>f.db,readFoodOperations:async()=>model,locateFoodAddress:async()=>null};
   const payments=runPrivateInNewContext(source('dog-food-payments.js')+'\n({activateDogFoodSubscriptionFromOrder,recordDogFoodPayment})',context);

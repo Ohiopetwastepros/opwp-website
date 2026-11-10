@@ -1,3 +1,5 @@
+import * as legacyPlans from '../lib/dog-food-legacy-plans.mjs';
+import * as websiteStore from '../lib/dog-food-website-store.mjs';
 import {runPrivateInNewContext} from './helpers/private-vm.mjs';
 import {foodProfileComplete,FOOD_STATES} from '../lib/dog-food-profile.mjs';
 import {foodCheckoutTotals,foodDeliveryPreference,FOOD_DELIVERY_OPTIONS,FOOD_TAX_BASIS_POINTS,foodSameDayOpen} from '../lib/dog-food-checkout.mjs';
@@ -20,7 +22,7 @@ function portalFixture(stock=10) {
   const model={sync:{dirty:0,last_success_at:new Date().toISOString()},products:[{websiteId:'edf-22-12-pink-40',confirmed:true,onHand:stock,reserved:0}]};
   f.sql.prepare("INSERT INTO dog_food_stock_lots(id,product_id,lot_number,best_before,usable_bags,counted_date,confirmed_by) VALUES ('lot','edf-22-12-pink-40','TEST','2030-01-01',?,date('now'),'test')").run(stock);
   const fulfillment=runPrivateInNewContext(fs.readFileSync(new URL('../lib/dog-food-fulfillment.js',import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'')+'\n({reserveFoodLots,checkFoodLotReconciliation})',{FoodError:FoodAccountError,Date,foodDate:()=>easternFoodDate()});
-  f.api=runPrivateInNewContext(source+'\n({readFoodPortal,saveFoodProfile,createFoodPortalOrder,manageFoodSubscription})',{...fulfillment,foodProfileComplete,FOOD_STATES,locateFoodAddress:async()=>null,readFoodDeliveryChoices:async()=>({deliveryAvailable:true,days:[{day:'Tuesday',weekday:2}],tonyDates:[]}),crypto,Map,Date,Number,String,Object,Array,JSON,foodCheckoutTotals,foodDeliveryPreference,FOOD_DELIVERY_OPTIONS,FOOD_TAX_BASIS_POINTS,foodSameDayOpen,FoodAccountError,foodTokenHash,nextFoodDelivery,shiftFoodDays,easternFoodDate,readFoodOperations:async()=>model});
+  f.api=runPrivateInNewContext(source+'\n({readFoodPortal,saveFoodProfile,createFoodPortalOrder,manageFoodSubscription})',{...legacyPlans,...websiteStore,...fulfillment,foodProfileComplete,FOOD_STATES,locateFoodAddress:async()=>null,readFoodDeliveryChoices:async()=>({deliveryAvailable:true,days:[{day:'Tuesday',weekday:2}],tonyDates:[]}),crypto,Map,Date,Number,String,Object,Array,JSON,foodCheckoutTotals,foodDeliveryPreference,FOOD_DELIVERY_OPTIONS,FOOD_TAX_BASIS_POINTS,foodSameDayOpen,FoodAccountError,foodTokenHash,nextFoodDelivery,shiftFoodDays,easternFoodDate,readFoodOperations:async()=>model});
   f.account={id:'account',customer_id:'buyer',email:'buyer@example.com'};
   return f;
 }

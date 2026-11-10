@@ -6,6 +6,7 @@ import vm from 'node:vm';
 import {DatabaseSync} from 'node:sqlite';
 import schema from '../data/dog-food-airtable-schema.json' with {type:'json'};
 import * as logic from '../lib/dog-food-operations.mjs';
+import * as websiteStore from '../lib/dog-food-website-store.mjs';
 import {readFoodSalesIntelligence} from '../lib/dog-food-sales-intelligence.mjs';
 import {readBoundedBytes,readBoundedProviderJson} from '../lib/bounded-body.mjs';
 const source=fs.readFileSync(new URL('../lib/dog-food-ops-store.js',import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'');
@@ -32,7 +33,7 @@ function fixture(seed=snapshot()) {
     if(segments[3])return Response.json(records[name].find(r=>r.id===segments[3])||{}, {status:records[name].some(r=>r.id===segments[3])?200:404});
     return Response.json({records:records[name]});
   }
-  const context={...logic,readFoodSalesIntelligence,schema,crypto,setTimeout,TextEncoder,TextDecoder,atob,URL,URLSearchParams,Response,console,outboundFetch,readBoundedProviderJson};
+  const context={...websiteStore,...logic,readFoodSalesIntelligence,schema,crypto,setTimeout,TextEncoder,TextDecoder,atob,URL,URLSearchParams,Response,console,outboundFetch,readBoundedProviderJson};
   const service=runPrivateInNewContext(`${source}\n({readFoodOperations,readFoodSnapshot,syncFoodOperations,foodOperation,runFoodCommand})`,context);
   return {sql,db,service,env:{DB:db,AIRTABLE_API_KEY:'test'},records,calls:()=>calls,fail:()=>{fail=true;}};
 }

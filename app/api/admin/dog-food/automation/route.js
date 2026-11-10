@@ -46,23 +46,23 @@ export async function POST(request) {
     if(!body||Array.isArray(body)||typeof body!=='object')throw new FoodError('Invalid request.');
     if(body.action==='providers')return Response.json({ok:true,providers:await providerReview(c.env)},{headers});
     if(body.action==='run')return Response.json({ok:true,result:await runFoodWebsiteWorkflow(c.env),data:await readFoodWorkflow(c.env.DB)},{headers});
-    const execute=async()=>{
-      if(['capacity_slot','pickup_capacity','pickup_complete','pickup_ready','pickup_arrange','lot_count','finalize_count'].includes(body.action))return foodFulfillmentCommand(c.env,body,c.auth.email);
+    const execute=async working=>{
+      if(['capacity_slot','pickup_capacity','pickup_complete','pickup_ready','pickup_arrange','lot_count','finalize_count'].includes(body.action))return foodFulfillmentCommand(working,body,c.auth.email);
       if(body.action==='settings') {
         if(body.confirm!==true||[body.posting,body.email,body.scheduling].some(v=>typeof v!=='boolean'))throw new FoodError('Confirm explicit workflow settings.');
-        await c.env.DB.prepare("UPDATE dog_food_workflow_settings SET posting_enabled=?,email_enabled=?,scheduling_enabled=?,updated_at=CURRENT_TIMESTAMP WHERE id='org-opwp'").bind(body.posting?1:0,body.email?1:0,body.scheduling?1:0).run();
+        await working.DB.prepare("UPDATE dog_food_workflow_settings SET posting_enabled=?,email_enabled=?,scheduling_enabled=?,updated_at=CURRENT_TIMESTAMP WHERE id='org-opwp'").bind(body.posting?1:0,body.email?1:0,body.scheduling?1:0).run();
         return {message:'Workflow settings saved. Launch readiness requires provider and fulfillment evidence.'};
       }
       if(body.action==='retry_sync') {
         const key=typeof body.key==='string'?body.key:'';
         if(!/^(customer|order|payment|plan|delivery):[a-zA-Z0-9_-]{1,100}$/.test(key))throw new FoodError('Choose a valid source record.');
-        await c.env.DB.prepare('UPDATE dog_food_sync_outbox SET attempts=0,next_attempt_at=CURRENT_TIMESTAMP,last_error=NULL WHERE entity_key=? AND (lease_until IS NULL OR lease_until<CURRENT_TIMESTAMP)').bind(key).run();
+        await working.DB.prepare('UPDATE dog_food_sync_outbox SET attempts=0,next_attempt_at=CURRENT_TIMESTAMP,last_error=NULL WHERE entity_key=? AND (lease_until IS NULL OR lease_until<CURRENT_TIMESTAMP)').bind(key).run();
         return {message:'Idempotent source posting queued for retry.'};
       }
       if(body.action==='retry_email') {
         const key=typeof body.key==='string'?body.key:'';
         if(!/^(plan_request_received|plan_request_update|ordered|paid|failed|scheduled|on_way|delivered|pickup_ready|picked_up|cancelled|refunded):[a-zA-Z0-9_-]{1,100}$/.test(key))throw new FoodError('Choose a valid failed notice.');
-        const row=await c.env.DB.prepare(`UPDATE dog_food_transactional_outbox SET attempts=0,next_attempt_at=CURRENT_TIMESTAMP,last_error=NULL
+        const row=await working.DB.prepare(`UPDATE dog_food_transactional_outbox SET attempts=0,next_attempt_at=CURRENT_TIMESTAMP,last_error=NULL
           WHERE event_key=? AND status='failed' AND first_attempt_at>=datetime('now','-23 hours') AND (lease_until IS NULL OR lease_until<CURRENT_TIMESTAMP) RETURNING event_key`).bind(key).first();
         if(!row)throw new FoodError('This notice needs provider reconciliation before another attempt. Automatic resend outside the safe window is blocked.',409);
         return {message:'The original identical provider request is queued for safe retry.'};
