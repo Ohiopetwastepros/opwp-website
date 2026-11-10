@@ -36,6 +36,13 @@ test('monthly enrollment requires explicit consent, captured payment and a confi
   assert.equal((await activate()).reason,'existing_plan_preserved');
   assert.equal(f.sql.prepare('SELECT count(*) n FROM dog_food_subscriptions').get().n,1);
 });
+
+test('late payment or fulfillment cannot enroll an inactive customer into automatic billing',async()=>{
+  const f=billingFixture();f.scheduled();f.paid();f.sql.exec("UPDATE dog_food_customers SET status='inactive'");
+  const result=await f.payments.activateDogFoodSubscriptionFromOrder({orderId:'first',paymentMethodId:'pm_buyer'});
+  assert.equal(result.reason,'inactive_customer_review_required');assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM dog_food_subscriptions').get().n,0);
+  assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM dog_food_payments').get().n,1);
+});
 test('payment replays cannot resume a cancelled plan or advance the same monthly cycle twice',async()=>{
   const f=billingFixture();f.scheduled();f.paid();
   const {subscriptionId}=await f.payments.activateDogFoodSubscriptionFromOrder({orderId:'first',paymentMethodId:'pm_buyer'});

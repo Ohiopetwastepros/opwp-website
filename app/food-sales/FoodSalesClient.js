@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from 'react';
 import styles from './food-sales.module.css';
 import FoodCustomerDialog,{invitationLabel} from '@/components/FoodCustomerDialog';
+import FoodCustomerSearch from '@/components/FoodCustomerSearch';
 const money=cents=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format((cents||0)/100);
 const blank=()=>({customerId:'',newCustomer:null,items:[],fulfillmentMethod:'pickup',fulfillmentStatus:'pending',billingProvider:'manual',amount:'0.00',paymentMethod:'cash',paymentReference:'',paymentReceivedConfirmed:false,handoffConfirmed:false,receivedBy:'',handoffNote:'',addressId:'',deliveryAddress:{line1:'',city:'',state:'OH',postalCode:''}});
 async function request(url,body,method='POST',office=false) {
@@ -13,7 +14,7 @@ async function request(url,body,method='POST',office=false) {
 }
 export default function FoodSalesClient({embedded=false}) {
   const call=(url,body,method)=>request(url,body,method,embedded);
-  const [customerOpen,setCustomerOpen]=useState(false);
+  const [customerOpen,setCustomerOpen]=useState(false),[searchResult,setSearchResult]=useState({query:'',customers:[]}),[searchBusy,setSearchBusy]=useState(false);
   const [data,setData]=useState(null),[draft,setDraft]=useState(blank),[query,setQuery]=useState(''),[customer,setCustomer]=useState(null),[quote,setQuote]=useState(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState(''),[pending,setPending]=useState(null),[tab,setTab]=useState('sale'),[login,setLogin]=useState({email:'',password:''}),[loaded,setLoaded]=useState(false),[recentAction,setRecentAction]=useState(null);
   const [setupToken,setSetupToken]=useState(''),[passwordSetup,setPasswordSetup]=useState({password:'',passwordConfirm:''});
   useEffect(()=>{const match=/^#setup=([a-f0-9]{64})$/.exec(window.location.hash);if(match){setSetupToken(match[1]);window.history.replaceState(null,'',window.location.pathname+window.location.search);}},[]);
@@ -36,9 +37,9 @@ export default function FoodSalesClient({embedded=false}) {
   },[data?.member.id]);
   useEffect(()=>{if(data?.member.id)try{sessionStorage.setItem('opwp-food-sales:'+data.member.id+':draft',JSON.stringify({draft,customer}));}catch{/* Saving is still server confirmed; no offline queue. */}},[draft,customer,data?.member.id]);
   useEffect(()=>{
-    if(!data)return;const version=++searchVersion.current;
-    const timer=setTimeout(()=>call('/api/food-sales/?q='+encodeURIComponent(query)).then(d=>{if(version===searchVersion.current)setData(d);}).catch(e=>setError(e.message)),300);
-    return ()=>clearTimeout(timer);
+    if(!data)return;const version=++searchVersion.current;setSearchBusy(true);
+    const timer=setTimeout(()=>call('/api/food-sales/?q='+encodeURIComponent(query)).then(d=>{if(version===searchVersion.current){setData(d);setSearchResult({query,customers:d.customers});}}).catch(e=>{if(version===searchVersion.current)setError(e.message);}).finally(()=>{if(version===searchVersion.current)setSearchBusy(false);}),180);
+    return ()=>{clearTimeout(timer);searchVersion.current++;};
   },[query]);
   function persist(payload) {
     const key='opwp-food-sales:'+member.current,ref={commandId:payload.commandId};
@@ -96,7 +97,7 @@ export default function FoodSalesClient({embedded=false}) {
       {pending&&<section className={styles.pending} aria-label='Unconfirmed submission'><strong>Check this submission before another sale</strong><p>Its outcome is not yet confirmed on this device.</p><code>{pending.commandId}</code><div className={styles.actions}><button disabled={busy} onClick={checkPending}>Check save status</button>{pending.payload&&<button disabled={busy} onClick={()=>submit(pending.payload)}>Retry same submission</button>}{pending.rejected&&<button disabled={busy} onClick={releaseRejected}>Edit rejected draft</button>}</div></section>}
       {tab==='sale'?<form onSubmit={saveSale} className={styles.saleForm}>
         <fieldset disabled={busy||Boolean(pending)} className={styles.card}><legend><span>01</span>Customer</legend>
-          {customer?<div className={styles.selected}><div><strong>{customer.first_name} {customer.last_name}</strong><small>{[customer.email,customer.phone].filter(Boolean).join(' / ')||'Contact details can be added later'}</small></div><button type='button' onClick={()=>{setCustomer(null);set('customerId','');}}>Change</button></div>:<><label>Find a customer<input type='search' placeholder='Name, phone or email' value={query} onChange={e=>setQuery(e.target.value)}/></label>{data.customers.map(c=><button className={styles.customer} type='button' key={c.id} onClick={()=>{setCustomer(c);setDraft(d=>({...d,customerId:c.id,newCustomer:null,addressId:''}));setQuote(null);}}><strong>{c.first_name} {c.last_name}</strong><span>{[c.email,c.phone].filter(Boolean).join(' / ')||'Existing customer'}</span></button>)}{query.length>=1&&!data.customers.length&&<p>No matching customer found.</p>}<button type='button' className={styles.textButton} onClick={()=>setCustomerOpen(true)}>+ Add a new customer</button></>}
+          {customer?<div className={styles.selected}><div><strong>{customer.first_name} {customer.last_name}</strong><small>{[customer.email,customer.phone].filter(Boolean).join(' / ')||'Contact details can be added later'}</small></div><button type='button' onClick={()=>{setCustomer(null);set('customerId','');}}>Change</button></div>:<><FoodCustomerSearch value={query} onChange={setQuery} customers={searchResult.query===query?searchResult.customers:[]} loading={searchBusy||searchResult.query!==query} onSelect={c=>{setCustomer(c);setDraft(d=>({...d,customerId:c.id,newCustomer:null,addressId:''}));setQuote(null);}}/><button type='button' className={styles.textButton} onClick={()=>setCustomerOpen(true)}>+ Add a new customer</button></>}
 
         </fieldset>
         <fieldset disabled={busy||Boolean(pending)} className={styles.card}><legend><span>02</span>Food & quantities</legend><div className={styles.products}>{data.products.map(p=>{const selected=draft.items.find(i=>i.productId===p.id);return <label key={p.id} className={styles.product}><img src={'/assets/edf/'+p.formula_code+'.webp'} alt='' width='36' height='55'/><span><strong>{p.color} · {p.formula_code}</strong><small>{p.name} · {p.bag_weight_lb} lb</small><b>{money(p.retail_price_cents)} / bag, before tax</b>{data.stockBasis==='confirmed_count'&&<small>{p.available==null?'Inventory not confirmed':p.available+' bags available'}</small>}</span><input aria-label={p.color+' '+p.formula_code+' quantity'} inputMode='numeric' type='number' min='0' max={p.available==null?100:Math.max(0,p.available)} disabled={data.stockBasis==='confirmed_count'&&(p.available==null||p.available<=0)} value={selected?.quantity||0} onChange={e=>{const quantity=Number(e.target.value);set('items',[...draft.items.filter(i=>i.productId!==p.id),...(quantity>0?[{productId:p.id,quantity}]:[])]);}}/></label>;})}</div><p className={styles.hint}>Catalog prices. Lucas County tax is calculated in the confirmed total.</p></fieldset>

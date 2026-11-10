@@ -141,6 +141,13 @@ test('renewal timeout retains the same cycle; stale uncertainty and SNG plans ne
   assert.equal((await f.runScheduledDogFoodRenewals(f.env)).results[0].status,'payment_review');assert.equal(attempts,1);
   f.sql.exec("UPDATE dog_food_customers SET sng_client_id='sng-linked'");assert.equal((await f.runScheduledDogFoodRenewals(f.env)).processed,0);assert.equal(attempts,1);
 });
+
+test('inactive customers never create a renewal order, reserve stock or issue a Stripe charge',async()=>{
+  let attempts=0;const f=await setup(true,{charge:async()=>{attempts++;throw Error('Inactive customer must not charge');}});await duePlan(f);
+  const before=f.sql.prepare('SELECT count(*) n FROM dog_food_orders').get().n;
+  f.sql.exec("UPDATE dog_food_customers SET status='inactive'");
+  assert.equal((await f.runScheduledDogFoodRenewals(f.env)).processed,0);assert.equal(attempts,0);assert.equal(f.sql.prepare('SELECT count(*) n FROM dog_food_orders').get().n,before);
+});
 test('lost Airtable write response retries the same stable ID and source revisions remain pending',async()=>{
   const f=await setup();await f.create();f.loseWrite();
   const failed=await f.flushFoodProjections(f.env,{limit:25});assert.ok(failed.results.some(r=>r.status==='failed'));

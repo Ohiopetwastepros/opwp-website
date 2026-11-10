@@ -86,3 +86,42 @@ test('Airtable projection attaches the native ID to the known source customer wi
   assert.equal(f.records.Customers.length,1);assert.equal(f.records.Customers[0].fields[fields['Website Customer ID']],'native-buyer');
   await assert.rejects(workflow.upsertFoodProjection(f.env,f.service.foodSchema.tables.Customers.id,fields,'Website Customer ID',{...value,'Website Customer ID':'wrong-native'},id),/different website record/);
 });
+
+async function statusBody(f,id,status,extra={}){const c=(await hub.readFoodCustomerHub(f.db,{id})).customers[0];return {action:'set_customer_status',commandId:crypto.randomUUID(),customerId:id,status,expectedStatus:c.status,statusVersion:c.statusVersion,reason:'Customer requested a service change',confirm:true,...extra};}
+test('deactivation retains history and credentials, revokes sessions and invitations, pauses native plans and can be reversed without resuming billing',async()=>{
+  const f=fixture(),password='Customer-choice!2026';
+  f.sql.prepare("UPDATE dog_food_accounts SET password_hash=? WHERE id='account'").run(await auth.hashFoodPassword(password));
+  const login=await auth.loginFoodAccount(f.db,{email:'buyer@example.test',password}),headers=new Headers({cookie:auth.FOOD_SESSION_COOKIE+'='+login.sessionToken});
+  const order=await f.save({amountReceivedCents:1000,paymentReceivedConfirmed:true,paymentMethod:'cash'});
+  f.sql.exec("INSERT INTO dog_food_subscriptions(id,customer_id,address_id,next_charge_at,next_delivery_date,payment_provider) VALUES('native-plan','buyer','address','2027-01-01','2027-01-03','stripe'),('external-plan','buyer','address','2027-01-01','2027-01-03','sweep_and_go')");
+  const customer=await hub.foodCustomerCommand(f.db,customerBody(),'seller'),queued=await statusBody(f,customer.id,'inactive');
+  await hub.foodCustomerCommand(f.db,queued,'owner',{office:true});assert.ok((await hub.foodCustomerMessages(f.db,customer.id)).every(m=>m.status==='cancelled'));
+  const body=await statusBody(f,'buyer','inactive'),before=f.sql.prepare("SELECT password_hash FROM dog_food_accounts WHERE id='account'").get().password_hash;
+  const result=await hub.foodCustomerCommand(f.db,body,'owner',{office:true});assert.deepEqual(await hub.foodCustomerCommand(f.db,body,'owner',{office:true}),result);
+  assert.equal(await auth.foodAccountSession(f.db,headers),null);await assert.rejects(auth.loginFoodAccount(f.db,{email:'buyer@example.test',password}),/incorrect/);
+  await assert.rejects(f.save(),/Customer not found/);
+  assert.equal(f.sql.prepare("SELECT status FROM dog_food_subscriptions WHERE id='native-plan'").get().status,'paused');assert.equal(f.sql.prepare("SELECT status FROM dog_food_subscriptions WHERE id='external-plan'").get().status,'active');
+  assert.equal(f.sql.prepare('SELECT total_cents FROM dog_food_orders WHERE id=?').get(order.orderId).total_cents,6357);assert.equal(count(f,'dog_food_payments'),1);assert.equal(count(f,'dog_food_lot_allocations'),1);
+  const inactive=(await hub.readFoodCustomerHub(f.db,{id:'buyer'})).customers[0];assert.equal(inactive.orders[0].balance_cents,5357);assert.equal(inactive.activity[0].to,'inactive');
+  await hub.foodCustomerCommand(f.db,await statusBody(f,'buyer','active'),'owner',{office:true});
+  assert.equal(await auth.foodAccountSession(f.db,headers),null);assert.ok((await auth.loginFoodAccount(f.db,{email:'buyer@example.test',password})).sessionToken);
+  assert.equal(f.sql.prepare("SELECT password_hash FROM dog_food_accounts WHERE id='account'").get().password_hash,before);assert.equal(f.sql.prepare("SELECT status FROM dog_food_subscriptions WHERE id='native-plan'").get().status,'paused');
+  await assert.rejects(hub.foodCustomerCommand(f.db,{...body,commandId:crypto.randomUUID()},'owner',{office:true}),/changed/);
+});
+test('status changes require office authority, a reason and fresh profile; billing and invitation leases block changes atomically',async()=>{
+  const f=fixture(),body=await statusBody(f,'buyer','inactive');
+  await assert.rejects(hub.foodCustomerCommand(f.db,body,'seller'),/office/);
+  await assert.rejects(hub.foodCustomerCommand(f.db,{...body,reason:''},'owner',{office:true}),/reason/);
+  await assert.rejects(hub.foodCustomerCommand(f.db,{...body,confirm:false},'owner',{office:true}),/Confirm/);
+  f.sql.exec("UPDATE dog_food_ops_state SET command_until=datetime('now','+2 minutes')");
+  await assert.rejects(hub.foodCustomerCommand(f.db,body,'owner',{office:true}),/operation/);assert.equal(f.sql.prepare("SELECT status FROM dog_food_customers WHERE id='buyer'").get().status,'active');
+  assert.equal(count(f,'dog_food_sales_write_guards'),0);assert.equal(count(f,'dog_food_customer_commands'),0);
+  f.sql.exec("UPDATE dog_food_ops_state SET command_until=NULL; INSERT INTO dog_food_subscriptions(id,customer_id,address_id,next_charge_at,next_delivery_date,payment_provider,billing_lease_until) VALUES('billing','buyer','address','2027-01-01','2027-01-03','stripe',datetime('now','+5 minutes'))");
+  await assert.rejects(hub.foodCustomerCommand(f.db,body,'owner',{office:true}),/operation/);
+  f.sql.exec("UPDATE dog_food_subscriptions SET billing_lease_until=NULL");await hub.foodCustomerCommand(f.db,body,'owner',{office:true});
+});
+test('customer directory searches contact details and filters inactive records while profiles retain exact linked IDs',async()=>{
+  const f=fixture(),saved=await hub.foodCustomerCommand(f.db,customerBody(),'seller');await hub.foodCustomerCommand(f.db,await statusBody(f,saved.id,'inactive'),'owner',{office:true});
+  for(const q of ['New B','new@example.test','5550199']){const data=await hub.readFoodCustomerHub(f.db,{q});assert.equal(data.customers[0].id,saved.id);assert.equal(data.customers[0].phone,'+14195550199');assert.equal(data.customers[0].email,'new@example.test');}
+  assert.equal((await hub.readFoodCustomerHub(f.db,{status:'active'})).customers.length,1);assert.equal((await hub.readFoodCustomerHub(f.db,{status:'inactive'})).customers[0].id,saved.id);assert.equal((await hub.readFoodCustomerHub(f.db,{q:"' OR 1=1 --"})).customers.length,0);
+});
