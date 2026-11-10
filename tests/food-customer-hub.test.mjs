@@ -86,3 +86,36 @@ test('Airtable projection attaches the native ID to the known source customer wi
   assert.equal(f.records.Customers.length,1);assert.equal(f.records.Customers[0].fields[fields['Website Customer ID']],'native-buyer');
   await assert.rejects(workflow.upsertFoodProjection(f.env,f.service.foodSchema.tables.Customers.id,fields,'Website Customer ID',{...value,'Website Customer ID':'wrong-native'},id),/different website record/);
 });
+
+for(const blocked of ['email','sms'])for(const reason of ['unconfigured','budget']){
+  test(`${reason} ${blocked} backlog does not starve the other invitation channel`,async()=>{
+    const f=fixture(),provider=senders(),working=blocked==='email'?'sms':'email';
+    for(let i=0;i<6;i++)await hub.foodCustomerCommand(f.db,customerBody({email:`queue-${i}@example.test`}),'seller');
+    f.sql.prepare("UPDATE dog_food_customer_messages SET created_at=CASE WHEN channel=? THEN '2026-01-01' ELSE '2026-01-02' END").run(blocked);
+    const window=Math.floor(Date.now()/86400000)*86400;
+    if(reason==='unconfigured')provider.options[blocked+'Configured']=false;
+    else f.sql.prepare("INSERT INTO api_rate_limits VALUES('food_customer_invites',?,?,100,datetime(?,'unixepoch'))").run(blocked,window,window+172800);
+    await processFoodCustomerMessages(f.db,provider.options);
+    assert.equal(provider[blocked].length,0);assert.equal(provider[working].length,4);
+    assert.equal(f.sql.prepare("SELECT COUNT(*) n FROM dog_food_customer_messages WHERE channel=? AND status='queued'").get(blocked).n,6);
+    if(reason==='budget')assert.equal(f.sql.prepare("SELECT request_count FROM api_rate_limits WHERE client_key=?").get(blocked).request_count,100);
+    await processFoodCustomerMessages(f.db,provider.options);
+    assert.equal(provider[working].length,6);assert.equal(provider[blocked].length,0);
+    // Making the blocked channel eligible drains its preserved queue once only.
+    provider.options[blocked+'Configured']=true;
+    if(reason==='budget')f.sql.prepare("UPDATE api_rate_limits SET window_start=? WHERE client_key=?").run(window-86400,blocked);
+    await processFoodCustomerMessages(f.db,{...provider.options,limit:10});
+    await processFoodCustomerMessages(f.db,provider.options);
+    assert.equal(provider[blocked].length,6);assert.equal(provider[working].length,6);
+  });
+}
+test('reaching a channel budget within a bounded pass leaves capacity for the other channel',async()=>{
+  const f=fixture(),provider=senders(),window=Math.floor(Date.now()/86400000)*86400;
+  for(let i=0;i<6;i++)await hub.foodCustomerCommand(f.db,customerBody({email:`budget-${i}@example.test`}),'seller');
+  f.sql.prepare("UPDATE dog_food_customer_messages SET created_at=CASE WHEN channel='sms' THEN '2026-01-01' ELSE '2026-01-02' END").run();
+  f.sql.prepare("INSERT INTO api_rate_limits VALUES('food_customer_invites','sms',?,99,datetime(?,'unixepoch'))").run(window,window+172800);
+  await processFoodCustomerMessages(f.db,provider.options);
+  assert.equal(provider.sms.length,1);assert.equal(provider.email.length,3);
+  assert.equal(f.sql.prepare("SELECT request_count FROM api_rate_limits WHERE client_key='sms'").get().request_count,100);
+  assert.equal(f.sql.prepare("SELECT COUNT(*) n FROM dog_food_customer_messages WHERE channel='sms' AND status='queued'").get().n,5);
+});

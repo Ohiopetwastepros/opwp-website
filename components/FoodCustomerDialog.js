@@ -4,21 +4,21 @@ import {createPortal} from 'react-dom';
 import {FOOD_STATES} from '@/lib/dog-food-profile.mjs';
 import s from './food-customer-dialog.module.css';
 export const invitationLabel=status=>({queued:'Queued',sending:'Sending',accepted:'Accepted by provider',suppressed:'Not sent: SMS opt-out',uncertain:'Needs delivery review',failed:'Failed',cancelled:'Cancelled'}[status]||'Not invited');
-export default function FoodCustomerDialog({endpoint='/api/food-sales/customers/',customer=null,onClose,onSaved}){
-  const dialog=useRef(null),command=useRef(crypto.randomUUID()),submitted=useRef(null),[mounted,setMounted]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
+export default function FoodCustomerDialog({endpoint='/api/food-sales/customers/',customer=null,onClose,onSaved,onRefresh}){
+  const dialog=useRef(null),command=useRef(crypto.randomUUID()),submitted=useRef(null),saving=useRef(false),[mounted,setMounted]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[refreshRequired,setRefreshRequired]=useState(false);
   const a=customer?.addresses?.find(a=>a.is_primary)||customer?.addresses?.[0];
   const [values,setValues]=useState({firstName:customer?.first_name||'',lastName:customer?.last_name||'',email:customer?.email||'',phone:customer?.phone||'',address:a?.line1||'',city:a?.city||'',state:a?.state||'OH',zip:a?.postal_code||'',dogCount:customer?.dog_count||'',customerType:customer?.customer_type||'on_demand',frequency:customer?.service_frequency||'as_needed',fulfillment:customer?.preferred_fulfillment||'delivery',placement:a?.placement_preference||'Front door',placementOther:a?.placement_other||'',notes:customer?.notes||'',smsConsent:Boolean(customer?.sms_consent_at)});
   useEffect(()=>{setMounted(true);},[]);
   useEffect(()=>{if(!mounted)return;const previous=document.activeElement;dialog.current?.showModal();dialog.current?.querySelector('input')?.focus();return()=>previous?.focus?.();},[mounted]);
   const set=(key,value)=>setValues(v=>({...v,[key]:value,...(key==='phone'?{smsConsent:false}:{})}));
   async function save(event){
-    event.preventDefault();setBusy(true);setError('');
+    event.preventDefault();if(saving.current||refreshRequired)return;saving.current=true;setBusy(true);setError('');
     const body=submitted.current||{action:customer?'update_customer':'create_customer',commandId:command.current,...values,...(customer?{customerId:customer.id,revision:customer.revision||0,version:customer.version}:{})};submitted.current=body;
     try{
       const r=await fetch(endpoint,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),v=await r.json();
-      if(!r.ok){if(r.status===400)submitted.current=null;throw Error(v.error||'Customer could not be confirmed. Search the customer hub before trying another submission.');}
+      if(!r.ok){if(r.status===400||v.definitive===true)submitted.current=null;if(v.refreshRequired===true)setRefreshRequired(true);throw Error(v.error||'Customer could not be confirmed. Search the customer hub before trying another submission.');}
       await onSaved(v.customer,v.messages||[]);
-    }catch(e){setError(e.message);}finally{setBusy(false);}
+    }catch(e){setError(e.message);}finally{saving.current=false;setBusy(false);}
   }
   if(!mounted)return null;
   return createPortal(<dialog ref={dialog} className={s.dialog} onCancel={e=>{e.preventDefault();if(!busy)onClose();}} aria-labelledby='food-customer-title'><form onSubmit={save}>
@@ -40,6 +40,6 @@ export default function FoodCustomerDialog({endpoint='/api/food-sales/customers/
     </div><label>Notes (optional)<textarea name='notes' rows='3' maxLength={4000} value={values.notes} onChange={e=>set('notes',e.target.value)}/></label><small>Service frequency records the customer’s preference; billing and monthly plans are set separately.</small></fieldset>
     <label className={s.check}><input required name='smsConsent' type='checkbox' checked={values.smsConsent} onChange={e=>set('smsConsent',e.target.checked)}/>The customer agreed to receive portal setup and service texts at this mobile number.</label>
     {error&&<p role='alert' className={s.error}>{error}</p>}
-    <footer><button type='button' disabled={busy} onClick={onClose}>Cancel</button><button className={s.primary} disabled={busy}>{busy?'Saving customer…':customer?'Save customer information':'Submit new customer & send portal access'}</button></footer>
+    <footer><button type='button' disabled={busy} onClick={onClose}>Cancel</button>{refreshRequired?<button type='button' className={s.primary} disabled={busy} onClick={onRefresh||onClose}>Reload customer record</button>:<button className={s.primary} disabled={busy}>{busy?'Saving customer…':customer?'Save customer information':'Submit new customer & send portal access'}</button>}</footer>
   </form></dialog>,document.body);
 }
