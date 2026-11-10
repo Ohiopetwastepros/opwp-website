@@ -25,6 +25,8 @@ export const ADMIN_NAVIGATION = [
     { id: "office-access", label: "Office access", href: "/admin/office-access/" },
   ] },
   { id: "dog-food", label: "Dog food", items: [
+    { id: "food-customers", label: "Customer information hub", href: "/admin/dog-food/customers/" },
+    { id: "food-sale", label: "Record a food sale", href: "/admin/dog-food/record-sale/" },
     { id: "dog-food", label: "Sales operations", href: "/admin/dog-food/" },
     { id: "food-inventory", label: "Inventory & monthly demand", href: "/admin/dog-food/inventory/" },
     { id: "food-profit", label: "Sales & profit/loss", href: "/admin/dog-food/profit-loss/" },
