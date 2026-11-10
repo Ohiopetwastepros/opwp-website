@@ -1,5 +1,6 @@
 'use client';
-import {useEffect,useRef,useState} from 'react';
+import {useState} from 'react';
+import FoodCustomerDialog from '@/components/FoodCustomerDialog';
 import s from './sales-operations.module.css';
 export function StaffCustomerSelect({customers,selected,onCreate}) {
   const [search,setSearch]=useState('');
@@ -7,8 +8,5 @@ export function StaffCustomerSelect({customers,selected,onCreate}) {
   return <div><label className={s.field}><span>Search saved customer accounts first</span><input type='search' value={search} onChange={e=>setSearch(e.target.value)} placeholder='Name, email or phone'/></label><label className={s.field}><span>Customer account</span><select name='customerId' required defaultValue={selected||''}><option value=''>Select a saved customer</option>{rows.map(c=><option key={c.id} value={c.id}>{c.first_name} {c.last_name} · {c.email}</option>)}</select></label><button type='button' onClick={onCreate}>Create customer account</button><p>No password is needed for a direct sale. Online access requires email verification.</p></div>;
 }
 export default function StaffCustomerDialog({onClose,onSaved}) {
-  const ref=useRef(null),id=useRef(crypto.randomUUID()),[busy,setBusy]=useState(false),[error,setError]=useState('');
-  useEffect(()=>{const prior=document.activeElement;ref.current?.showModal();return()=>prior?.focus?.();},[]);
-  async function save(e){e.preventDefault();const values=Object.fromEntries(new FormData(e.currentTarget));setBusy(true);setError('');try{const r=await fetch('/api/admin/dog-food/experience/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'create_customer',commandId:id.current,...values})}),v=await r.json();if(!r.ok||!v.ok)throw Error(v.error||'Customer could not be saved.');await onSaved(v.result.id);}catch(e){setError(e.message);}finally{setBusy(false);}}
-  return <dialog ref={ref} className={s.modal} onCancel={e=>{e.preventDefault();if(!busy)onClose();}}><form onSubmit={save}><header><div><small>CREATE ACCOUNT BEFORE SALE</small><h2>Save customer contact</h2></div><button type='button' disabled={busy} onClick={onClose} aria-label='Close customer dialog'>×</button></header><p>Use the customer’s own email. Existing records with that email are protected from duplicate creation. No customer invitation or payment is sent automatically.</p><div className={s.formGrid}>{[['firstName','First name','text',80],['lastName','Last name','text',80],['email','Email','email',254],['phone','Phone','tel',40]].map(([name,label,type,maxLength])=><label key={name} className={s.field}><span>{label}</span><input name={name} type={type} required maxLength={maxLength}/></label>)}</div>{error&&<p className={s.error} role='alert'>{error}</p>}<footer><button type='button' disabled={busy} onClick={onClose}>Cancel</button><button className={s.primary} disabled={busy}>{busy?'Saving…':'Save customer & continue'}</button></footer></form></dialog>;
+  return <FoodCustomerDialog endpoint='/api/admin/dog-food/customers/' onClose={onClose} onSaved={customer=>onSaved(customer.id)}/>;
 }

@@ -74,8 +74,7 @@ test('customer portal signup links the imported email only after email verificat
   assert.equal(f.sql.prepare("SELECT customer_id FROM dog_food_accounts WHERE email='known@example.test'").get().customer_id,id);
   assert.equal(f.sql.prepare("SELECT COUNT(*) n FROM dog_food_accounts a JOIN dog_food_customers c ON c.id=a.customer_id WHERE c.email=''").get().n,0);
 });
-test('name-only staff contacts can record sales without creating portal credentials',async()=>{
-  const f=counts();await f.save({customerId:'',newCustomer:{firstName:'New',lastName:'Contact',email:'',phone:''}});
-  assert.equal(f.sql.prepare("SELECT COUNT(*) n FROM dog_food_customers WHERE email='' AND first_name='New'").get().n,1);
-  assert.equal(f.sql.prepare("SELECT COUNT(*) n FROM dog_food_accounts a JOIN dog_food_customers c ON c.id=a.customer_id WHERE c.first_name='New'").get().n,0);
+test('inline name-only creation is rejected; submit the complete customer form first',async()=>{
+  const f=counts();await assert.rejects(f.save({customerId:'',newCustomer:{firstName:'New',lastName:'Contact',email:'',phone:''}}),/complete customer form/);
+  assert.equal(f.sql.prepare("SELECT COUNT(*) n FROM dog_food_customers WHERE first_name='New'").get().n,0);
 });

@@ -5,6 +5,7 @@ import {readBoundedBytes} from '@/lib/bounded-body.mjs';
 import {FoodError} from '@/lib/dog-food-operations.mjs';
 import {reviewFoodPlanRequest,createFoodStaffCustomer} from '@/lib/dog-food-experience.mjs';
 import {runFoodCommand} from '@/lib/dog-food-ops-store';
+import {flushFoodCustomerMessages} from '@/lib/food-customer-service';
 export const dynamic='force-dynamic';
 const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'};
 export async function POST(request) {
@@ -17,7 +18,8 @@ export async function POST(request) {
     const env=getRuntimeEnv();if(!env.DB)throw new FoodError('Storage unavailable.',503);
     const body=JSON.parse(new TextDecoder().decode(await readBoundedBytes(request,8192)));
     if(!body||Array.isArray(body)||!['review_plan_request','create_customer'].includes(body.action))throw new FoodError('Choose a valid office action.');
-    const result=await runFoodCommand(env,body,auth.email,()=>body.action==='create_customer'?createFoodStaffCustomer(env.DB,body):reviewFoodPlanRequest(env.DB,body,auth.email));
+    const result=body.action==='create_customer'?await createFoodStaffCustomer(env.DB,body,auth.email):await runFoodCommand(env,body,auth.email,()=>reviewFoodPlanRequest(env.DB,body,auth.email));
+    if(body.action==='create_customer')try{await flushFoodCustomerMessages(env,{customerId:result.id,limit:2});}catch{/* Office can inspect the durable invitation queue. */}
     return Response.json({ok:true,result},{headers});
   }catch(error){return Response.json({ok:false,error:error instanceof FoodError?error.message:'The review could not be confirmed. Refresh before retrying.'},{status:error instanceof FoodError?error.status:error instanceof RangeError?413:error instanceof SyntaxError?400:503,headers});}
 }

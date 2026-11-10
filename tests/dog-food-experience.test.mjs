@@ -1,3 +1,4 @@
+import {customerBody} from './helpers/food-customer-input.mjs';
 import {runPrivateInNewContext} from './helpers/private-vm.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -86,8 +87,9 @@ test('new direct sales require a saved customer, preserve actual cash/payment st
   assert.equal(mine.orders.length,1);assert.equal(mine.orders[0].source,'direct');assert.equal(mine.orders[0].paid_provider,null);assert.equal(mine.orders[0].fulfillment_method,'pickup');assert.equal(mine.orders[0].balance_cents,6000);
   assert.equal(other.orders.length,1);assert.equal(other.orders[0].balance_cents,0);assert.notEqual(other.orders[0].id,mine.orders[0].id,'Durable customer IDs scope direct history; matching names are never used');
   await assert.rejects(f.service.foodOperation(f.env,{...sale,id:saved.id,customerId:'other'},'office'),/customer link is locked/);
-  const c=await createFoodStaffCustomer(f.db,{firstName:'New',lastName:'Buyer',email:'new@example.test',phone:'4195550199'});
+  f.sql.exec(fs.readFileSync(new URL('../schema-proposals/0060_unified_food_sales.sql',import.meta.url),'utf8'));
+  const c=await createFoodStaffCustomer(f.db,customerBody());
   assert.ok(c.id);assert.equal(f.sql.prepare('SELECT count(*) n FROM dog_food_accounts WHERE customer_id=?').get(c.id).n,0);
-  await assert.rejects(createFoodStaffCustomer(f.db,{firstName:'Duplicate',lastName:'Buyer',email:'NEW@example.test',phone:'4195550199'}),/already exists/);
+  await assert.rejects(createFoodStaffCustomer(f.db,customerBody({email:'NEW@example.test'})),/already exists/);
   f.sql.close();
 });

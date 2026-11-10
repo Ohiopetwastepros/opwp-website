@@ -1,3 +1,5 @@
+import {foodCustomerCommand} from '../lib/food-customer-hub.mjs';
+import {customerBody} from './helpers/food-customer-input.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -32,7 +34,7 @@ test('native staff sale reserves shared lots and leaves unpaid pickup independen
   assert.equal(f.sql.prepare("SELECT count(*) n FROM dog_food_transactional_outbox WHERE status<>'cancelled'").get().n,0);
 });
 test('multiple formulas, new shared customer, delivery, partial and later full receipts',async()=>{
-  const f=setup(),o=await f.save({customerId:undefined,newCustomer:{firstName:'New',lastName:'Buyer',email:'new@example.test',phone:'4195550102'},items:[{productId:pink,quantity:2},{productId:blue,quantity:1}],fulfillmentMethod:'delivery',deliveryAddress:{line1:'456 Test',city:'Toledo',state:'OH',postalCode:'43614'},amountReceivedCents:1000,paymentMethod:'cash',paymentReceivedConfirmed:true});
+  const f=setup(),created=await foodCustomerCommand(f.db,customerBody(),'seller'),o=await f.save({customerId:created.id,items:[{productId:pink,quantity:2},{productId:blue,quantity:1}],fulfillmentMethod:'delivery',deliveryAddress:{line1:'456 Test',city:'Toledo',state:'OH',postalCode:'43614'},amountReceivedCents:1000,paymentMethod:'cash',paymentReceivedConfirmed:true});
   assert.equal(o.totalCents,19071);assert.equal(o.balanceCents,18071);assert.equal(count(f,'dog_food_order_items'),2);
   assert.equal((await ledger.foodSalesOrder(f.db,o.orderId)).payment_status,'partial');
   await f.sales.command(f.db,{...payment(18071),orderId:o.orderId},'seller');
