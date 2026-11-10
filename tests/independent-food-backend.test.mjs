@@ -40,6 +40,7 @@ test('purchase failure rolls back all record, stock and command changes',async()
 test('supplier payments require actual evidence and record only the additional money',async()=>{
   const f=await website(),day=new Date().toISOString().slice(0,10),base={action:'save_purchase',number:'PO-PAY',supplier:'Example',date:day,paid:'100',reference:'supplier-ref-1',paymentDate:day,lines:[{productId:'recPink',quantity:10,received:0,cost:'30'}]};
   await assert.rejects(f.service.runFoodCommand(f.env,command(base),'owner'),/actually paid/);
+  await assert.rejects(f.service.runFoodCommand(f.env,command({...base,supplierPaymentConfirmed:true,paymentDate:'2099-01-01'}),'owner'),/future/);
   const first=await f.service.runFoodCommand(f.env,command({...base,supplierPaymentConfirmed:true}),'owner');
   const second=command({...base,id:first.id,paid:'150',reference:'supplier-ref-2',supplierPaymentConfirmed:true});await f.service.runFoodCommand(f.env,second,'owner');await f.service.runFoodCommand(f.env,second,'owner');
   const m=await f.service.readFoodOperations(f.db);assert.equal(m.pos[0].paidCents,15000);assert.deepEqual(m.pos[0].payments.map(p=>p.amountCents).sort((a,b)=>a-b),[5000,10000]);
@@ -57,6 +58,7 @@ test('office plans and portal requests share exact customer identity without cha
 });
 test('native sale receipts use the same payment ledger and replay without changing physical stock',async()=>{
   const f=await website();f.sql.exec("UPDATE dog_food_sales_settings SET stock_basis='confirmed_count'");f.fail();const order=await f.save(),sale=(await f.service.readFoodOperations(f.db)).sales.find(s=>s.orderId===order.orderId);assert.ok(sale);
+  await assert.rejects(f.service.runFoodCommand(f.env,command({action:'record_payment',saleId:sale.id,amount:'63.57',method:'Cash',date:'2099-01-01',reference:'future-receipt'}),'owner'),/future/);
   const b=command({action:'record_payment',saleId:sale.id,amount:'63.57',method:'Cash',date:new Date().toISOString().slice(0,10),reference:'office-native-receipt-1'});await f.service.runFoodCommand(f.env,b,'owner');await f.service.runFoodCommand(f.env,b,'owner');
   const m=await f.service.readFoodOperations(f.db);assert.equal(m.sales.find(s=>s.id===sale.id).balanceCents,0);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM dog_food_payments').get().n,1);const p=m.products.find(p=>p.id==='recPink');assert.equal(p.onHand,8);assert.equal(p.available,7);
 });
