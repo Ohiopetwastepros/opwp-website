@@ -167,11 +167,14 @@ test('payment before invoice remains reviewable and settles only after verified 
   await ingest(f,'invoice-later','client:invoice_finalized',invoice());assert.equal(count(f,'dog_food_payments'),0);
   await sng.linkFoodSalesInvoice(f.db,{eventId:'invoice-later',orderId:o.orderId,reason:'Exact reviewed source link',confirm:true},'owner');assert.equal(count(f,'dog_food_payments'),1);
 });
-test('manual payment later imported is linked as evidence, never a second receipt',async()=>{
-  const f=setup(),o=await f.save({amountReceivedCents:6357,paymentMethod:'check',paymentReference:'sng-payment-1',paymentReceivedConfirmed:true});
-  await ingest(f,'invoice','client:invoice_finalized',invoice());await sng.linkFoodSalesInvoice(f.db,{eventId:'invoice',orderId:o.orderId,reason:'Check reference verified on SNG',confirm:true},'owner');
-  const result=await ingest(f,'payment','client:client_payment_accepted',accepted());assert.equal(result.linkedExistingReceipt,true);assert.equal(count(f,'dog_food_payments'),1);
+test('manual check and digital/card payments later imported are linked as evidence, never a second receipt',async()=>{
+  for(const method of ['check','zelle','paypal','card']){
+    const f=setup(),o=await f.save({amountReceivedCents:6357,paymentMethod:method,paymentReference:'sng-payment-1',paymentReceivedConfirmed:true});
+    await ingest(f,'invoice','client:invoice_finalized',invoice());await sng.linkFoodSalesInvoice(f.db,{eventId:'invoice',orderId:o.orderId,reason:'Processor reference verified on SNG',confirm:true},'owner');
+    const result=await ingest(f,'payment','client:client_payment_accepted',accepted());assert.equal(result.linkedExistingReceipt,true);assert.equal(count(f,'dog_food_payments'),1);
+  }
 });
+
 test('mixed invoices, missing references, equal-value orders and ambiguous manual payments stay in review',async()=>{
   const f=setup();await f.save();await f.save();
   assert.equal((await ingest(f,'no-invoice','client:client_payment_accepted',accepted({invoice_id:undefined}))).reason,'payment_has_no_invoice_reference');

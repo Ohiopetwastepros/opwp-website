@@ -15,7 +15,7 @@ import styles from './account.module.css';
 const money = n => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(n || 0) / 100);
 const date = s => s ? new Date(`${s.slice(0,10)}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Awaiting confirmation';
 const label = s => String(s || '').replaceAll('_', ' ');
-const blankProfile = { firstName:'',lastName:'',phone:'',address:'',city:'',state:'OH',zip:'',placement:'Front door',placementOther:'',fulfillmentMethod:'delivery' };
+const blankProfile = { firstName:'',lastName:'',phone:'',address:'',city:'',state:'OH',zip:'',placement:'Front door',placementOther:'',fulfillmentMethod:'delivery',dogCount:'',frequency:'as_needed' };
 export default function FoodAccountClient() {
   const [data,setData] = useState(null), [requestedTab,setTab] = useState('home'), [authMode,setAuthMode] = useState('login');
   const tab=data?.authenticated&&data.profileRequired?'profile':requestedTab;
@@ -70,7 +70,7 @@ export default function FoodAccountClient() {
     setData(result);
     if (result.authenticated) {
       const c = result.customer, a = result.addresses[0];
-      setProfile({ firstName:c.first_name||'',lastName:c.last_name||'',phone:c.phone||'',address:a?.line1 || '',city:a?.city || '',state:a?.state || 'OH',zip:a?.postal_code || '',placement:a?.placement_preference || 'Front door',placementOther:a?.placement_other || '',fulfillmentMethod:result.preferredFulfillment||'delivery' });
+      setProfile({ firstName:c.first_name||'',lastName:c.last_name||'',phone:c.phone||'',address:a?.line1 || '',city:a?.city || '',state:a?.state || 'OH',zip:a?.postal_code || '',placement:a?.placement_preference || 'Front door',placementOther:a?.placement_other || '',fulfillmentMethod:result.preferredFulfillment||'delivery',dogCount:result.foodPreferences?.dog_count||'',frequency:result.foodPreferences?.service_frequency||'as_needed' });
       setFulfillmentMethod(result.preferredFulfillment||'delivery');if(result.preferredFulfillment==='pickup'){setCadence('fixed_day');setDeliverySpeed('route_day');}setDeliveryChoices(result.deliveryChoices);
       if(result.profileRequired)setTab('profile');
     }

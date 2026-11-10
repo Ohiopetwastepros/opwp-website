@@ -34,7 +34,7 @@ function setup() {
     UPDATE dog_food_products SET retail_price_cents=5900,is_active=1,is_customer_visible=1 WHERE id='edf-22-12-pink-40';
     INSERT INTO dog_food_stock_lots(id,product_id,lot_number,best_before,usable_bags,counted_date,confirmed_by) VALUES ('lot','edf-22-12-pink-40','TEST','2030-01-01',8,date('now'),'test');`);
   const account={id:'account',customer_id:'buyer',email:'buyer@example.test'};
-  const savedProfile={firstName:'Test',lastName:'Buyer',phone:'4195550101',address:'123 Main',city:'Toledo',state:'OH',zip:'43614',placement:'Front door',fulfillmentMethod:'delivery'};
+  const savedProfile={dogCount:'2',frequency:'monthly',firstName:'Test',lastName:'Buyer',phone:'4195550101',address:'123 Main',city:'Toledo',state:'OH',zip:'43614',placement:'Front door',fulfillmentMethod:'delivery'};
   const order=(extra={})=>portal.createFoodPortalOrder(f.db,account,{commandId:crypto.randomUUID(),plan:'on_demand',deliverySpeed:'route_day',fulfillmentMethod:'delivery',routeWeekday:2,items:[{productId:'edf-22-12-pink-40',quantity:2}],...extra});
   return {...f,...portal,...fulfillment,...payments,...workflow,...routing,account,savedProfile,order,model,setRoster:r=>{current=r;}};
 }
@@ -64,7 +64,7 @@ test('autofilled visible profile values submit without change events and persist
   let submitted;
   const form=await profileForm({profile:stale,required:true,email:f.account.email,busy:false,onSave:async value=>{submitted=value;await f.saveFoodProfile(f.db,f.account,{profile:value});}});
   const inputs=controls(form),names=inputs.map(input=>input.props.name);
-  assert.equal(new Set(names).size,9);
+  assert.equal(new Set(names).size,11);
   assert.ok(inputs.every(input=>!Object.hasOwn(input.props,'value')),'rerenders must not replace browser autofill with stale state');
   assert.equal(inputs.find(input=>input.props.name==='phone').props.autoComplete,'tel');
   assert.equal(inputs.find(input=>input.props.name==='address').props.autoComplete,'address-line1');
@@ -74,6 +74,7 @@ test('autofilled visible profile values submit without change events and persist
   assert.equal(prevented,true);assert.equal(submitted.phone,f.savedProfile.phone);
   const saved=await f.readFoodPortal(f.db,f.account);
   assert.equal(saved.profileRequired,false);assert.equal(saved.addresses[0].line1,f.savedProfile.address);assert.equal(saved.customer.first_name,f.savedProfile.firstName);
+  assert.equal(saved.foodPreferences.dog_count,2);assert.equal(saved.foodPreferences.service_frequency,'monthly');
   assert.equal(stale.phone,'','saving must not depend on a React change event');
 });
 

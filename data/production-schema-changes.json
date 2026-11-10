@@ -15,6 +15,11 @@
       "path": "migrations/0062_food_customer_hub.sql",
       "reviewedSource": "schema-proposals/0062_food_customer_hub.sql",
       "sha256": "83ce62b6e316a807c0213c1c29ed21479d397bc784868a90b29a0440d8c73c92"
+    },
+    {
+      "path": "migrations/0063_food_sale_intake.sql",
+      "reviewedSource": "schema-proposals/0063_food_sale_intake.sql",
+      "sha256": "bf822ddce2b3572e92686e08d92de0d6695f18604f3af92e4954a94d55ea529d"
     }
   ]
 }
