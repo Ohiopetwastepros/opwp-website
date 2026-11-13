@@ -1,3 +1,4 @@
+import {archiveFoodExternalStripe} from '../lib/food-external-stripe.mjs';
 import {runPrivateInNewContext} from './helpers/private-vm.mjs';
 import staffPrivate from '../lib/staff-private.json' with {type:'json'};
 import {foodProfileComplete,FOOD_STATES} from '../lib/dog-food-profile.mjs';
@@ -25,7 +26,7 @@ async function setup(routes=false,{sendEmail,charge}={}) {
   const portal=runPrivateInNewContext(source('dog-food-portal.js')+'\n({readFoodPortal,saveFoodProfile,createFoodPortalOrder,manageFoodSubscription})',{...base,...fulfillment});
   const workflow=runPrivateInNewContext(source('dog-food-workflow.js')+'\n({flushFoodProjections,flushFoodEmails,upsertFoodProjection})',{...base,sendTransactionalEmail:async(env,message)=>{sends.push(message);return sendEmail?sendEmail(message,sends.length):'email_'+sends.length;}});
   const renewals=runPrivateInNewContext(source('dog-food-renewals.js')+'\n({runScheduledDogFoodRenewals})',{...base,...fulfillment,...payments,console,stripeConfigured:()=>true,createStripePaymentIntent:charge||(()=>{throw new Error('No test charge configured');})});
-  const events=runPrivateInNewContext(source('stripe-events.js')+'\n({processStripeEvent})',{...base,...payments,retrieveStripePaymentMethod:async()=>({id:'pm_test',customer:'cus_test',card:{brand:'visa',last4:'4242'}})});
+  const events=runPrivateInNewContext(source('stripe-events.js')+'\n({processStripeEvent})',{archiveFoodExternalStripe,...base,...payments,retrieveStripePaymentMethod:async()=>({id:'pm_test',customer:'cus_test',card:{brand:'visa',last4:'4242'}})});
   f.sql.exec("UPDATE dog_food_workflow_settings SET posting_enabled=1,email_enabled=1; UPDATE dog_food_products SET retail_price_cents=5900 WHERE id='edf-22-12-pink-40';");
   f.sql.prepare(`INSERT INTO dog_food_stock_lots(id,product_id,lot_number,best_before,usable_bags,counted_date,confirmed_by) VALUES ('lot','edf-22-12-pink-40','TEST-LOT','2030-01-01',8,?,'test')`).run(logic.foodDate());
   // In-memory mailbox and synthetic test-only passphrase; no production credentials.

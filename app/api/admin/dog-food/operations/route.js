@@ -24,7 +24,8 @@ export async function GET(request) {
   try{const submission=new URL(request.url).searchParams.get('submission');
     if(submission){if(!/^[a-f0-9-]{36}$/i.test(submission))return Response.json({ok:false,error:'Invalid submission.'},{status:400,headers});
       const command=await c.env.DB.prepare('SELECT status,result FROM dog_food_ops_commands WHERE id=? AND actor=?').bind(submission,c.auth.email).first();
-      return Response.json({ok:true,submission:command?{status:command.status,result:command.status==='complete'?JSON.parse(command.result):null}:{status:'unconfirmed'},data:await readFoodOperations(c.env.DB)},{headers});}
+      const running=!command&&await c.env.DB.prepare("SELECT id FROM dog_food_ops_state WHERE command_token=? AND command_until>CURRENT_TIMESTAMP").bind(submission).first();
+      return Response.json({ok:true,submission:command?{status:command.status,result:command.status==='complete'?JSON.parse(command.result):null}:{status:running?'running':'unconfirmed'},data:await readFoodOperations(c.env.DB)},{headers});}
     return Response.json({ok:true,data:await readFoodOperations(c.env.DB)},{headers});}
   catch{return Response.json({ok:false,error:'Dog-food operations could not be loaded.'},{status:503,headers});}
 }

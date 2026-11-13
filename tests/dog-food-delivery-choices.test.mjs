@@ -94,7 +94,7 @@ test('new account is gated until a complete profile is saved, and subsequent ses
   await assert.rejects(f.order(),/Save your delivery profile/);
   await assert.rejects(f.saveFoodProfile(f.db,f.account,{profile:{...f.savedProfile,phone:'123'}}),/Complete/);
   await f.saveFoodProfile(f.db,f.account,{profile:f.savedProfile});
-  const session=await f.readFoodPortal(f.db,{...f.account});assert.equal(session.profileRequired,false);assert.equal(session.customer.phone,'4195550101');assert.equal(session.addresses[0].line1,'123 Main');
+  const session=await f.readFoodPortal(f.db,{...f.account});assert.equal(session.profileRequired,false);assert.equal(session.customer.phone,'+14195550101');assert.equal(session.addresses[0].line1,'123 Main');
   assert.ok(f.sql.prepare('SELECT profile_completed_at FROM dog_food_accounts').get().profile_completed_at);
   await f.saveFoodProfile(f.db,f.account,{profile:f.savedProfile});assert.equal(f.sql.prepare('SELECT count(*) n FROM dog_food_addresses').get().n,1);
   const response=JSON.stringify(session.deliveryChoices);assert.ok(!response.includes('Private neighbor'));assert.ok(!response.includes('private-id'));assert.ok(!response.includes('123 Main'));

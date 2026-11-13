@@ -25,6 +25,16 @@
       "path": "migrations/0064_independent_food_backend.sql",
       "reviewedSource": "schema-proposals/0064_independent_food_backend.sql",
       "sha256": "113be82d56e654e7cd812412f846e25cf4dcaf246096a5ae42f28a23cc4b535c"
+    },
+    {
+      "path": "migrations/0065_food_customer_optional_intake.sql",
+      "reviewedSource": "schema-proposals/0065_food_customer_optional_intake.sql",
+      "sha256": "79151fae0ca50935de0d1085bd776ba4dd58c71a8547c714dd7d10dd25762918"
+    },
+    {
+      "path": "migrations/0066_food_source_reconciliation.sql",
+      "reviewedSource": "schema-proposals/0066_food_source_reconciliation.sql",
+      "sha256": "743fc3b24effbc77c70e0e99e4f993a76771ed20b7ad0713f517d3de854fa069"
     }
   ]
 }

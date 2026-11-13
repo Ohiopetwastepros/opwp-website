@@ -43,10 +43,10 @@ test('email recovery preserves the original request and blocks retry after the s
   assert.equal((await api.POST(req())).status,409);assert.equal(f.sql.prepare('SELECT attempts FROM dog_food_transactional_outbox').get().attempts,5);
 });
 test('public checkout stays gated and production never accepts a test key or sandbox override',async()=>{
-  let enabled=0,checkouts=0,env={STRIPE_SECRET_KEY:'sk_live_testfixture'};
+  let enabled=0,checkouts=0,launchApproved=false,env={STRIPE_SECRET_KEY:'sk_live_testfixture'};
   const db={prepare:q=>({first:async()=>({posting_enabled:enabled,scheduling_enabled:enabled}),bind:()=>({first:async()=>q.includes('dog_food_payments')?null:{id:'owned-order',status:'pending_payment'}})})};
   const api=runPrivateInNewContext(source('app/api/dog-food/account/route.js')+'\n({POST})',{
-    Response,URL,FoodAccountError,requireFoodProfile:async()=>({}),getDb:()=>db,getRuntimeEnv:()=>env,foodAccountSession:async()=>({customer_id:'owner'}),stripeConfigured:()=>true,
+    readFoodLaunchReadiness:async()=>({orderingAvailable:launchApproved}),readFoodOperations:async()=>({}),Response,URL,FoodAccountError,requireFoodProfile:async()=>({}),getDb:()=>db,getRuntimeEnv:()=>env,foodAccountSession:async()=>({customer_id:'owner'}),stripeConfigured:()=>true,
     protectJsonRequest:async()=>({body:{action:'checkout',orderId:'owned-order'}}),applicationConfig:()=>({siteOrigin:'https://example.test'}),
     createDogFoodCheckout:async()=>{checkouts++;return {checkoutUrl:'https://checkout.stripe.com/test'};},
   });
@@ -54,9 +54,10 @@ test('public checkout stays gated and production never accepts a test key or san
   assert.equal((await api.POST(req('www.ohiopetwastepros.com'))).status,503);assert.equal(checkouts,0);
   enabled=1;env={STRIPE_SECRET_KEY:'sk_test_fixture',DOG_FOOD_TEST_CHECKOUT:'true'};
   assert.equal((await api.POST(req('www.ohiopetwastepros.com'))).status,503);assert.equal(checkouts,0);
-  assert.equal((await api.POST(req('sandbox.example.test'))).status,200);assert.equal(checkouts,1);
+  assert.equal((await api.POST(req('sandbox.example.test'))).status,503);assert.equal(checkouts,0);
+  env.APP_ENV='test';assert.equal((await api.POST(req('localhost'))).status,200);assert.equal(checkouts,1);
   env={STRIPE_SECRET_KEY:'sk_test_fixture'};assert.equal((await api.POST(req('sandbox.example.test'))).status,503);assert.equal(checkouts,1);
-  env={STRIPE_SECRET_KEY:'sk_live_fixture'};assert.equal((await api.POST(req('www.ohiopetwastepros.com'))).status,200);assert.equal(checkouts,2);
+  env={STRIPE_SECRET_KEY:'sk_live_fixture'};assert.equal((await api.POST(req('www.ohiopetwastepros.com'))).status,503);launchApproved=true;assert.equal((await api.POST(req('www.ohiopetwastepros.com'))).status,200);assert.equal(checkouts,2);
 });
 test('workflow controls reject non-admin sessions, cross-site writes and streamed oversized bodies',async()=>{
   let admin=false,calls=0;

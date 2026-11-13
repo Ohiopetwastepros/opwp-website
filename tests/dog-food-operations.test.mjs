@@ -6,12 +6,13 @@ import vm from 'node:vm';
 import {DatabaseSync} from 'node:sqlite';
 import schema from '../data/dog-food-airtable-schema.json' with {type:'json'};
 import * as logic from '../lib/dog-food-operations.mjs';
+import * as sourceHelpers from '../lib/food-source-reconciliation.mjs';
 import * as websiteStore from '../lib/dog-food-website-store.mjs';
 import {readFoodSalesIntelligence} from '../lib/dog-food-sales-intelligence.mjs';
 import {readBoundedBytes,readBoundedProviderJson} from '../lib/bounded-body.mjs';
 const source=fs.readFileSync(new URL('../lib/dog-food-ops-store.js',import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'');
 const row=(id,fields)=>({id,fields});
-function snapshot(){return {tables:{Products:[row('recPink',{'Product Name':'Chicken (Pink)','Formula Code':'22-12','Bag Weight':40,'DC Cost':30,'Dealer Price':40,'Retail Price':60,'Active Status':true,'Website Product ID':'edf-22-12-pink-40'})],Sales:[row('recSale',{'Sold To':'Real Buyer',Product:['recPink'],'Bag Quantity':2,'Sale Date':'2026-10-02','Amount Collected':120,'Payment Status':'Unpaid',Notes:'Collect a check'})], 'Inventory Adjustments':[row('recCount',{'Product':['recPink'],'Movement Type':'Stock Count','Counted Quantity':10,'Movement Date':'2026-10-01',Reason:'End-of-day count'})]}};}
+function snapshot(){return {tables:{Products:[row('recPink',{'Product Name':'Chicken (Pink)','Formula Code':'22-12','Bag Weight':40,'DC Cost':30,'Dealer Price':40,'Retail Price':60,'Active Status':true,'Website Product ID':'edf-22-12-pink-40'})],Sales:[row('recSale',{'Sold To':'Real Buyer',Product:['recPink'],'Bag Quantity':2,'Sale Date':'2026-10-02','Amount Collected':120,'Payment Status':'Unpaid','Fulfillment Status':'Delivered',Notes:'Collect a check'})], 'Inventory Adjustments':[row('recCount',{'Product':['recPink'],'Movement Type':'Stock Count','Counted Quantity':10,'Movement Date':'2026-10-01',Reason:'End-of-day count'})]}};}
 function fixture(seed=snapshot()) {
   const sql=new DatabaseSync(':memory:');sql.exec(fs.readFileSync(new URL('../tmp/test-migrations/0007_dog_food_foundation.sql',import.meta.url),'utf8'));sql.exec(fs.readFileSync(new URL('../tmp/test-migrations/0025_dog_food_stripe.sql',import.meta.url),'utf8'));sql.exec(fs.readFileSync(new URL('../tmp/test-migrations/0049_dog_food_operations.sql',import.meta.url),'utf8'));
   sql.exec(fs.readFileSync(new URL('../tmp/test-migrations/0050_dog_food_collections.sql',import.meta.url),'utf8'));
@@ -33,12 +34,12 @@ function fixture(seed=snapshot()) {
     if(segments[3])return Response.json(records[name].find(r=>r.id===segments[3])||{}, {status:records[name].some(r=>r.id===segments[3])?200:404});
     return Response.json({records:records[name]});
   }
-  const context={...websiteStore,...logic,readFoodSalesIntelligence,schema,crypto,setTimeout,TextEncoder,TextDecoder,atob,URL,URLSearchParams,Response,console,outboundFetch,readBoundedProviderJson};
+  const context={...sourceHelpers,...websiteStore,...logic,readFoodSalesIntelligence,schema,crypto,setTimeout,TextEncoder,TextDecoder,atob,URL,URLSearchParams,Response,console,outboundFetch,readBoundedProviderJson};
   const service=runPrivateInNewContext(`${source}\n({readFoodOperations,readFoodSnapshot,syncFoodOperations,foodOperation,runFoodCommand})`,context);
   return {sql,db,service,env:{DB:db,AIRTABLE_API_KEY:'test'},records,calls:()=>calls,fail:()=>{fail=true;}};
 }
 test('unpaid delivered bags deduct stock, cash is independent, count excludes earlier activity',()=>{
-  const s=snapshot();s.tables.Sales.push(row('old',{'Sold To':'Past Buyer',Product:['recPink'],'Bag Quantity':100,'Sale Date':'2026-09-30','Amount Collected':6000,'Payment Status':'Paid'}));
+  const s=snapshot();s.tables.Sales.push(row('old',{'Sold To':'Past Buyer',Product:['recPink'],'Bag Quantity':100,'Sale Date':'2026-09-30','Amount Collected':6000,'Payment Status':'Paid','Fulfillment Status':'Delivered'}));
   const m=logic.operationModel(s);assert.equal(m.products[0].onHand,8);assert.equal(m.metrics.receivablesCents,12000);assert.equal(m.metrics.collectedCents,600000);assert.equal(m.metrics.stockBags,8);
 });
 test('unreconciled inventory stays unknown instead of displaying fabricated zero',()=>{const s=snapshot();s.tables['Inventory Adjustments']=[];const m=logic.operationModel(s);assert.equal(m.products[0].onHand,null);assert.equal(m.metrics.stockBags,null);});
@@ -49,7 +50,7 @@ test('intraday physical counts exclude prior deliveries and deduct later same-da
 });
 test('intraday counts with unknown same-day movement times fail closed',()=>{
   const s=snapshot(),d=logic.foodDate();s.tables['Inventory Adjustments']=[row('intraday',{Product:['recPink'],'Movement Type':'Stock Count','Counted Quantity':8,'Movement Date':d,'Counted At (Website)':`${d}T15:30:00.000Z`})];
-  s.tables.Sales.push(row('unknown-time',{'Sold To':'Legacy Buyer',Product:['recPink'],'Bag Quantity':2,'Sale Date':d,'Sale Total':120}));
+  s.tables.Sales.push(row('unknown-time',{'Sold To':'Legacy Buyer',Product:['recPink'],'Bag Quantity':2,'Sale Date':d,'Sale Total':120,'Fulfillment Status':'Delivered'}));
   const m=logic.operationModel(s);assert.equal(m.products[0].onHand,null);assert.equal(m.products[0].confirmed,false);assert.ok(m.issues.some(i=>i.message.includes('exact time')));
 });
 test('paid purchase orders add stock only at physical receipt; waste removes usable stock',()=>{const s=snapshot();s.tables['Purchase Orders']=[row('po',{'PO Number':'PO1','Amount Paid':300, 'PO Status':'Ordered'})];s.tables['Purchase Order Lines']=[row('line',{'Purchase Order':['po'],Product:['recPink'],'Ordered Quantity':10,'Received Quantity':0,'Cost Per Bag':30})];let m=logic.operationModel(s);assert.equal(m.products[0].onHand,8);assert.equal(m.metrics.supplierPaidCents,30000);

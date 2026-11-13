@@ -1,3 +1,5 @@
+import {readFoodLaunchReadiness} from '@/lib/food-launch-readiness.mjs';
+import {readFoodOperations} from '@/lib/dog-food-ops-store';
 import { getDb } from '@/lib/db';
 import { getRuntimeEnv } from '@/lib/cloudflare';
 import { applicationConfig } from '@/lib/app-config';
@@ -25,8 +27,9 @@ export async function POST(request) {
     if (['order','checkout'].includes(body.action)) {
       const env=getRuntimeEnv(),key=String(env.STRIPE_SECRET_KEY||'');
       const settings=await db.prepare("SELECT posting_enabled,scheduling_enabled FROM dog_food_workflow_settings WHERE id='org-opwp'").first();
-      const testSandbox=env.DOG_FOOD_TEST_CHECKOUT==='true'&&key.startsWith('sk_test_')&&!['www.ohiopetwastepros.com','ohiopetwastepros.com'].includes(new URL(request.url).hostname);
-      if(!settings?.posting_enabled||!settings?.scheduling_enabled||!key.startsWith('sk_live_')&&!testSandbox)return reply({error:'Online ordering is awaiting verified payment and delivery setup. Please call 419-262-2371. No payment has been taken.'},503);
+      const testSandbox=env.DOG_FOOD_TEST_CHECKOUT==='true'&&env.APP_ENV==='test'&&key.startsWith('sk_test_')&&['localhost','127.0.0.1'].includes(new URL(request.url).hostname);
+      const ready=testSandbox?true:(await readFoodLaunchReadiness(db,env,await readFoodOperations(db))).orderingAvailable;
+      if(!ready||!settings?.posting_enabled||!settings?.scheduling_enabled||!key.startsWith('sk_live_')&&!testSandbox)return reply({error:'Online ordering is awaiting verified payment and delivery setup. Please call 419-262-2371. No payment has been taken.'},503);
     }
     let orderId;
     if (body.action === 'order') orderId = (await createFoodPortalOrder(db, account, body)).orderId;

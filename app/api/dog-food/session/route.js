@@ -18,7 +18,7 @@ export async function GET(request) {
   try {
     const db = getDb(), env = getRuntimeEnv();
     if (!db) return reply({ error: 'Account service is unavailable.' }, 503);
-    return reply({ ok: true, ...await readFoodPortal(db, await foodAccountSession(db, request.headers)), paymentConfigured: stripeConfigured(env), emailConfigured: transactionalEmailConfig(env).configured });
+    return reply({ ok: true, ...await readFoodPortal(db, await foodAccountSession(db, request.headers),env), paymentConfigured: stripeConfigured(env), emailConfigured: transactionalEmailConfig(env).configured });
   } catch { return reply({ error: 'Account service is temporarily unavailable.' }, 503); }
 }
 export async function POST(request) {

@@ -14,26 +14,27 @@ function fixture(){const f=setup();f.sql.exec(`CREATE TABLE IF NOT EXISTS field_
 CREATE TABLE IF NOT EXISTS lead_suppressions(organization_id TEXT,phone_hash TEXT,reason TEXT);
 CREATE TABLE IF NOT EXISTS api_rate_limits(scope TEXT,client_key TEXT,window_start INTEGER,request_count INTEGER,expires_at TEXT,PRIMARY KEY(scope,client_key,window_start));`);return f;}
 const source=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'');
+async function invite(f,id){return hub.foodCustomerCommand(f.db,{action:'invite_customer',commandId:crypto.randomUUID(),customerId:id,channels:['email','sms'],confirm:true},'owner',{office:true});}
 function senders(extra={}){const email=[],sms=[];return {email,sms,options:{emailConfigured:true,smsConfigured:true,origin:'https://example.test',sendEmail:async m=>{email.push(m);return 'email-'+email.length;},sendSms:async m=>{sms.push(m);return 'sms-'+sms.length;},...extra}};}
 
-test('new customer requires complete contact, address, dog and service details before any record or invitation',async()=>{
-  const f=fixture();for(const field of ['firstName','lastName','email','phone','address','city','state','zip','dogCount','customerType','frequency','fulfillment','placement','smsConsent']){
+test('customer creation requires core contact, address and handoff details before any record',async()=>{
+  const f=fixture();for(const field of ['firstName','lastName','phone','address','city','state','zip','fulfillment','placement']){
     await assert.rejects(hub.foodCustomerCommand(f.db,customerBody({[field]:field==='smsConsent'?false:''}),'seller'));
     assert.equal(count(f,'dog_food_customers'),1);assert.equal(count(f,'dog_food_customer_messages'),0);
   }
   await assert.rejects(hub.foodCustomerCommand(f.db,customerBody({placement:'Other',placementOther:''}),'seller'),/instructions/);
 });
-test('customer, profile, address and two invitation intents commit once; retries never duplicate or create a portal password',async()=>{
+test('customer, profile and address commit once without invitations or a portal password',async()=>{
   const f=fixture(),body=customerBody(),saved=await hub.foodCustomerCommand(f.db,body,'seller');
   assert.deepEqual(await hub.foodCustomerCommand(f.db,{...body},'seller'),saved);
-  assert.equal(count(f,'dog_food_customers'),2);assert.equal(count(f,'dog_food_customer_profiles'),1);assert.equal(count(f,'dog_food_customer_messages'),2);assert.equal(count(f,'dog_food_accounts'),1);assert.equal(count(f,'dog_food_orders'),0);
+  assert.equal(count(f,'dog_food_customers'),2);assert.equal(count(f,'dog_food_customer_profiles'),1);assert.equal(count(f,'dog_food_customer_messages'),0);assert.equal(count(f,'dog_food_accounts'),1);assert.equal(count(f,'dog_food_orders'),0);
   assert.equal(f.sql.prepare('SELECT phone FROM dog_food_customers WHERE id=?').get(saved.id).phone,'+14195550199');
   await assert.rejects(hub.foodCustomerCommand(f.db,{...body,lastName:'Different'},'seller'),/different details/);
   await assert.rejects(hub.foodCustomerCommand(f.db,customerBody(),'other'),/already exists/);
 });
 test('email and SMS lead to one verified portal account and the same staff sale, address and customer history',async()=>{
   const f=fixture(),body=customerBody({fulfillment:'pickup'}),saved=await hub.foodCustomerCommand(f.db,body,'seller'),provider=senders();
-  await processFoodCustomerMessages(f.db,provider.options);await processFoodCustomerMessages(f.db,provider.options);
+  await invite(f,saved.id);await processFoodCustomerMessages(f.db,provider.options);await processFoodCustomerMessages(f.db,provider.options);
   assert.equal(provider.email.length,1);assert.equal(provider.sms.length,1);assert.equal(count(f,'dog_food_accounts'),1);
   const temporary=provider.email[0].text.match(/Temporary password: (\S+)/)[1];assert.equal(provider.sms[0].text.includes(temporary),false);
   assert.equal(JSON.stringify(await hub.readFoodCustomerHub(f.db,{id:saved.id})).includes(temporary),false);
@@ -47,17 +48,17 @@ test('email and SMS lead to one verified portal account and the same staff sale,
   await assert.rejects(auth.loginFoodAccount(f.db,{email:body.email,password:temporary}),/incorrect/);
 });
 test('SMS opt-out is honored while the email invitation still sends',async()=>{
-  const f=fixture(),saved=await hub.foodCustomerCommand(f.db,customerBody(),'seller'),provider=senders();f.sql.prepare('INSERT INTO field_message_suppression(phone,suppressed) VALUES(?,1)').run('+14195550199');
+  const f=fixture(),saved=await hub.foodCustomerCommand(f.db,customerBody(),'seller'),provider=senders();await invite(f,saved.id);f.sql.prepare('INSERT INTO field_message_suppression(phone,suppressed) VALUES(?,1)').run('+14195550199');
   await processFoodCustomerMessages(f.db,provider.options);assert.equal(provider.email.length,1);assert.equal(provider.sms.length,0);
   const messages=await hub.foodCustomerMessages(f.db,saved.id);assert.equal(messages.find(m=>m.channel==='sms').status,'suppressed');assert.equal(messages.find(m=>m.channel==='email').status,'accepted');
 });
 test('uncertain provider acceptance and repeated submission never automatically resend or duplicate a contact',async()=>{
   const f=fixture(),body=customerBody(),saved=await hub.foodCustomerCommand(f.db,body,'seller');let sms=0;const provider=senders({sendSms:async()=>{sms++;throw Error('response lost after provider acceptance');}});
-  await processFoodCustomerMessages(f.db,provider.options);await hub.foodCustomerCommand(f.db,body,'seller');await processFoodCustomerMessages(f.db,provider.options);
+  await invite(f,saved.id);await processFoodCustomerMessages(f.db,provider.options);await hub.foodCustomerCommand(f.db,body,'seller');await processFoodCustomerMessages(f.db,provider.options);
   assert.equal(sms,1);assert.equal(provider.email.length,1);assert.equal(count(f,'dog_food_customers'),2);assert.equal((await hub.foodCustomerMessages(f.db,saved.id)).find(m=>m.channel==='sms').status,'uncertain');
 });
 test('unconfigured providers leave a durable queue and never report invitations as delivered',async()=>{
-  const f=fixture(),saved=await hub.foodCustomerCommand(f.db,customerBody(),'seller'),provider=senders({emailConfigured:false,smsConfigured:false});await processFoodCustomerMessages(f.db,provider.options);
+  const f=fixture(),saved=await hub.foodCustomerCommand(f.db,customerBody(),'seller'),provider=senders({emailConfigured:false,smsConfigured:false});await invite(f,saved.id);await processFoodCustomerMessages(f.db,provider.options);
   assert.equal(provider.email.length+provider.sms.length,0);assert.ok((await hub.foodCustomerMessages(f.db,saved.id)).every(m=>m.status==='queued'));
 });
 test('office edits preserve historical order addresses, reject stale changes and keep existing portal credentials',async()=>{
@@ -124,4 +125,37 @@ test('customer directory searches contact details and filters inactive records w
   const f=fixture(),saved=await hub.foodCustomerCommand(f.db,customerBody(),'seller');await hub.foodCustomerCommand(f.db,await statusBody(f,saved.id,'inactive'),'owner',{office:true});
   for(const q of ['New B','new@example.test','5550199']){const data=await hub.readFoodCustomerHub(f.db,{q});assert.equal(data.customers[0].id,saved.id);assert.equal(data.customers[0].phone,'+14195550199');assert.equal(data.customers[0].email,'new@example.test');}
   assert.equal((await hub.readFoodCustomerHub(f.db,{status:'active'})).customers.length,1);assert.equal((await hub.readFoodCustomerHub(f.db,{status:'inactive'})).customers[0].id,saved.id);assert.equal((await hub.readFoodCustomerHub(f.db,{q:"' OR 1=1 --"})).customers.length,0);
+});
+
+for(const blocked of ['email','sms'])for(const reason of ['unconfigured','budget']){
+  test(`${reason} ${blocked} backlog does not starve the other invitation channel`,async()=>{
+    const f=fixture(),provider=senders(),working=blocked==='email'?'sms':'email';
+    for(let i=0;i<6;i++){const c=await hub.foodCustomerCommand(f.db,customerBody({firstName:'Queue'+i,phone:'419555018'+i,email:`queue-${i}@example.test`}),'seller');await invite(f,c.id);}
+    f.sql.prepare("UPDATE dog_food_customer_messages SET created_at=CASE WHEN channel=? THEN '2026-01-01' ELSE '2026-01-02' END").run(blocked);
+    const window=Math.floor(Date.now()/86400000)*86400;
+    if(reason==='unconfigured')provider.options[blocked+'Configured']=false;
+    else f.sql.prepare("INSERT INTO api_rate_limits VALUES('food_customer_invites',?,?,100,datetime(?,'unixepoch'))").run(blocked,window,window+172800);
+    await processFoodCustomerMessages(f.db,provider.options);
+    assert.equal(provider[blocked].length,0);assert.equal(provider[working].length,4);
+    assert.equal(f.sql.prepare("SELECT COUNT(*) n FROM dog_food_customer_messages WHERE channel=? AND status='queued'").get(blocked).n,6);
+    if(reason==='budget')assert.equal(f.sql.prepare("SELECT request_count FROM api_rate_limits WHERE client_key=?").get(blocked).request_count,100);
+    await processFoodCustomerMessages(f.db,provider.options);
+    assert.equal(provider[working].length,6);assert.equal(provider[blocked].length,0);
+    // Making the blocked channel eligible drains its preserved queue once only.
+    provider.options[blocked+'Configured']=true;
+    if(reason==='budget')f.sql.prepare("UPDATE api_rate_limits SET window_start=? WHERE client_key=?").run(window-86400,blocked);
+    await processFoodCustomerMessages(f.db,{...provider.options,limit:10});
+    await processFoodCustomerMessages(f.db,provider.options);
+    assert.equal(provider[blocked].length,6);assert.equal(provider[working].length,6);
+  });
+}
+test('reaching a channel budget within a bounded pass leaves capacity for the other channel',async()=>{
+  const f=fixture(),provider=senders(),window=Math.floor(Date.now()/86400000)*86400;
+  for(let i=0;i<6;i++){const c=await hub.foodCustomerCommand(f.db,customerBody({firstName:'Budget'+i,phone:'419555017'+i,email:`budget-${i}@example.test`}),'seller');await invite(f,c.id);}
+  f.sql.prepare("UPDATE dog_food_customer_messages SET created_at=CASE WHEN channel='sms' THEN '2026-01-01' ELSE '2026-01-02' END").run();
+  f.sql.prepare("INSERT INTO api_rate_limits VALUES('food_customer_invites','sms',?,99,datetime(?,'unixepoch'))").run(window,window+172800);
+  await processFoodCustomerMessages(f.db,provider.options);
+  assert.equal(provider.sms.length,1);assert.equal(provider.email.length,3);
+  assert.equal(f.sql.prepare("SELECT request_count FROM api_rate_limits WHERE client_key='sms'").get().request_count,100);
+  assert.equal(f.sql.prepare("SELECT COUNT(*) n FROM dog_food_customer_messages WHERE channel='sms' AND status='queued'").get().n,5);
 });
