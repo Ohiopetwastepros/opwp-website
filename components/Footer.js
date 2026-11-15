@@ -13,7 +13,7 @@ export default function Footer() {
             <span style={{ fontFamily: "var(--font-bricolage)", fontWeight: 800, fontSize: 18, lineHeight: 1.0, color: "#fff" }}>Ohio Pet<br />Waste Pros</span>
           </div>
           <p style={{ fontSize: 14.5, lineHeight: 1.6, margin: "0 0 20px", maxWidth: 330, color: "#9fb1c2" }}>
-            Northwest Ohio &amp; Southeast Michigan&apos;s family-owned dog poop removal service. Gate photos, double-bagged waste hauled away, and eco-friendly sanitizing — a clean yard without the dirty work.
+            Northwest Ohio &amp; Southeast Michigan&apos;s family-owned dog poop removal service. Gate photos, double-bagged waste, optional haul-away, and eco-friendly sanitizing — a clean yard without the dirty work.
           </p>
           <div style={{ display: "flex", gap: 10 }}>
             <a href="https://www.facebook.com/profile.php?id=61575239054687" aria-label="Facebook" className="hov-white-08" style={{ width: 40, height: 40, borderRadius: 9, background: "rgba(255,255,255,.08)", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>

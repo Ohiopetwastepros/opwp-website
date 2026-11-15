@@ -143,7 +143,7 @@ export default function HomePage() {
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "22px 28px", display: "flex", flexWrap: "wrap", gap: "14px 30px", justifyContent: "center", alignItems: "center", fontSize: 14.5, fontWeight: 700, color: "#3a4750" }}>
           <span>📷 Gate photo every visit</span>
           <span style={{ color: "#dcdcd0" }}>|</span>
-          <span>♻️ Waste double-bagged &amp; hauled away</span>
+          <span>♻️ Double-bagged waste &bull; Optional haul-away</span>
           <span style={{ color: "#dcdcd0" }}>|</span>
           <span>🌿 Eco-friendly sanitizing</span>
           <span style={{ color: "#dcdcd0" }}>|</span>
