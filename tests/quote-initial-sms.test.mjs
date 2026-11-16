@@ -192,6 +192,40 @@ test("interrupted workers are quarantined with a visible reason and cannot repla
   assert.equal(f.delivery().attempt_count,5);assert.equal(f.calls.length,0);
 });
 
+test("a duplicate consented form during preflight uses the latest service details once",async()=>{
+  const f=await fixture();
+  const fetcher=async(url,options)=>{
+    if (url.includes("/calls?")) {
+      const row=f.db.sqlite.prepare("SELECT payload FROM submissions WHERE id=?").get(f.id);
+      const body=JSON.parse(row.payload);body.follow_up_consent_at=new Date().toISOString();
+      body.quote_context={dogs:3,frequency:"every_other_week"};
+      f.db.sqlite.prepare("UPDATE submissions SET payload=? WHERE id=?").run(JSON.stringify(body),f.id);
+    }
+    return f.fetcher(url,options);
+  };
+  await runInitialQuoteSms(f.env,{fetcher});
+  const posts=f.calls.filter(call=>call.options.method==="POST");
+  assert.equal(posts.length,1);assert.match(JSON.parse(posts[0].options.body).content,/every-other-week cleanup for your 3 dogs/);
+});
+
+test("owner verification is bound to one funnel and phone, expires, and still enforces permission",async()=>{
+  for (const mode of ["approved","expired","wrong_phone","opted_out"]) {
+    const f=await fixture({body:mode==="opted_out"?{sms_opt_out:true}:{}});
+    const funnel=crypto.randomUUID();
+    f.db.sqlite.prepare("UPDATE submissions SET funnel_id=? WHERE id=?").run(funnel,f.id);
+    const hash=Buffer.from(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(initialSmsPhone("4192620100")))).toString("hex");
+    f.db.sqlite.prepare("INSERT INTO airtable_cockpit_snapshots(snapshot_key,payload) VALUES (?,?)")
+      .run("quote_initial_sms_verification:"+funnel,JSON.stringify({approvedByOwner:true,
+        phoneHash:mode==="wrong_phone"?"wrong":hash,expiresAt:new Date(Date.now()+(mode==="expired"?-60000:10*60000)).toISOString()}));
+    f.db.sqlite.prepare("INSERT INTO submissions(id,kind,source,status,phone,payload) VALUES (?,'partial_quote','website','converted','4192620100','{}')").run(crypto.randomUUID());
+    const fetcher=async(url,options)=>url.includes("/messages?")?Response.json({data:[{id:"old-test-message"}]}):f.fetcher(url,options);
+    await runInitialQuoteSms(f.env,{fetcher});
+    await runInitialQuoteSms(f.env,{fetcher});
+    assert.equal(f.calls.filter(call=>call.options.method==="POST").length,mode==="approved"?1:0);
+    assert.equal(f.delivery().status,mode==="approved"?"sent":"cancelled");
+  }
+});
+
 test("normal form entry schedules SMS before owner notification and survives request replay",async()=>{
   const routeBundle=await build({entryPoints:["app/api/lead/route.js"],bundle:true,platform:"node",format:"esm",write:false,
     alias:{"@":process.cwd()},plugins:[{name:"form-entry",setup(b){
