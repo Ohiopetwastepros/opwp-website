@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { build } from "esbuild";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { leadTestDatabase } from "./helpers/lead-inbox-fixture.mjs";
 import { initialQuoteSmsId, initialSmsPhone, runInitialQuoteSms } from "../lib/quote-initial-sms.mjs";
 import { buildCustomerQuoteFollowUpSms } from "../lib/quote-funnel.mjs";
@@ -34,6 +35,7 @@ async function fixture({phone="4192620100",body={},historical=false}={}) {
   if (historical) db.sqlite.prepare("UPDATE quote_follow_up_deliveries SET id=? WHERE id=?").run(crypto.randomUUID(),initialQuoteSmsId(id));
   const calls = [];
   const fetcher = async (url,options={})=>{
+    assert.equal(options.redirect,"manual");
     calls.push({url,options});
     if (options.method==="POST") return Response.json({data:{id:"ACmock",status:"queued"}},{status:202});
     if (url.endsWith("/phone-numbers")) return Response.json({data:[{number:"+14192622371",id:"PNmock"}]});
@@ -81,6 +83,16 @@ test("approved wording handles missing fields and uses only supplied service det
 test("invalid and reserved numbers fail closed",()=>{
   for (const phone of ["1234567890","4195550100","+441234567890","4192620424 ext 5",""]) assert.equal(initialSmsPhone(phone),"");
   assert.equal(initialSmsPhone("(419) 262-0100"),"+14192620100");
+});
+
+test("both Quo request paths construct successfully in the production Workers runtime",async()=>{
+  const source=readFileSync(new URL("../lib/quote-initial-sms.mjs",import.meta.url),"utf8");
+  const modes=[...source.matchAll(/redirect:\s*"([a-z]+)"/g)].map(match=>match[1]);
+  assert.deepEqual(modes,["manual","manual"]);
+  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,compatibilityDate:"2026-08-28",compatibilityFlags:["nodejs_compat"],
+    script:`export default {fetch(){const modes=${JSON.stringify(modes)};for(const redirect of modes)new Request('https://api.openphone.com/v1/messages',{redirect});return new Response('ok');}}`}));
+  try{assert.equal(await(await mf.dispatchFetch("http://example.com")).text(),"ok");}
+  finally{await mf.dispose();}
 });
 
 test("initial sender personalizes, records a durable key and accepts only one concurrent attempt",async()=>{
