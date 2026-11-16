@@ -1,5 +1,5 @@
 'use client';
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import styles from './staff-access.module.css';
 const pendingKey='opwp-food-staff-invitation';
 const labels={active:'Active',invited:'Awaiting setup',expired:'Setup expired',revoked:'Revoked',blocked:'Account blocked'};
@@ -10,6 +10,7 @@ async function api(body){
   if(!r.ok){const e=Error(d.error||'Staff access could not be confirmed.');e.definitive=[400,403,404,409,413].includes(r.status)||d.error?.includes('No account or password was changed.');throw e;}return d;
 }
 export default function StaffAccessClient(){
+  const submitting=useRef(false);
   const [staff,setStaff]=useState([]),[emailConfigured,setEmailConfigured]=useState(false),[loading,setLoading]=useState(true);
   const [adding,setAdding]=useState(false),[name,setName]=useState(''),[email,setEmail]=useState(''),[plan,setPlan]=useState(null);
   const [confirm,setConfirm]=useState(false),[fieldAccess,setFieldAccess]=useState(false),[reset,setReset]=useState(false);
@@ -25,10 +26,11 @@ export default function StaffAccessClient(){
   function begin(m=null){setName(m?.display_name||'');setEmail(m?.email||'');setPlan(null);setConfirm(false);setReset(false);setFieldAccess(false);setAdding(true);setRevoking(null);setError('');setMessage('');}
   async function prepare(e){e.preventDefault();setBusy(true);setError('');setConfirm(false);setReset(false);setFieldAccess(false);try{setPlan((await api({action:'prepare',email})).result);}catch(e){setError(e.message);}finally{setBusy(false);}}
   async function invite(payload=null){
+    if(submitting.current)return;submitting.current=true;
     const request=payload||{action:'invite',commandId:crypto.randomUUID(),email:plan.email,name,confirm,acknowledgeExistingFieldAccess:fieldAccess,replaceExistingPassword:reset};
     setBusy(true);setError('');setMessage('');
     try{sessionStorage.setItem(pendingKey,JSON.stringify(request));setPending(request);const d=await api(request);sessionStorage.removeItem(pendingKey);setPending(null);setMessage(d.result.message);setPlan(null);setAdding(false);setConfirm(false);await load();}
-    catch(e){if(e.definitive){sessionStorage.removeItem(pendingKey);setPending(null);}setError(e.message);}finally{setBusy(false);}
+    catch(e){if(e.definitive){sessionStorage.removeItem(pendingKey);setPending(null);}setError(e.message);}finally{submitting.current=false;setBusy(false);}
   }
   async function revoke(id){setBusy(true);setError('');setMessage('');try{const d=await api({action:'revoke',memberId:id,confirm:true});setMessage(d.result.message);setRevoking(null);await load();}catch(e){setError(e.message+' Refresh to confirm the current access status.');}finally{setBusy(false);}}
   const visible=staff.filter(m=>(filter==='all'||m.access_status===filter)&&`${m.display_name} ${m.email}`.toLowerCase().includes(query.trim().toLowerCase())),locked=busy||Boolean(pending);

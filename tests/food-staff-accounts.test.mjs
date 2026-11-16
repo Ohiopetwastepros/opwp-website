@@ -71,11 +71,12 @@ test('master directory distinguishes setup, expiry, active and revoked; revocati
 test('staff HTTP boundary allows new sales and blocks customer mutations and changes to existing sales',async()=>{
   const f=setup();let office=false,commandCalls=0;
   const context=async()=>({env:{DB:f.db,FOOD_SALES_RECORDING_ENABLED:'true'},auth:{office,member:{id:'seller'}}});
-  const common={...ledger,...logic,...hub,foodSalesContext:context,salesHeaders:{},salesError:e=>Response.json({error:e.message},{status:e.status||500}),readBoundedBytes:async r=>new Uint8Array(await r.arrayBuffer()),Response,URL,TextDecoder};
+  const common={...ledger,...logic,...hub,foodSalesContext:context,salesHeaders:{},salesError:e=>Response.json({error:e.message,definitive:e.definitive===true},{status:e.status||500}),readBoundedBytes:async r=>new Uint8Array(await r.arrayBuffer()),Response,URL,TextDecoder};
   const route=vm.runInNewContext(source('app/api/food-sales/route.js')+'\n({GET,POST})',{...common,foodSalesService:{...f.sales,command:async(...args)=>{commandCalls++;return f.sales.command(...args);}}});
   const customers=vm.runInNewContext(source('app/api/food-sales/customers/route.js')+'\n({GET,POST})',common);
   const req=(payload,path='/api/food-sales/')=>new Request(origin+path,{method:'POST',headers:{origin},body:JSON.stringify(payload)});
   for(const action of ['receipt','handoff','correction','refund','return'])assert.equal((await route.POST(req({action,commandId:crypto.randomUUID()}))).status,403);
+  const denied=await route.POST(req({action:'receipt',commandId:crypto.randomUUID()}));assert.equal((await denied.json()).definitive,true);
   assert.equal((await route.POST(req({...await f.payload(),newCustomer:{firstName:'Blocked'}}))).status,403);
   for(const action of ['create_customer','update_customer','invite_customer','set_customer_status'])assert.equal((await customers.POST(req({action},'/api/food-sales/customers/'))).status,403);
   const profile=await customers.GET(new Request(origin+'/api/food-sales/customers/?id=buyer'));assert.equal(profile.status,200);assert.equal((await profile.json()).customer.canEditIntake,false);

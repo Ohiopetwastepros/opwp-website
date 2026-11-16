@@ -30,7 +30,7 @@ export async function POST(request) {
     const body=JSON.parse(new TextDecoder().decode(await readBoundedBytes(request,16384)));
     if(!body||typeof body!=='object'||Array.isArray(body))throw new FoodError('Invalid request.');
     if(!['quote','save','receipt','handoff','correction'].includes(body.action))throw new FoodError('Action is not permitted.',403);
-    if(!c.auth.office&&(!['quote','save'].includes(body.action)||body.action==='save'&&body.newCustomer))throw new FoodError('This staff account can only record a new food sale for an existing client. Contact the office for changes.',403);
+    if(!c.auth.office&&(!['quote','save'].includes(body.action)||body.action==='save'&&body.newCustomer))throw Object.assign(new FoodError('This staff account can only record a new food sale for an existing client. Contact the office for changes.',403),{definitive:true});
     if(body.action==='save'&&c.env.FOOD_SALES_RECORDING_ENABLED!=='true')return Response.json({error:'New food-sale recording is paused while the office verifies inventory.',uncertain:false,definitive:true},{status:503,headers:salesHeaders});
     const result=body.action==='quote'?await foodSalesService.quote(c.env.DB,body):await foodSalesService.command(c.env.DB,body,c.auth.member.id,{office:Boolean(c.auth.office)});
     return Response.json({ok:true,result},{headers:salesHeaders});
