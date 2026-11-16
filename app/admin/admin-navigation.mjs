@@ -30,6 +30,7 @@ export const ADMIN_NAVIGATION = [
     { id: "dog-food", label: "Sales operations", href: "/admin/dog-food/" },
     { id: "food-inventory", label: "Inventory & monthly demand", href: "/admin/dog-food/inventory/" },
     { id: "food-profit", label: "Sales & profit/loss", href: "/admin/dog-food/profit-loss/" },
+      { id: "food-settings", label: "Plans & settings", href: "/admin/dog-food/settings/" },
     { id: "food", label: "Sales & retention", href: "/admin/?view=food" },
   ] },
   { id: "systems", label: "Systems & settings", items: [

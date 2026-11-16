@@ -1,5 +1,4 @@
 'use client';
-import CustomerHub from './CustomerHub';
 import SourceReconciliation from './SourceReconciliation';
 import LaunchReadiness from './LaunchReadiness';
 import FoodPlans from './FoodPlans';
@@ -7,7 +6,8 @@ import FoodSalesClient from '../../food-sales/FoodSalesClient';
 import {recordDestination} from '@/lib/admin-record-policy.mjs';
 import {useEffect,useRef,useState} from 'react';
 import s from './sales-operations.module.css';
-import StaffCustomerDialog,{StaffCustomerSelect} from './StaffCustomer';
+import {foodWorkspaceForTab,foodWorkspaceHref} from './workspace-navigation.mjs';
+import {StaffCustomerSelect} from './StaffCustomer';
 import FoodWorkQueue from './FoodWorkQueue';
 import NativeOrderTools from './NativeOrderTools';
 import WebsiteAutomation from './WebsiteAutomation';
@@ -30,15 +30,16 @@ function Modal({title,children,onClose,onSubmit,busy,submit='Save record'}){
 function Table({head,children,empty}){return <div className={s.tableWrap}><table><thead><tr>{head.map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table>{empty?<p className={s.empty}>{empty}</p>:null}</div>;}
 function exportRows(rows){const fields=['name','date','productName','quantity','totalCents','collectedCents','balanceCents','paymentMethod','fulfillment','responsible','notes'];const escape=v=>'"'+String(v??'').replace(/^[=+@\t\r-]/,"' $&").replaceAll('"','""')+'"';const csv=[fields.join(','),...rows.map(r=>fields.map(f=>escape(f.endsWith('Cents')?r[f]/100:r[f])).join(','))].join('\r\n');const a=document.createElement('a'),u=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.href=u;a.download=`dog-food-sales-${day()}.csv`;a.click();URL.revokeObjectURL(u);}
 export default function DogFoodSalesWorkspace({initialData,loadError='',initialTab='queue'}){
-  const [customerDialog,setCustomerDialog]=useState(false);
+  const workspace=foodWorkspaceForTab(initialTab);
+  const visibleTabs=tabs.filter(([id])=>workspace.tabs.includes(id));
   const [pending,setPending]=useState(null);const submitting=useRef(false);
   const independent=initialData.sync.backend==='website';
   useEffect(()=>{try{const saved=JSON.parse(sessionStorage.getItem('food-operation-pending')||'null');if(saved?.commandId)setPending(saved);}catch{}},[]);
   function remember(body){setPending(body);try{if(body)sessionStorage.setItem('food-operation-pending',JSON.stringify(body));else sessionStorage.removeItem('food-operation-pending');}catch{}}
   const [data,setData]=useState(initialData),[tab,setTab]=useState(initialTab),[search,setSearch]=useState(''),[status,setStatus]=useState('all'),[from,setFrom]=useState(''),[to,setTo]=useState(''),[modal,setModal]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(loadError),[notice,setNotice]=useState('');
-  useEffect(()=>{const p=new URLSearchParams(location.search).get('tab');if(tabs.some(([id])=>id===p))setTab(p);},[]);
+  useEffect(()=>{const requested=new URLSearchParams(location.search).get('tab');if(!tabs.some(([id])=>id===requested))return;if(workspace.tabs.includes(requested))setTab(requested);else window.location.replace(foodWorkspaceHref(requested));},[workspace]);
   useEffect(()=>{let active=true;const id=setInterval(async()=>{if(document.hidden||busy)return;try{const r=await fetch('/api/admin/dog-food/operations/',{cache:'no-store'});const v=await r.json();if(active&&r.ok&&v.ok)setData(v.data);}catch{}},60000);return()=>{active=false;clearInterval(id);};},[busy]);
-  const navigate=id=>{setTab(id);setStatus('all');history.replaceState(null,'',`?tab=${id}`);};
+  const navigate=id=>{if(!workspace.tabs.includes(id)){window.location.assign(foodWorkspaceHref(id));return;}setTab(id);setStatus('all');history.replaceState(null,'',foodWorkspaceHref(id));};
   async function refresh(){const r=await fetch('/api/admin/dog-food/operations/',{cache:'no-store'}),v=await r.json();if(!r.ok||!v.ok)throw Error(v.error||'Refresh failed.');setData(v.data);}
   async function checkPending(){if(!pending||busy)return;setBusy(true);setError('');try{const r=await fetch('/api/admin/dog-food/operations/?submission='+encodeURIComponent(pending.commandId),{cache:'no-store'}),v=await r.json();if(!r.ok||!v.ok)throw Error(v.error||'Status could not be checked.');setData(v.data);if(v.submission.status==='complete'){remember(null);setModal(null);setNotice(v.submission.result?.message||'The original submission is saved and verified.');}else setNotice('Submission is not yet confirmed. Use Retry original submission; its reference stays the same.');}catch(e){setError(e.message);}finally{setBusy(false);}}
   async function action(body,close=true,retry=false){if(submitting.current)return;if(pending&&!retry){setError('Resolve the pending submission before another change.');return;}submitting.current=true;setBusy(true);setError('');const payload=retry?pending:{...body,commandId:crypto.randomUUID()};remember(payload);try{const r=await fetch('/api/admin/dog-food/operations/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const v=await r.json();if(!r.ok||!v.ok){if(!retry&&[400,404,409,422].includes(r.status))remember(null);throw new Error(v.error||'The operation could not be confirmed.');}remember(null);setData(v.data);setNotice(v.syncWarning||v.result?.message||'Record saved and verified.');if(close)setModal(null);return true;}catch(e){setError(e.message);}finally{submitting.current=false;setBusy(false);}}
@@ -57,13 +58,26 @@ export default function DogFoodSalesWorkspace({initialData,loadError='',initialT
   const paymentSelect=value=><select name="method" defaultValue={value||'Cash'}>{[...new Set([...methods,...data.sales.map(r=>r.paymentMethod).filter(Boolean),value].filter(Boolean))].map(v=><option key={v}>{v}</option>)}</select>;
   const nativeOrders=data.native?.orders||[],nativeCustomers=data.native?.customers||[];
   return <main className={s.shell}>
-    {customerDialog&&<StaffCustomerDialog onClose={()=>setCustomerDialog(false)} onSaved={async customerId=>{const response=await fetch('/api/admin/dog-food/operations/',{cache:'no-store'}),result=await response.json();if(!response.ok||!result.ok)throw Error('Customer saved. Refresh before recording the sale.');setData(result.data);setCustomerDialog(false);navigate('record');}}/>}
-    <header className={s.header}><div><span className={s.eyebrow}>OPWP / EXTREME DOG FUEL</span><h1>My Dog Food</h1><p>Orders, pickups and your local food business.</p></div><div className={s.headerActions}><button disabled={busy} onClick={()=>independent?refresh().catch(e=>setError(e.message)):action({action:'sync'},false)}>{busy?'Working…':independent?'Refresh records':'↻ Sync Airtable'}</button>{!independent&&<a href={recordDestination('appc40e3mlfOt2HoA','tblpEYQ3qpfcKLmdo')}>Manage business records</a>}<button onClick={()=>setCustomerDialog(true)}>+ Add customer</button><button onClick={()=>navigate('customers')}>Find / edit customer</button><button className={s.primary} onClick={()=>navigate('record')}>＋ Record sale</button></div></header>
-    {independent?<div className={s.syncStrip}><Badge tone="green">Website ledger active</Badge><span>Customers, sales, stock and plans are stored here</span><span>{data.sales.length} sales · {data.unpaid.length} outstanding</span><span>{products.filter(p=>!p.confirmed).length} formulas need a physical count</span></div>:<div className={s.syncStrip}><Badge tone={data.sync.last_error?'danger':data.sync.dirty?'amber':'green'}>{data.sync.last_error?'Sync needs attention':data.sync.dirty?'Changes pending':data.sync.webhook_id?'Airtable push connected':'Scheduled Airtable sync'}</Badge><span>{data.sync.webhook_id?'Signed push + reconciliation':'30-minute fallback; Sync updates now'}</span><span>Last verified {stamp(data.sync.last_success_at)}</span><span>{data.sales.length} sales · {data.unpaid.length} outstanding</span><span>{products.filter(p=>!p.confirmed).length} formulas need a physical count</span></div>}
+    <header className={s.header}>
+      <div><span className={s.eyebrow}>OPWP / EXTREME DOG FUEL</span><h1>{workspace.title}</h1><p>{workspace.description}</p></div>
+      {workspace.id==='sales'&&<div className={s.headerActions}>
+        <a href={foodWorkspaceHref('customers')}>Customers</a>
+        <a className={s.primary} href={foodWorkspaceHref('record')}>+ Record sale</a>
+      </div>}
+    </header>
+    {workspace.id!=='record'&&<details className={s.sourceStatus}>
+      <summary><Badge tone={independent?'green':data.sync.last_error?'danger':data.sync.dirty?'amber':'green'}>{independent?'Website ledger':data.sync.last_error?'Sync needs attention':data.sync.dirty?'Changes pending':'Source verified'}</Badge><span>{independent?'Records stored in the website':'Last verified '+stamp(data.sync.last_success_at)}</span></summary>
+      <div className={s.syncStrip}>
+        <span>{data.sales.length} sales - {data.unpaid.length} outstanding</span>
+        <span>{products.filter(p=>!p.confirmed).length} formulas need a physical count</span>
+        <button disabled={busy} onClick={()=>independent?refresh().catch(e=>setError(e.message)):action({action:'sync'},false)}>{busy?'Working...':independent?'Refresh records':'Sync Airtable'}</button>
+        {!independent&&<a href={recordDestination('appc40e3mlfOt2HoA','tblpEYQ3qpfcKLmdo')}>Manage source records</a>}
+      </div>
+    </details>}
     {pending&&<section className={s.callout} role="status"><strong>Submission awaiting confirmation</strong><p>Keep this reference for recovery: {pending.commandId}. Resolve it before another operation.</p><div className={s.headerActions}><button disabled={busy} onClick={checkPending}>Check submission status</button><button disabled={busy} onClick={()=>action(pending,true,true)}>Retry original submission</button></div></section>}
     {error?<p className={s.error} role="alert">{error}</p>:null}{notice?<p className={s.notice} role="status">{notice}</p>:null}
-    <label className={s.workspaceSelect}>Dog-food workspace<select value={tab} onChange={e=>navigate(e.target.value)}>{tabs.map(([id,name])=><option key={id} value={id}>{name}{id==='collections'&&data.unpaid.length?' ('+data.unpaid.length+')':''}</option>)}</select></label>
-    <nav className={s.tabs} aria-label="Dog-food operations">{tabs.map(([id,name])=><button key={id} aria-current={tab===id?'page':undefined} className={tab===id?s.selected:''} onClick={()=>navigate(id)}>{name}{id==='collections'&&data.unpaid.length?<b>{data.unpaid.length}</b>:null}</button>)}</nav>
+    {visibleTabs.length>1&&<label className={s.workspaceSelect}>View<select value={tab} onChange={e=>navigate(e.target.value)}>{visibleTabs.map(([id,name])=><option key={id} value={id}>{name}{id==='collections'&&data.unpaid.length?' ('+data.unpaid.length+')':''}</option>)}</select></label>}
+    {visibleTabs.length>1&&<nav className={s.tabs} aria-label={workspace.title+' views'}>{visibleTabs.map(([id,name])=><button key={id} aria-current={tab===id?'page':undefined} className={tab===id?s.selected:''} onClick={()=>navigate(id)}>{name}{id==='collections'&&data.unpaid.length?<b>{data.unpaid.length}</b>:null}</button>)}</nav>}
     {tab==='queue'?<FoodWorkQueue native={data.native} onRefresh={setData} onRecordSale={()=>navigate('record')} onCustomers={()=>navigate('customers')}/>:null}
     {tab==='funnel'?<SalesFunnel data={data} onNavigate={navigate} busy={busy} onAction={body=>action(body,false)}/>:null}
     {tab==='metrics'?<SalesMetrics data={data} busy={busy} onAction={body=>action(body,false)} onNavigate={navigate}/>:null}
@@ -85,7 +99,6 @@ export default function DogFoodSalesWorkspace({initialData,loadError='',initialT
     {tab==='purchases'?<section className={s.card}><div className={s.cardHeading}><div><small>SUPPLIER PURCHASING</small><h2>Paid for, on order, and received</h2></div><button className={s.primary} onClick={()=>open('purchase')}>Enter purchase order</button></div><div className={s.metrics}><article><span>Supplier payments</span><strong>{money(m.supplierPaidCents)}</strong><small>Historical and current POs</small></article><article><span>Incoming bags</span><strong>{data.pos.reduce((n,p)=>n+Math.max(0,p.ordered-p.received),0)}</strong><small>Ordered but not yet received</small></article><article><span>Purchase orders</span><strong>{data.pos.length}</strong><small>Receipts retain unit costs and lots</small></article></div><Table head={['Purchase order','Supplier / date','Products','Ordered / received','Order value','Supplier paid','Status','Actions']} empty={!data.pos.length?'Add your paid purchase history or enter a new order. Stock increases on receipt.':''}>{data.pos.map(p=><tr key={p.id}><td><strong>{p.number}</strong><small>{p.notes}</small></td><td>{p.supplier}<small>{p.date} · Expected {p.expected||'Not set'}</small></td><td>{p.lines.map(l=><div key={l.id}>{l.productName}<small>{money(l.costCents)} / bag · {l.lot||'Lot not recorded'}</small></div>)}</td><td>{p.ordered} / {p.received}</td><td>{money(p.totalCents)}</td><td>{money(p.paidCents)}<small>{p.reference||'Reference not recorded'}</small></td><td><Badge>{p.status}</Badge></td><td><div className={s.rowActions}><button onClick={()=>open('purchase',p)}>Edit / receive</button><button className={s.deleteButton} onClick={()=>deleteRecord('Purchase Orders',p)}>Delete</button></div></td></tr>)}</Table></section>:null}
     {tab==='sources'?<SourceReconciliation/>:null}
     {tab==='readiness'?<LaunchReadiness/>:null}
-    {tab==='customers'?<CustomerHub/>:null}
     {tab==='plans'?(independent?<FoodPlans data={data} busy={busy} onAction={body=>action(body,false)}/>:<section className={s.card}><h2>Plans</h2><p>Independent plan controls become available after the verified website cutover.</p></section>):null}
     {tab==='record'?<FoodSalesClient embedded/>:null}
     {tab==='website'?<><WebsiteAutomation/><section className={s.card}><h2>Website order queue</h2><NativeOrderTools native={data.native} onRefresh={setData}/><p className={s.caption}>Website lines use exact order-item identity in the shared operating ledger. Payment and physical delivery are separate events.</p><Table head={['Order','Customer','Food','Delivery / review','Total','State','Actions']}>{nativeOrders.filter(o=>!o.deleted_at).map(o=><tr key={o.id}><td>{o.order_number}</td><td>{o.first_name} {o.last_name}</td><td>{o.items}</td><td>{o.scheduled_date||'Unscheduled'}<small>{o.automation_review||label(o.delivery_status)}</small></td><td>{money(o.total_cents)}</td><td>{label(o.status)}</td><td><div className={s.rowActions}>{['pending_payment','payment_failed'].includes(o.status)&&<button onClick={()=>open('native_payment',o)}>Confirm payment</button>}<button onClick={()=>open('delete',{entity:'order',id:o.id,label:o.order_number})}>Delete</button></div></td></tr>)}</Table><h3>Monthly plans</h3><Table head={['Customer','Provider','State','Next delivery']}>{(data.native?.subscriptions||[]).map(v=><tr key={v.id}><td>{v.first_name} {v.last_name}</td><td>{v.payment_provider}</td><td>{v.status}</td><td>{v.next_delivery_date}</td></tr>)}</Table></section></>:null}
