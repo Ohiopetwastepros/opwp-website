@@ -209,7 +209,7 @@ test("a duplicate consented form during preflight uses the latest service detail
 });
 
 test("owner verification is bound to one funnel and phone, expires, and still enforces permission",async()=>{
-  for (const mode of ["approved","expired","wrong_phone","opted_out"]) {
+  for (const mode of ["approved","expired","wrong_phone","opted_out","suppressed","deleted_test"]) {
     const f=await fixture({body:mode==="opted_out"?{sms_opt_out:true}:{}});
     const funnel=crypto.randomUUID();
     f.db.sqlite.prepare("UPDATE submissions SET funnel_id=? WHERE id=?").run(funnel,f.id);
@@ -218,11 +218,14 @@ test("owner verification is bound to one funnel and phone, expires, and still en
       .run("quote_initial_sms_verification:"+funnel,JSON.stringify({approvedByOwner:true,
         phoneHash:mode==="wrong_phone"?"wrong":hash,expiresAt:new Date(Date.now()+(mode==="expired"?-60000:10*60000)).toISOString()}));
     f.db.sqlite.prepare("INSERT INTO submissions(id,kind,source,status,phone,payload) VALUES (?,'partial_quote','website','converted','4192620100','{}')").run(crypto.randomUUID());
+    if (["suppressed","deleted_test"].includes(mode)) f.db.sqlite.prepare("INSERT INTO lead_suppressions VALUES ('org-opwp',?,?,?,'owner',CURRENT_TIMESTAMP)")
+      .run(hash,mode==="deleted_test"?"Test":"opted_out",mode==="deleted_test"?"deleted_lead":"quo_webhook");
     const fetcher=async(url,options)=>url.includes("/messages?")?Response.json({data:[{id:"old-test-message"}]}):f.fetcher(url,options);
     await runInitialQuoteSms(f.env,{fetcher});
     await runInitialQuoteSms(f.env,{fetcher});
-    assert.equal(f.calls.filter(call=>call.options.method==="POST").length,mode==="approved"?1:0);
-    assert.equal(f.delivery().status,mode==="approved"?"sent":"cancelled");
+    const accepted=["approved","deleted_test"].includes(mode);
+    assert.equal(f.calls.filter(call=>call.options.method==="POST").length,accepted?1:0);
+    assert.equal(f.delivery().status,accepted?"sent":"cancelled");
   }
 });
 
