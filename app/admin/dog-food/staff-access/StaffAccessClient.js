@@ -1,22 +1,62 @@
 'use client';
 import {useEffect,useState} from 'react';
-import styles from '@/app/food-sales/food-sales.module.css';
+import styles from './staff-access.module.css';
+const pendingKey='opwp-food-staff-invitation';
+const labels={active:'Active',invited:'Awaiting setup',expired:'Setup expired',revoked:'Revoked',blocked:'Account blocked'};
+const emails={accepted:'Accepted by email provider',uncertain:'Email needs review',sending:'Email acceptance unconfirmed',cancelled:'Invitation cancelled'};
+const date=value=>value?new Date(value.replace(' ','T')+'Z').toLocaleString():'—';
+async function api(body){
+  const r=await fetch('/api/admin/dog-food/staff-access/',{cache:'no-store',...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})}),d=await r.json();
+  if(!r.ok){const e=Error(d.error||'Staff access could not be confirmed.');e.definitive=[400,403,404,409,413].includes(r.status)||d.error?.includes('No account or password was changed.');throw e;}return d;
+}
 export default function StaffAccessClient(){
-  const [staff,setStaff]=useState([]),[name,setName]=useState(''),[email,setEmail]=useState(''),[plan,setPlan]=useState(null),[confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[setupUrl,setSetupUrl]=useState(''),[fieldAccess,setFieldAccess]=useState(false),[reset,setReset]=useState(false);
-  async function api(body){const r=await fetch('/api/admin/dog-food/staff-access/',{cache:'no-store',...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})}),d=await r.json();if(!r.ok)throw Error(d.error||'Staff access could not be confirmed.');return d;}
-  async function load(){setStaff((await api()).staff);}
-  useEffect(()=>{load().catch(e=>setMessage(e.message));},[]);
-  async function prepare(e){e.preventDefault();setBusy(true);setMessage('');setSetupUrl('');setConfirm(false);setFieldAccess(false);setReset(false);try{setPlan((await api({action:'prepare',email})).result);}catch(e){setMessage(e.message);}finally{setBusy(false);}}
-  async function invite(){setBusy(true);setMessage('');try{const d=await api({action:'invite',commandId:crypto.randomUUID(),email:plan.email,name,confirm,acknowledgeExistingFieldAccess:fieldAccess,replaceExistingPassword:reset});setSetupUrl(d.result.setupUrl||'');setMessage(d.result.message);setPlan(null);setConfirm(false);await load();}catch(e){setMessage(e.message);}finally{setBusy(false);}}
-  async function revoke(memberId){setBusy(true);setMessage('');try{const d=await api({action:'revoke',memberId,confirm:true});setMessage(d.result.message);await load();}catch(e){setMessage(e.message);}finally{setBusy(false);}}
-  return <div className={styles.shell}><div className={styles.content}><span className={styles.eyebrow}>OWNER MFA · INDIVIDUAL STAFF ACCESS</span><h1>Food-sales logins</h1><p>Review an individual’s email and food permissions, then create a private link for them to set their own password.</p><p><a href='/admin/dog-food/review/'>Back to food-sales review</a></p>
-    <section className={styles.card}><form onSubmit={prepare}><label>Name<input required maxLength={100} value={name} onChange={e=>{setName(e.target.value);setPlan(null);}}/></label><label>Individual email<input type='email' required maxLength={254} value={email} onChange={e=>{setEmail(e.target.value);setPlan(null);}}/></label><button disabled={busy}>Review account & permissions</button></form>
-    {plan&&<div><h2>{name} · {plan.email}</h2><p>{plan.newMember?'New individual account':'Existing individual account'} · base role: {plan.baseRole}</p><ul>{plan.permissions.map(p=><li key={p}>{p}</li>)}</ul><p>Food-sales access does not include payroll, business finance, purchasing, integrations, user management or unrestricted deletion.</p>
-      {plan.existingFieldAccess&&<label className={styles.check}><input type='checkbox' checked={fieldAccess} onChange={e=>setFieldAccess(e.target.checked)}/>This technician’s existing field access is intended.</label>}
-      {plan.passwordSet&&<label className={styles.check}><input type='checkbox' checked={reset} onChange={e=>setReset(e.target.checked)}/>Reset this account’s password, sign out its food-sales sessions and invalidate older setup links.</label>}
-      <label className={styles.check}><input type='checkbox' checked={confirm} onChange={e=>setConfirm(e.target.checked)}/>I confirm this identity and these food-sales permissions.</label><button className={styles.primary} disabled={busy||!confirm||plan.existingFieldAccess&&!fieldAccess||plan.passwordSet&&!reset} onClick={invite}>Create password setup link</button></div>}
-    </section>{message&&<div className={styles.notice} role='status'>{message}</div>}
-    {setupUrl&&<section className={styles.card}><h2>Private setup link</h2><p>Give this link directly to the person you verified. It expires in 24 hours and can be used once. No email has been sent. The link is displayed only for this request.</p><label>Setup link<input readOnly value={setupUrl} onFocus={e=>e.target.select()}/></label><button onClick={()=>setSetupUrl('')}>Hide setup link</button></section>}
-    <section className={styles.recent}>{staff.map(m=><article className={styles.card} key={m.id}><strong>{m.display_name}</strong><p>{m.email} · {m.enabled?'Food access enabled':'Food access revoked'}</p><p>{m.password_set?'Password set':'Awaiting password setup'}</p>{m.enabled&&<form onSubmit={e=>{e.preventDefault();revoke(m.id);}}><label className={styles.check}><input type='checkbox' required/>Confirm immediate revocation of this person’s food-sales access.</label><button disabled={busy}>Revoke food-sales access</button></form>}</article>)}</section>
-  </div></div>;
+  const [staff,setStaff]=useState([]),[emailConfigured,setEmailConfigured]=useState(false),[loading,setLoading]=useState(true);
+  const [adding,setAdding]=useState(false),[name,setName]=useState(''),[email,setEmail]=useState(''),[plan,setPlan]=useState(null);
+  const [confirm,setConfirm]=useState(false),[fieldAccess,setFieldAccess]=useState(false),[reset,setReset]=useState(false);
+  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState(''),[query,setQuery]=useState(''),[filter,setFilter]=useState('all');
+  const [revoking,setRevoking]=useState(null),[pending,setPending]=useState(null);
+  async function load(){const d=await api();setStaff(d.staff);setEmailConfigured(d.emailConfigured);}
+  useEffect(()=>{
+    let active=true;
+    api().then(d=>{if(active){setStaff(d.staff);setEmailConfigured(d.emailConfigured);}}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setLoading(false);});
+    try{const saved=JSON.parse(sessionStorage.getItem(pendingKey)||'null');if(saved?.action==='invite'&&saved.commandId)setPending(saved);}catch{/* No mutation without a retained request. */}
+    return()=>{active=false;};
+  },[]);
+  function begin(m=null){setName(m?.display_name||'');setEmail(m?.email||'');setPlan(null);setConfirm(false);setReset(false);setFieldAccess(false);setAdding(true);setRevoking(null);setError('');setMessage('');}
+  async function prepare(e){e.preventDefault();setBusy(true);setError('');setConfirm(false);setReset(false);setFieldAccess(false);try{setPlan((await api({action:'prepare',email})).result);}catch(e){setError(e.message);}finally{setBusy(false);}}
+  async function invite(payload=null){
+    const request=payload||{action:'invite',commandId:crypto.randomUUID(),email:plan.email,name,confirm,acknowledgeExistingFieldAccess:fieldAccess,replaceExistingPassword:reset};
+    setBusy(true);setError('');setMessage('');
+    try{sessionStorage.setItem(pendingKey,JSON.stringify(request));setPending(request);const d=await api(request);sessionStorage.removeItem(pendingKey);setPending(null);setMessage(d.result.message);setPlan(null);setAdding(false);setConfirm(false);await load();}
+    catch(e){if(e.definitive){sessionStorage.removeItem(pendingKey);setPending(null);}setError(e.message);}finally{setBusy(false);}
+  }
+  async function revoke(id){setBusy(true);setError('');setMessage('');try{const d=await api({action:'revoke',memberId:id,confirm:true});setMessage(d.result.message);setRevoking(null);await load();}catch(e){setError(e.message+' Refresh to confirm the current access status.');}finally{setBusy(false);}}
+  const visible=staff.filter(m=>(filter==='all'||m.access_status===filter)&&`${m.display_name} ${m.email}`.toLowerCase().includes(query.trim().toLowerCase())),locked=busy||Boolean(pending);
+  return <main className={styles.page}>
+    <header className={styles.heading}><div><span className={styles.eyebrow}>DOG FOOD / STAFF ACCESS</span><h1>Staff accounts</h1><p>Approve individual accounts to record food sales for existing clients.</p></div><button className={styles.primary} disabled={locked||loading} onClick={()=>begin()}>+ Add staff account</button></header>
+    <div className={styles.summary} aria-label='Account summary'><span><strong>{staff.filter(m=>m.access_status==='active').length}</strong> Active</span><span><strong>{staff.filter(m=>['invited','expired'].includes(m.access_status)).length}</strong> Awaiting setup / expired</span><span><strong>{staff.filter(m=>m.access_status==='revoked').length}</strong> Revoked</span><a href='/food-sales/'>Staff sign-in ↗</a></div>
+    {message&&<div className={styles.notice} role='status'>{message}</div>}{error&&<div className={styles.error} role='alert'>{error}</div>}
+    {pending&&<section className={styles.warning}><h2>Confirm this invitation first</h2><p>{pending.email} · The previous response was not confirmed. Checking the same request will not send another email.</p><button disabled={busy} onClick={()=>invite(pending)}>Check invitation result</button></section>}
+    {!loading&&!emailConfigured&&<div className={styles.warning} role='status'>Invitation email is unavailable. Existing accounts still work; new invitations wait until email service is available.</div>}
+    {adding&&!pending&&<section className={styles.panel} aria-labelledby='staff-add-heading'>
+      <div className={styles.panelHeading}><div><h2 id='staff-add-heading'>Add or renew staff access</h2><p>You approve the account. They receive an email and choose their own password.</p></div><button disabled={busy} onClick={()=>{setAdding(false);setPlan(null);}}>Cancel</button></div>
+      <form onSubmit={prepare}><fieldset disabled={busy}><div className={styles.fields}><label>Name<input autoComplete='name' required maxLength={100} value={name} onChange={e=>{setName(e.target.value);setPlan(null);}}/></label><label>Individual email<input type='email' autoComplete='email' required maxLength={254} value={email} onChange={e=>{setEmail(e.target.value);setPlan(null);}}/></label></div><button disabled={!emailConfigured}>Review account</button></fieldset></form>
+      {plan&&<div className={styles.approval}><h3>Review approval</h3><p><strong>{name}</strong> · {plan.email}</p><p>{plan.newMember?'New individual account.':'Existing individual account.'} Access: <strong>Record new food sales only.</strong></p><p>Customer lookup is included. Customer edits, later payment changes, inventory management, reports and staff administration require the office.</p>
+        {plan.existingFieldAccess&&<label className={styles.check}><input type='checkbox' checked={fieldAccess} disabled={busy} onChange={e=>setFieldAccess(e.target.checked)}/>This person already has separate field access. I confirm that existing access is intended.</label>}
+        {plan.passwordSet&&<label className={styles.check}><input type='checkbox' checked={reset} disabled={busy} onChange={e=>setReset(e.target.checked)}/>Reset this food-sales password and sign out existing food-sales sessions.</label>}
+        <label className={styles.check}><input type='checkbox' checked={confirm} disabled={busy} onChange={e=>setConfirm(e.target.checked)}/>I approve this person and the sale-only permissions, and authorize the invitation email.</label>
+        <button className={styles.primary} disabled={busy||!confirm||!emailConfigured||plan.existingFieldAccess&&!fieldAccess||plan.passwordSet&&!reset} onClick={()=>invite()}>Approve & email invitation</button><p className={styles.fine}>One-use link · Expires in 24 hours · Minimum 12-character password. No access until password setup is complete.</p>
+      </div>}
+    </section>}
+    <section className={styles.panel} aria-labelledby='staff-directory-heading'>
+      <div className={styles.panelHeading}><div><h2 id='staff-directory-heading'>All staff accounts</h2><p>Revoking access signs the person out and invalidates unused setup links.</p></div><button disabled={locked} onClick={()=>{setError('');load().catch(e=>setError(e.message));}}>Refresh</button></div>
+      <div className={styles.filters}><label>Find an account<input type='search' placeholder='Name or email' value={query} onChange={e=>setQuery(e.target.value)}/></label><label>Status<select value={filter} onChange={e=>setFilter(e.target.value)}><option value='all'>All accounts</option>{Object.entries(labels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label></div>
+      {loading?<p role='status'>Loading accounts…</p>:!visible.length?<p>No matching staff accounts.</p>:<div className={styles.directory}>{visible.map(m=><article className={styles.account} key={m.id}>
+        <div className={styles.identity}><h3>{m.display_name}</h3><a href={'mailto:'+m.email}>{m.email}</a><span className={styles.scope}>Record new food sales only</span></div>
+        <div className={styles.details}><span className={styles.badge} data-status={m.access_status}>{labels[m.access_status]}</span><p>Last sign-in: {date(m.last_login_at)}</p>{m.access_status==='invited'&&<p>Setup expires: {date(m.invitation_expires_at)}</p>}{m.email_status&&['invited','expired'].includes(m.access_status)&&<p>{emails[m.email_status]||'Email status unavailable'}</p>}</div>
+        <div className={styles.actions}>{m.access_status!=='blocked'&&<button disabled={locked||!emailConfigured} onClick={()=>begin(m)}>{m.access_status==='revoked'?'Review reactivation':m.access_status==='active'?'Reset / send setup':'Review new invitation'}</button>}{Boolean(m.enabled)&&<button className={styles.danger} disabled={locked} onClick={()=>setRevoking(m.id)}>Revoke access</button>}</div>
+        {revoking===m.id&&<div className={styles.revoke}><p><strong>Revoke {m.display_name}’s food-sales access now?</strong> Existing sales remain recorded under their name.</p><button className={styles.danger} disabled={locked} onClick={()=>revoke(m.id)}>Confirm revocation</button><button disabled={locked} onClick={()=>setRevoking(null)}>Keep access</button></div>}
+      </article>)}</div>}
+    </section>
+  </main>;
 }

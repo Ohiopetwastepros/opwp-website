@@ -3,7 +3,9 @@ import {getRuntimeEnv} from '@/lib/cloudflare';
 import {checkRateLimit,rateLimitResponse} from '@/lib/rate-limit';
 import {readBoundedBytes} from '@/lib/bounded-body.mjs';
 import {salesHeaders,salesError} from '@/lib/food-sales-api';
-import {prepareFoodSalesStaff,inviteFoodSalesStaff,revokeFoodSalesStaff} from '@/lib/food-sales-staff.mjs';
+import {prepareFoodSalesStaff,inviteFoodSalesStaff,revokeFoodSalesStaff,readFoodSalesStaff} from '@/lib/food-sales-staff.mjs';
+import {sendTransactionalEmail,transactionalEmailConfig} from '@/lib/submission-notifications';
+import {applicationConfig} from '@/lib/app-config';
 import {FoodError} from '@/lib/dog-food-operations.mjs';
 export const dynamic='force-dynamic';
 async function context(request,write=false) {
@@ -16,18 +18,14 @@ async function context(request,write=false) {
 }
 export async function GET(request) {
   try{const c=await context(request);if(c.response)return c.response;
-    const rows=await c.env.DB.prepare(`SELECT m.id,m.email,m.display_name,m.role,m.status,g.enabled,g.approved_at,
-      CASE WHEN p.password_hash IS NOT NULL THEN 1 ELSE 0 END password_set,p.last_login_at
-      FROM dog_food_sales_grants g JOIN route_partner_members m ON m.id=g.member_id
-      LEFT JOIN dog_food_sales_credentials p ON p.member_id=m.id WHERE g.organization_id='org-opwp' ORDER BY m.display_name LIMIT 100`).all();
-    return Response.json({ok:true,staff:rows.results||[]},{headers:salesHeaders});
+    return Response.json({ok:true,staff:await readFoodSalesStaff(c.env.DB),emailConfigured:transactionalEmailConfig(c.env).configured},{headers:salesHeaders});
   }catch(error){return salesError(error);}
 }
 export async function POST(request) {
   try{const c=await context(request,true);if(c.response)return c.response;
     const body=JSON.parse(new TextDecoder().decode(await readBoundedBytes(request,8192)));let result;
     if(body.action==='prepare')result=await prepareFoodSalesStaff(c.env.DB,body);
-    else if(body.action==='invite')result=await inviteFoodSalesStaff(c.env.DB,body,c.auth.email,new URL(request.url).origin);
+    else if(body.action==='invite')result=await inviteFoodSalesStaff(c.env.DB,body,c.auth.email,applicationConfig(c.env).siteOrigin,{email:true,sendEmail:transactionalEmailConfig(c.env).configured?message=>sendTransactionalEmail(c.env,message):null});
     else if(body.action==='revoke'&&body.confirm===true)result=await revokeFoodSalesStaff(c.env.DB,body.memberId,c.auth.email);
     else throw new FoodError('Choose a supported staff-access action.');
     return Response.json({ok:true,result},{headers:salesHeaders});
