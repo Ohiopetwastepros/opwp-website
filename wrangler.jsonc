@@ -55,6 +55,7 @@
     "EMAIL_SENDING_ENABLED": "true",
     "RESEND_API_BASE_URL": "https://api.resend.com",
     "SMS_PROVIDER": "quo",
+    "QUOTE_INITIAL_SMS_ENABLED": "true",
     "FIELD_NOTIFICATIONS_ENABLED": "false",
     "FIELD_SMS_DAILY_LIMIT": "100",
     "QUO_API_BASE_URL": "https://api.openphone.com",
@@ -71,6 +72,6 @@
     "head_sampling_rate": 1
   },
   "triggers": {
-    "crons": ["*/10 * * * *", "0 * * * *", "5 * * * *", "15 * * * *", "35 * * * *"]
+    "crons": ["* * * * *", "*/10 * * * *", "0 * * * *", "5 * * * *", "15 * * * *", "35 * * * *"]
   }
 }

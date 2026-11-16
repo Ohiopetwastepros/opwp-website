@@ -292,7 +292,7 @@ export default function QuoteForm() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             source: "partial_quote", funnel_id: funnelId, lifecycle_stage: lifecycleStage,
-            zip: zipClean, phone, email,
+            zip: zipClean, phone, email, name: [firstName, lastName].filter(Boolean).join(" "),
             follow_up_consent: true,
             dogs, frequency, last_cleaned: lastCleaned, yard_size: yardSize,
             quote_monthly: monthlyTotal,
@@ -309,7 +309,7 @@ export default function QuoteForm() {
     };
     capture();
     return () => { cancelled = true; };
-  }, [funnelId, inArea, phoneReady, emailReady, followupConsent, zipClean, phone, email, dogs, frequency, lastCleaned, yardSize, monthlyTotal, selected, coupon, step, partialRetry]);
+  }, [funnelId, inArea, phoneReady, emailReady, followupConsent, zipClean, phone, email, firstName, lastName, dogs, frequency, lastCleaned, yardSize, monthlyTotal, selected, coupon, step, partialRetry]);
 
   // If the dog count pushes the current frequency past its cap (e.g. Monthly + 2 dogs),
   // fall back to Weekly so the form never sits on a disabled option.

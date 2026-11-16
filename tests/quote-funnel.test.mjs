@@ -113,7 +113,7 @@ test("partial quote follow-up requires explicit scoped consent", () => {
   assert.equal(accepted.value.marketing_consent, false);
 });
 
-test("partial quote customer follow-up waits ten minutes", () => {
+test("partial quote email and SNG retain their ten-minute schedule", () => {
   assert.equal(PARTIAL_QUOTE_FOLLOW_UP_DELAY_MINUTES, 10);
 });
 

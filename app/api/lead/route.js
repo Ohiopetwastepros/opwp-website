@@ -2,6 +2,9 @@ import { queuePartialQuoteFollowUp, saveSubmission, upsertPartialQuoteSubmission
 import { queueSubmissionNotificationSafe } from "@/lib/submission-notifications";
 import { protectJsonRequest, verifyTurnstile } from "@/lib/public-api-security";
 import { validateLeadInput } from "@/lib/public-input";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getRuntimeEnv } from "@/lib/cloudflare";
+import { runInitialQuoteSms } from "@/lib/quote-initial-sms.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -27,13 +30,18 @@ export async function POST(request) {
         funnelId: validation.value.funnel_id,
         lifecycleStage: isPartial ? validation.value.lifecycle_stage : "details_started",
       });
+  const smsFollowup = isPartial
+    ? await queuePartialQuoteFollowUp({ submissionId: saved.id, phone: validation.value.phone, consentAt: validation.value.follow_up_consent_at })
+    : null;
+  if (smsFollowup?.configured) {
+    const task = runInitialQuoteSms(getRuntimeEnv(), { submissionId: saved.id });
+    try { getCloudflareContext().ctx.waitUntil(task); }
+    catch { await task; }
+  }
   const notification = await queueSubmissionNotificationSafe({
     submissionId: saved.id,
     type: isPartial ? "partial_quote" : "question",
     body: validation.value,
   });
-  const smsFollowup = isPartial
-    ? await queuePartialQuoteFollowUp({ submissionId: saved.id, phone: validation.value.phone, consentAt: validation.value.follow_up_consent_at })
-    : null;
   return Response.json({ ok: true, stored: saved.configured, id: saved.id, notification: notification.status, smsFollowup: smsFollowup?.status || null });
 }
