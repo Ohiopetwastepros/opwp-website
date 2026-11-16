@@ -130,6 +130,14 @@ test("partial quote customer text stays concise and preserves the required opt-o
   assert.equal(content, "Hello, this is Craig with Ohio Pet Waste Pros. I saw that you filled out a quote form on our website. Did you have any questions about our service, or would you like help getting signed up?\n\nText STOP to unsubscribe.");
 });
 
+test("public lead validation retains restrictive preferences and never invents missing dog counts", () => {
+  const input={source:"partial_quote",email:"test@example.com",phone:"4192620100",follow_up_consent:true};
+  for (const dogs of [undefined,"","invalid",0,21]) assert.equal(validateLeadInput({...input,dogs}).value.quote_context.dogs,null);
+  const restricted=validateLeadInput({...input,do_not_contact:true,contact_preference:"email"}).value;
+  assert.equal(restricted.sms_opt_out,true);
+  assert.equal(restricted.preferred_channel,"email");
+});
+
 test("no-card onboarding requires a question but still validates for account creation", () => {
   const base = {
     funnel_id: "1234567890abcdef", first_name: "Test", last_name: "Customer", email: "test@example.com",
