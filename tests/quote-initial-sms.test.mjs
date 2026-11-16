@@ -39,7 +39,8 @@ async function fixture({phone="4192620100",body={},historical=false}={}) {
     calls.push({url,options});
     if (options.method==="POST") return Response.json({data:{id:"ACmock",status:"queued"}},{status:202});
     if (url.endsWith("/phone-numbers")) return Response.json({data:[{number:"+14192622371",id:"PNmock"}]});
-    assert.equal(new URL(url).searchParams.get("participants[]"),initialSmsPhone(phone));
+    assert.equal(new URL(url).searchParams.get("participants"),initialSmsPhone(phone));
+    assert.equal(new URL(url).searchParams.has("participants[]"),false);
     return Response.json({data:[]});
   };
   const env = {DB:db,QUOTE_INITIAL_SMS_ENABLED:"true",SMS_PROVIDER:"quo",QUO_FROM_NUMBER:"+14192622371",QUO_API_KEY:"mock"};
