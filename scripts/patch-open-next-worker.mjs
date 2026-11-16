@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { patchInitialSmsWatchdog } from "./patch-sms-watchdog-worker.mjs";
 
 const workerPath = new URL("../.open-next/worker.js", import.meta.url);
 let source = await fs.readFile(workerPath, "utf8");
@@ -95,3 +96,6 @@ if (!source.includes('from "../lib/live-density-worker.js"')) {
         );`);
   await fs.writeFile(workerPath, source);
 }
+
+source = patchInitialSmsWatchdog(source);
+await fs.writeFile(workerPath, source);

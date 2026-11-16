@@ -6,16 +6,16 @@ import { fileURLToPath } from "node:url";
 export function patchQuoteWorker(source) {
   const marker = "// OPWP_INITIAL_QUOTE_SMS_V1";
   if (source.includes(marker)) {
-    if (!source.includes("() => runInitialQuoteSms(env)")) throw new Error("Initial quote SMS handler is incomplete.");
+    if (!source.includes("() => runScheduledInitialQuoteSms(env)")) throw new Error("Initial quote SMS handler is incomplete.");
     return source;
   }
   const scheduled = "async scheduled(controller, env, ctx) {";
   if (!source.includes(scheduled)) throw new Error("OpenNext scheduled handler was not found for initial quote SMS.");
-  return 'import { runInitialQuoteSms } from "../lib/quote-initial-sms.mjs";\n' + source.replace(scheduled, `${scheduled}
+  return 'import { runScheduledInitialQuoteSms } from "../lib/quote-initial-sms.mjs";\n' + source.replace(scheduled, `${scheduled}
         ${marker}
         if (controller.cron === "* * * * *") ctx.waitUntil(
             runWithCloudflareRequestContext(new Request("https://opwp.internal/initial-quote-sms"), env, ctx,
-                () => runInitialQuoteSms(env))
+                () => runScheduledInitialQuoteSms(env))
         );`);
 }
 

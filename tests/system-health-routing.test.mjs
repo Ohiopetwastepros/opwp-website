@@ -19,7 +19,7 @@ async function health(options={}) {
     return {};
   },async all(){if(options.runQueryFails)throw Error('history unavailable');return {results:runs};}};}};
   const config={integrations:Object.fromEntries(['sweepAndGo','airtable','stripe','quickBooks','geoapify','fieldProofs'].map(key=>[key,{configured:true,webhookConfigured:true,provider:'r2'}]))};
-  const fn=runPrivateInNewContext(source+'\ngetSystemHealth;',{applicationConfig:()=>config,getDb:()=>db,notificationProvider:()=>({configured:true,name:'quo'}),submissionEmailProviderStatus:()=>({configured:true,name:'resend'}),Date:Clock});
+  const fn=runPrivateInNewContext(source+'\ngetSystemHealth;',{applicationConfig:()=>config,getDb:()=>db,notificationProvider:()=>({configured:true,name:'quo'}),submissionEmailProviderStatus:()=>({configured:true,name:'resend'}),getInitialSmsHealth:async()=>({status:'healthy',overdue:0,scheduler:{},watchdog:{},...options.initialSms}),Date:Clock});
   const result=await fn();
   return {queries,row:name=>result.rows.find(row=>row.name===name)};
 }
@@ -57,4 +57,11 @@ test('latest run selection is per job and cannot lose a daily run behind busy jo
 });
 test('submission emails disclose their actual scope and provider acceptance limitation',async()=>{
   const h=await health();const row=h.row('Owner submission emails');assert.match(row.details,/accepted by provider 1/);assert.match(row.details,/route-plan failure alerts are not part of this queue/);assert.match(row.details,/does not confirm inbox delivery/);
+});
+
+test('overdue initial texts and a failed health read have a dedicated red status',async()=>{
+  for(const initialSms of [{status:'attention',overdue:1},{status:'attention',error:true}]){
+    const h=await health({initialSms});assert.equal(h.row('Initial lead texts').tone,'red');
+    assert.match(h.row('Initial lead texts').details,/two minutes late/);
+  }
 });

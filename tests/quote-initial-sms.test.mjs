@@ -54,7 +54,7 @@ test("quote-specific patch survives existing ten-minute branches and preserves s
     const task = subscriptions(); ctx.waitUntil(task);
   }};`;
   const patched = patchQuoteWorker(original);
-  assert.match(patched,/runInitialQuoteSms\(env\)/);
+  assert.match(patched,/runScheduledInitialQuoteSms\(env\)/);
   assert.ok(patched.includes('const task = subscriptions(); ctx.waitUntil(task);'));
   assert.equal(patchQuoteWorker(patched),patched);
   assert.equal((patched.match(/OPWP_INITIAL_QUOTE_SMS_V1/g)||[]).length,1);
