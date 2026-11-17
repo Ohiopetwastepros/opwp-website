@@ -1,3 +1,4 @@
+import {foodDate} from '../lib/dog-food-operations.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
 import {setup} from './helpers/unified-food-sales-fixture.mjs';
 import * as store from '../lib/dog-food-website-store.mjs';
@@ -16,12 +17,12 @@ test('website import retains every original record and stock balance and never c
   await assert.rejects(store.importWebsiteFoodRecords(f.db,{tables:{}},{actor:'test-owner',sourceHash:'x',expectedSourceHash:'x',reconciliation:{verified:true},activate:true}),/reviewed/);
 });
 test('stock count, waste and native sale share one independent stock ledger with unchanged prices',async()=>{
-  const f=await website();f.sql.exec("UPDATE dog_food_sales_settings SET stock_basis='confirmed_count'");f.fail();await f.service.runFoodCommand(f.env,command({action:'stock_movement',productId:'recPink',type:'Waste',quantity:2,date:new Date().toISOString().slice(0,10),cost:'30',reason:'Damaged sealed bags removed'}),'owner');
+  const f=await website();f.sql.exec("UPDATE dog_food_sales_settings SET stock_basis='confirmed_count'");f.fail();await f.service.runFoodCommand(f.env,command({action:'stock_movement',productId:'recPink',type:'Waste',quantity:2,date:foodDate(),cost:'30',reason:'Damaged sealed bags removed'}),'owner');
   let m=await f.service.readFoodOperations(f.db);assert.equal(m.products.find(p=>p.id==='recPink').available,6);
   const order=await f.save();assert.equal(order.totalCents,6357);m=await f.service.readFoodOperations(f.db);assert.equal(m.products.find(p=>p.id==='recPink').available,5);assert.equal(m.products.find(p=>p.id==='recPink').reserved,1);
 });
 test('multi-line purchase receipt commits once and later partial receipts add only the actual delta',async()=>{
-  const f=await website(),day=new Date().toISOString().slice(0,10),body=command({action:'save_purchase',number:'PO-TEST',supplier:'Example Supplier',date:day,freight:'10',paid:'0',lines:[{productId:'recPink',quantity:10,received:3,cost:'30',receivedDate:day},{productId:'recBlue',quantity:8,received:0,cost:'31',receivedDate:''}]});
+  const f=await website(),day=foodDate(),body=command({action:'save_purchase',number:'PO-TEST',supplier:'Example Supplier',date:day,freight:'10',paid:'0',lines:[{productId:'recPink',quantity:10,received:3,cost:'30',receivedDate:day},{productId:'recBlue',quantity:8,received:0,cost:'31',receivedDate:''}]});
   const po=await f.service.runFoodCommand(f.env,body,'owner');assert.deepEqual(await f.service.runFoodCommand(f.env,body,'owner'),po);
   let m=await f.service.readFoodOperations(f.db);assert.equal(m.pos[0].received,3);assert.equal(m.products.find(p=>p.id==='recPink').onHand,11);
   await f.service.runFoodCommand(f.env,{...body,id:po.id,commandId:crypto.randomUUID(),lines:[{...body.lines[0],received:5},body.lines[1]]},'owner');m=await f.service.readFoodOperations(f.db);assert.equal(m.pos[0].received,5);assert.equal(m.products.find(p=>p.id==='recPink').onHand,13);
@@ -29,16 +30,16 @@ test('multi-line purchase receipt commits once and later partial receipts add on
 });
 test('lost transaction response replays the same completed command without a second waste event',async()=>{
   const f=await website(),original=f.db.batch;let lost=true;f.db.batch=async statements=>{const result=await original(statements);if(lost){lost=false;throw Error('Lost response after commit');}return result;};
-  const b=command({action:'stock_movement',productId:'recPink',type:'Waste',quantity:1,date:new Date().toISOString().slice(0,10),cost:'30',reason:'Damaged bag'});const result=await f.service.runFoodCommand(f.env,b,'owner');assert.deepEqual(await f.service.runFoodCommand(f.env,b,'owner'),result);
+  const b=command({action:'stock_movement',productId:'recPink',type:'Waste',quantity:1,date:foodDate(),cost:'30',reason:'Damaged bag'});const result=await f.service.runFoodCommand(f.env,b,'owner');assert.deepEqual(await f.service.runFoodCommand(f.env,b,'owner'),result);
   assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM dog_food_business_events').get().n,1);assert.equal((await f.service.readFoodOperations(f.db)).products.find(p=>p.id==='recPink').onHand,7);
 });
 test('purchase failure rolls back all record, stock and command changes',async()=>{
-  const f=await website();f.sql.exec("CREATE TRIGGER reject_test_receipt BEFORE INSERT ON dog_food_business_records WHEN NEW.table_name='Restock Log' BEGIN SELECT RAISE(ABORT,'simulated disk failure'); END;");const day=new Date().toISOString().slice(0,10);
+  const f=await website();f.sql.exec("CREATE TRIGGER reject_test_receipt BEFORE INSERT ON dog_food_business_records WHEN NEW.table_name='Restock Log' BEGIN SELECT RAISE(ABORT,'simulated disk failure'); END;");const day=foodDate();
   await assert.rejects(f.service.runFoodCommand(f.env,command({action:'save_purchase',number:'PO-FAIL',supplier:'Example',date:day,lines:[{productId:'recPink',quantity:5,received:2,cost:'30',receivedDate:day}]}),'owner'),/simulated/);
   for(const t of ['Purchase Orders','Purchase Order Lines','Restock Log'])assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM dog_food_business_records WHERE table_name=?').get(t).n,0);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM dog_food_business_events').get().n,0);
 });
 test('supplier payments require actual evidence and record only the additional money',async()=>{
-  const f=await website(),day=new Date().toISOString().slice(0,10),base={action:'save_purchase',number:'PO-PAY',supplier:'Example',date:day,paid:'100',reference:'supplier-ref-1',paymentDate:day,lines:[{productId:'recPink',quantity:10,received:0,cost:'30'}]};
+  const f=await website(),day=foodDate(),base={action:'save_purchase',number:'PO-PAY',supplier:'Example',date:day,paid:'100',reference:'supplier-ref-1',paymentDate:day,lines:[{productId:'recPink',quantity:10,received:0,cost:'30'}]};
   await assert.rejects(f.service.runFoodCommand(f.env,command(base),'owner'),/actually paid/);
   await assert.rejects(f.service.runFoodCommand(f.env,command({...base,supplierPaymentConfirmed:true,paymentDate:'2099-01-01'}),'owner'),/future/);
   const first=await f.service.runFoodCommand(f.env,command({...base,supplierPaymentConfirmed:true}),'owner');
@@ -47,7 +48,7 @@ test('supplier payments require actual evidence and record only the additional m
   await assert.rejects(f.service.runFoodCommand(f.env,command({...base,id:first.id,paid:'50',supplierPaymentConfirmed:true}),'owner'),/cannot.*decrease|cannot.*reduc|cannot.*lower/i);
 });
 test('office plans and portal requests share exact customer identity without charges or duplicate enrollment',async()=>{
-  const f=await website(),next=new Date().toISOString().slice(0,10),before=f.sql.prepare('SELECT COUNT(*) n FROM dog_food_payments').get().n;
+  const f=await website(),next=foodDate(),before=f.sql.prepare('SELECT COUNT(*) n FROM dog_food_payments').get().n;
   const plan=await f.service.runFoodCommand(f.env,command({action:'save_legacy_plan',customerId:'buyer',productId:'recPink',quantity:2,frequency:'Monthly',status:'Active',billingOwner:'manual',next,confirm:true}),'owner');
   assert.equal((await websiteLegacyPlans(f.db,'buyer')).length,1);assert.equal((await websiteLegacyPlans(f.db,'someone-else')).length,0);
   const b={commandId:crypto.randomUUID(),subscriptionId:'legacy:'+plan.id,requestType:'pause',details:'Please pause until next month.'};
@@ -59,7 +60,7 @@ test('office plans and portal requests share exact customer identity without cha
 test('native sale receipts use the same payment ledger and replay without changing physical stock',async()=>{
   const f=await website();f.sql.exec("UPDATE dog_food_sales_settings SET stock_basis='confirmed_count'");f.fail();const order=await f.save(),sale=(await f.service.readFoodOperations(f.db)).sales.find(s=>s.orderId===order.orderId);assert.ok(sale);
   await assert.rejects(f.service.runFoodCommand(f.env,command({action:'record_payment',saleId:sale.id,amount:'63.57',method:'Cash',date:'2099-01-01',reference:'future-receipt'}),'owner'),/future/);
-  const b=command({action:'record_payment',saleId:sale.id,amount:'63.57',method:'Cash',date:new Date().toISOString().slice(0,10),reference:'office-native-receipt-1'});await f.service.runFoodCommand(f.env,b,'owner');await f.service.runFoodCommand(f.env,b,'owner');
+  const b=command({action:'record_payment',saleId:sale.id,amount:'63.57',method:'Cash',date:foodDate(),reference:'office-native-receipt-1'});await f.service.runFoodCommand(f.env,b,'owner');await f.service.runFoodCommand(f.env,b,'owner');
   const m=await f.service.readFoodOperations(f.db);assert.equal(m.sales.find(s=>s.id===sale.id).balanceCents,0);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM dog_food_payments').get().n,1);const p=m.products.find(p=>p.id==='recPink');assert.equal(p.onHand,8);assert.equal(p.available,7);
 });
 test('private backups verify a read-back and exclude sessions, passwords and active tokens',async()=>{
