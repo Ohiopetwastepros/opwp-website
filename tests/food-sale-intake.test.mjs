@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
 import {setup} from './helpers/unified-food-sales-fixture.mjs';
 import {customerBody} from './helpers/food-customer-input.mjs';
-import {foodCustomerCommand,readStaffFoodCustomerIntake} from '../lib/food-customer-hub.mjs';
+import {foodCustomerCommand,readStaffFoodCustomerIntake,readFoodCustomerHub} from '../lib/food-customer-hub.mjs';
 import {foodDate} from '../lib/dog-food-operations.mjs';
 const office={office:true},staff={staffIntake:true};
 test('expanded receipt schema copies old rows exactly and retains immutable payment and capture guards',()=>{
@@ -24,6 +24,48 @@ test('manual intake saves date, customer type, notes and validated payment statu
 });
 test('unpaid sales retain the selected payment method without inventing a receipt',async()=>{
   const f=setup(),o=await f.save({paymentMethod:'card',paymentStatus:'unpaid'});assert.equal(f.sql.prepare('SELECT payment_method_entered FROM dog_food_sales_order_metadata WHERE order_id=?').get(o.orderId).payment_method_entered,'card');assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM dog_food_payments').get().n,0);
+});
+test('an addressless cash delivery saves once and appears in customer history and the bag sales registry',async()=>{
+  const f=setup(),product='edf-22-12-pink-40';
+  f.sql.exec("DELETE FROM dog_food_addresses WHERE customer_id='buyer'; UPDATE dog_food_sales_settings SET stock_basis='confirmed_count'");
+  const contact=await readStaffFoodCustomerIntake(f.db,'buyer');
+  assert.equal(contact.contactComplete,true);
+  assert.equal(contact.intakeComplete,false);
+  const body=await f.payload({intakeVersion:3,fulfillmentMethod:'delivery',paymentMethod:'cash',amountReceivedCents:6000,paymentReceivedConfirmed:true,paymentStatus:'paid'});
+  await assert.rejects(f.sales.command(f.db,{...body,includeTax:true},'seller'),/Review the current total/);
+  const saved=await f.sales.command(f.db,body,'seller');
+  assert.deepEqual(await f.sales.command(f.db,body,'seller'),saved);
+  assert.equal(saved.totalCents,6000);
+  assert.equal(saved.balanceCents,0);
+  assert.deepEqual({...f.sql.prepare('SELECT tax_cents,tax_rate_basis_points,requested_delivery_date FROM dog_food_orders WHERE id=?').get(saved.orderId)},{tax_cents:0,tax_rate_basis_points:0,requested_delivery_date:null});
+  assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM dog_food_deliveries').get().n,0);
+  const account={id:'account',customer_id:'buyer',email:'buyer@example.test'};
+  const portal=await f.readFoodPortal(f.db,account),history=portal.orders.find(o=>o.id===saved.orderId);
+  assert.equal(portal.addresses.length,0);
+  assert.equal(history.delivery_date,null);
+  assert.equal(history.amount_received_cents,6000);
+  assert.equal(history.items[0].product_id,product);
+  assert.equal((await readFoodCustomerHub(f.db,{id:'buyer'})).customers[0].orders[0].id,saved.orderId);
+  let model=await f.service.readFoodOperations(f.db);
+  assert.equal(model.sales.filter(s=>s.orderId===saved.orderId).length,1);
+  assert.equal(model.sales.find(s=>s.orderId===saved.orderId).quantity,1);
+  assert.equal(model.products.find(p=>p.websiteId===product).reserved,1);
+  const handoff={action:'handoff',commandId:crypto.randomUUID(),orderId:saved.orderId,handoffConfirmed:true,receivedBy:'Buyer'};
+  await f.sales.command(f.db,handoff,'owner',{office:true});
+  await f.sales.command(f.db,handoff,'owner',{office:true});
+  model=await f.service.readFoodOperations(f.db);
+  assert.equal(model.sales.find(s=>s.orderId===saved.orderId).fulfillment,'Delivered');
+  assert.equal(model.products.find(p=>p.websiteId===product).onHand,7);
+});
+test('staff can opt into tax for a manual sale and external billing keeps catalog pricing',async()=>{
+  const f=setup();
+  const manual={intakeVersion:3,includeTax:true,paymentMethod:'cash',fulfillmentMethod:'delivery',fulfillmentStatus:'completed',receivedBy:'Buyer',handoffConfirmed:true};
+  const saved=await f.save(manual);
+  assert.equal(saved.totalCents,6465);
+  assert.equal(f.sql.prepare('SELECT tax_cents FROM dog_food_orders WHERE id=?').get(saved.orderId).tax_cents,465);
+  const external=await f.sales.quote(f.db,{intakeVersion:3,billingProvider:'sweep_and_go',includeTax:false,items:[{productId:'edf-22-12-pink-40',quantity:1}]});
+  assert.equal(external.total,6357);
+  await assert.rejects(f.save({...manual,deliveryAddress:{line1:'123 Incomplete address'}}),/complete Ohio address/);
 });
 test('manual digital and card receipts can be partial, never charge a provider, and retain distinct methods and unique references',async()=>{
   const f=setup(),o=await f.save();
