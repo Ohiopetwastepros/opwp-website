@@ -10,7 +10,7 @@ import {FoodError} from '../lib/dog-food-operations.mjs';
 // Exercise the component's actual submit handler with persistent React hook state.
 // JSX rendering is covered by the production build; no test-only submit implementation.
 const source=fs.readFileSync(new URL('../components/FoodCustomerDialog.js',import.meta.url),'utf8');
-const handler=source.slice(source.indexOf('export default function'),source.indexOf('  if(!mounted)return null;')).replace('export default ','')+'return {save,set,refreshRequired,error};}\nFoodCustomerDialog';
+const handler=source.slice(source.indexOf('export default function'),source.indexOf('  if(!mounted)return null;')).replace('export default ','')+'return {save,set,setEditAddress,refreshRequired,error};}\nFoodCustomerDialog';
 function dialog(fetch,props={}){
   const states=[],refs=[],saved=[];let si=0,ri=0;
   const Component=vm.runInNewContext(handler,{crypto,fetch,useEffect:()=>{},useRef:value=>{const i=ri++;return refs[i]??=( {current:value} );},useState:value=>{const i=si++;if(!(i in states))states[i]=value;return [states[i],v=>{states[i]=typeof v==='function'?v(states[i]):v;}];}});
@@ -41,6 +41,31 @@ test('stale customer edits require refreshing before any further submission',asy
   const fresh=(await readFoodCustomerHub(f.db,{id:created.id})).customers[0],reopened=dialog(api(f,'owner',true),{customer:fresh});
   reopened.render().set('notes','Reviewed latest record');await reopened.submit();assert.equal(reopened.saved.length,1);
   assert.equal(reopened.saved[0].customer.notes,'Reviewed latest record');
+  assert.equal(reopened.saved[0].customer.addresses.length,fresh.addresses.length);
+  assert.equal(reopened.saved[0].customer.addresses[0].id,fresh.addresses[0].id);
+});
+
+test('an imported customer can save contact details without an address and add an address later',async()=>{
+  const f=setup();
+  f.sql.exec("INSERT INTO dog_food_customers(id,first_name,last_name,email,phone) VALUES('imported','Imported','Customer','','4195550198')");
+  const customer=(await readFoodCustomerHub(f.db,{id:'imported'})).customers[0];
+  const first=dialog(api(f,'owner',true),{customer});
+  first.render().set('email','updated@example.test');
+  await first.submit();
+  const edited=first.saved[0].customer;
+  assert.equal(edited.email,'updated@example.test');
+  assert.equal(edited.addresses.length,0);
+
+  const later=dialog(api(f,'owner',true),{customer:edited});
+  later.render().setEditAddress(true);
+  later.render().set('address','456 Example Street');
+  await later.submit();
+  assert.match(later.render().error,/city/);
+  later.render().set('city','Toledo');
+  later.render().set('zip','43614');
+  later.render().set('placement','Front door');
+  await later.submit();
+  assert.equal(later.saved[0].customer.addresses[0].line1,'456 Example Street');
 });
 
 for(const failure of ['network','server','replay-conflict'])test(`${failure} preserves the original submission for a safe retry`,async()=>{
