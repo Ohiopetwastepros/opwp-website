@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {setup} from './helpers/unified-food-sales-fixture.mjs';
 import {planFoodSalesCustomers,applyFoodSalesCustomerPlan,readFoodSalesCustomerDirectory} from '../lib/food-sales-customers.mjs';
+import {foodDate} from '../lib/dog-food-operations.mjs';
 import * as accounts from '../lib/dog-food-account.mjs';
 const pink='edf-22-12-pink-40';
 function counts(bags=4){const f=setup({bags});f.sql.exec("DELETE FROM dog_food_stock_lots; UPDATE dog_food_sales_settings SET stock_basis='confirmed_count'");return f;}
@@ -28,6 +30,29 @@ test('completed pickup and delivery use shared counts once, and overselling roll
     await assert.rejects(f.save(),/inventory/);
     assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM dog_food_orders').get().n,1);assert.ok(saved.orderId);
   }
+});
+test('staff can reconcile previous counts while launch verification still requires a current count',async()=>{
+  const f=counts(2),options={allowPreviousCounts:true};
+  f.sql.exec(fs.readFileSync(new URL('../schema-proposals/0066_food_source_reconciliation.sql',import.meta.url),'utf8'));
+  f.sql.prepare('UPDATE dog_food_launch_readiness SET created_at=?').run(foodDate()+' 17:00:00');
+  const stock=async options=>(await f.sales.inventory(f.db,options)).products.find(p=>p.id===pink).available;
+  assert.equal(await stock(),null);
+  assert.equal(await stock(options),2);
+  const body=await f.payload({amountReceivedCents:6000,paymentStatus:'partial',paymentMethod:'cash',paymentReceivedConfirmed:true});
+  await assert.rejects(f.sales.command(f.db,body,'seller'),/inventory/);
+  const order=await f.sales.command(f.db,body,'seller',options);
+  assert.equal(order.totalCents,6357);
+  assert.equal(order.balanceCents,357);
+  assert.equal(await stock(options),1);
+  assert.equal(f.sql.prepare('SELECT count_reference FROM dog_food_sales_count_allocations WHERE order_id=?').get(order.orderId).count_reference,'count-pink');
+  await f.sales.command(f.db,{action:'handoff',commandId:crypto.randomUUID(),orderId:order.orderId,handoffConfirmed:true,receivedBy:'Buyer'},'seller',options);
+  assert.equal(await stock(options),1);
+  assert.equal((await f.service.readFoodOperations(f.db)).products.find(p=>p.websiteId===pink).confirmed,false);
+  const stored=JSON.parse(f.sql.prepare("SELECT payload FROM dog_food_ops_snapshots WHERE id='initial'").get().payload);
+  stored.tables['Inventory Adjustments'].push({id:'new-count',fields:{Product:['recPink'],'Movement Type':'Stock Count','Counted Quantity':3,'Movement Date':foodDate()}});
+  f.sql.prepare("UPDATE dog_food_ops_snapshots SET payload=? WHERE id='initial'").run(JSON.stringify(stored));
+  assert.equal(await stock(options),3);
+  assert.equal(await stock(),3);
 });
 test('concurrent last-bag requests admit one sale, and stock changes block a pending handoff',async()=>{
   const f=counts(1),one=await f.payload(),two=await f.payload();

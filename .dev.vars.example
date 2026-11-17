@@ -119,6 +119,8 @@ FIELD_QUO_WEBHOOK_SIGNING_KEY=""
 FOOD_SALES_NATIVE_ENABLED=false
 # Enable new native sales only after inventory verification; also freezes legacy new-sale entry.
 FOOD_SALES_RECORDING_ENABLED=false
+# Allow staff count-based sales against the saved checkpoints during reconciliation.
+FOOD_SALES_USE_PREVIOUS_COUNTS=false
 # Keep true after pilot activation if native writers are later paused.
 FOOD_SALES_LEGACY_WRITES_FROZEN=false
 # Separate review of actual SNG evidence is required before replacing legacy reconciliation.

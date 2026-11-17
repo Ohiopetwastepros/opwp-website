@@ -6,3 +6,13 @@
 .saleDetailsGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .pending a{display:inline-flex;align-items:center;min-height:44px;color:#224536;font-weight:700;text-decoration:underline}
 @media(max-width:700px){.saleDetailsGrid{grid-template-columns:minmax(0,1fr)}}
+
+.shell .product{grid-template-columns:36px minmax(0,1fr) auto}
+.quantityControls{display:grid;grid-template-columns:44px 46px 44px;gap:4px;align-items:center}
+.shell .quantityControls button{padding:0;font-size:20px}
+.shell .quantityControls input{width:100%;appearance:textfield}
+.quantityControls input::-webkit-inner-spin-button,.quantityControls input::-webkit-outer-spin-button{appearance:none;margin:0}
+.receiptPresets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:14px}
+.receiptPresets button[aria-pressed=true]{background:#234c3b;border-color:#234c3b;color:#fff}
+@media(max-width:700px){.shell .product{grid-template-columns:33px minmax(0,1fr) auto}}
+@media(max-width:380px){.shell .product{grid-template-columns:33px minmax(0,1fr)}.quantityControls{grid-column:2}}
