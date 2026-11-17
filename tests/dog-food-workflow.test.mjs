@@ -1,7 +1,7 @@
 import {archiveFoodExternalStripe} from '../lib/food-external-stripe.mjs';
 import {runPrivateInNewContext} from './helpers/private-vm.mjs';
 import staffPrivate from '../lib/staff-private.json' with {type:'json'};
-import {foodProfileComplete,FOOD_STATES} from '../lib/dog-food-profile.mjs';
+import {foodProfileComplete,FOOD_STATES,foodAddressInput,foodPhone} from '../lib/dog-food-profile.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -19,7 +19,7 @@ async function setup(routes=false,{sendEmail,charge}={}) {
   if(!routes)f.sql.exec(`CREATE TABLE IF NOT EXISTS route_partner_plan_events(id TEXT,organization_id TEXT,event_type TEXT,actor_email TEXT,details TEXT);`);
   await f.service.syncFoodOperations(f.env,{force:true});
   const sends=[];
-  const base={readFoodPlanning,foodProfileComplete,FOOD_STATES,locateFoodAddress:async()=>null,readFoodDeliveryChoices:async()=>({deliveryAvailable:true,days:[1,2,3,4,5].map(weekday=>({weekday})),tonyDates:[]}),...logic,...food,...checkout,...cadence,...f.service,crypto,Date,Map,URL,URLSearchParams,JSON,TextEncoder,Buffer,workflowSchema,getDb:()=>f.db};
+  const base={readFoodPlanning,foodProfileComplete,FOOD_STATES,foodAddressInput,foodPhone,locateFoodAddress:async()=>null,readFoodDeliveryChoices:async()=>({deliveryAvailable:true,days:[1,2,3,4,5].map(weekday=>({weekday})),tonyDates:[]}),...logic,...food,...checkout,...cadence,...f.service,crypto,Date,Map,URL,URLSearchParams,JSON,TextEncoder,Buffer,workflowSchema,getDb:()=>f.db};
   const payments=runPrivateInNewContext(source('dog-food-payments.js')+'\n({recordDogFoodPayment,activateDogFoodSubscriptionFromOrder})',base);
   const field=runPrivateInNewContext(source('field-operations.js')+'\n({prepareFieldRelease})',{...base,OPWP_ORGANIZATION_ID:'org-opwp',FieldError:logic.FoodError});
   const fulfillment=runPrivateInNewContext(source('dog-food-fulfillment.js')+'\n({reserveFoodLots,checkFoodLotReconciliation,scheduleFoodOrders,foodFulfillmentCommand})',{...base,...field,...payments});
@@ -36,7 +36,7 @@ async function setup(routes=false,{sendEmail,charge}={}) {
   const login=await food.loginFoodAccount(f.db,{email:'workflow@example.test',password:temporary});
   assert.equal(login.passwordChangeRequired,true);
   await assert.rejects(food.loginFoodAccount(f.db,{email:'workflow@example.test',password:temporary}));
-  const active=await food.redeemFoodEmail(f.db,{token:login.setupToken,password:'Synthetic test-only passphrase!',passwordConfirm:'Synthetic test-only passphrase!'});
+  const active=await food.redeemFoodEmail(f.db,{token:login.setupToken,password:'Synthetic test-only passphrase!',passwordConfirm:'Synthetic test-only passphrase!',firstName:'Test',lastName:'Buyer',phone:'4195550101'});
   const account=await food.foodAccountSession(f.db,new Headers({cookie:food.foodCookie(active.sessionToken).split(';')[0]}));
   await portal.saveFoodProfile(f.db,account,{profile:{firstName:'Test',lastName:'Buyer',phone:'4195550101',address:'123 Test','city':'Toledo',state:'OH',zip:'43614',placement:'Front door'}});
   f.sql.prepare("UPDATE dog_food_customers SET stripe_customer_id='cus_test' WHERE id=?").run(account.customer_id);

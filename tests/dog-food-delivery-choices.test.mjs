@@ -79,20 +79,20 @@ test('autofilled visible profile values submit without change events and persist
 });
 
 test('autofill submission preserves server validation and puts save errors in the profile form',async()=>{
-  const f=setup(),error='Complete your name, phone and address.';
+  const f=setup(),error='Enter a valid US phone number.';
   const form=await profileForm({profile:{...f.savedProfile,placement:'Other',placementOther:'Side porch'},required:true,email:f.account.email,error,onSave:value=>f.saveFoodProfile(f.db,f.account,{profile:value})});
-  const instructions=controls(form).find(input=>input.props.name==='placementOther');assert.equal(instructions.props.required,true);
+  const instructions=controls(form).find(input=>input.props.name==='placementOther');assert.equal(Boolean(instructions.props.required),false);
   const values={...f.savedProfile,phone:'123',placement:'Other',placementOther:'Side porch'};
-  await assert.rejects(form.props.onSubmit({preventDefault(){},currentTarget:{values}}),/Complete/);
+  await assert.rejects(form.props.onSubmit({preventDefault(){},currentTarget:{values}}),/valid US phone number/);
   assert.equal((await f.readFoodPortal(f.db,f.account)).profileRequired,true);
   assert.ok(form.props.children.some(child=>child?.props?.role==='alert'&&child.props.children.includes(error)));
   assert.equal(values.placementOther,'Side porch');
 });
-test('new account is gated until a complete profile is saved, and subsequent sessions remember it',async()=>{
+test('checkout requires a complete delivery profile, and subsequent sessions remember it',async()=>{
   const f=setup();assert.equal((await f.readFoodPortal(f.db,f.account)).profileRequired,true);
   await assert.rejects(f.requireFoodProfile(f.db,f.account),/Save your delivery profile/);
   await assert.rejects(f.order(),/Save your delivery profile/);
-  await assert.rejects(f.saveFoodProfile(f.db,f.account,{profile:{...f.savedProfile,phone:'123'}}),/Complete/);
+  await assert.rejects(f.saveFoodProfile(f.db,f.account,{profile:{...f.savedProfile,phone:'123'}}),/valid US phone number/);
   await f.saveFoodProfile(f.db,f.account,{profile:f.savedProfile});
   const session=await f.readFoodPortal(f.db,{...f.account});assert.equal(session.profileRequired,false);assert.equal(session.customer.phone,'+14195550101');assert.equal(session.addresses[0].line1,'123 Main');
   assert.ok(f.sql.prepare('SELECT profile_completed_at FROM dog_food_accounts').get().profile_completed_at);

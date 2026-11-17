@@ -17,12 +17,17 @@ const source=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8').replace
 async function invite(f,id){return hub.foodCustomerCommand(f.db,{action:'invite_customer',commandId:crypto.randomUUID(),customerId:id,channels:['email','sms'],confirm:true},'owner',{office:true});}
 function senders(extra={}){const email=[],sms=[];return {email,sms,options:{emailConfigured:true,smsConfigured:true,origin:'https://example.test',sendEmail:async m=>{email.push(m);return 'email-'+email.length;},sendSms:async m=>{sms.push(m);return 'sms-'+sms.length;},...extra}};}
 
-test('customer creation requires core contact, address and handoff details before any record',async()=>{
-  const f=fixture();for(const field of ['firstName','lastName','phone','address','city','state','zip','fulfillment','placement']){
-    await assert.rejects(hub.foodCustomerCommand(f.db,customerBody({[field]:field==='smsConsent'?false:''}),'seller'));
-    assert.equal(count(f,'dog_food_customers'),1);assert.equal(count(f,'dog_food_customer_messages'),0);
+test('customer creation requires only name, phone and email',async()=>{
+  const f=fixture();
+  for(const field of ['firstName','lastName','phone','email']){
+    await assert.rejects(hub.foodCustomerCommand(f.db,customerBody({[field]:''}),'seller'));
+    assert.equal(count(f,'dog_food_customers'),1);
   }
-  await assert.rejects(hub.foodCustomerCommand(f.db,customerBody({placement:'Other',placementOther:''}),'seller'),/instructions/);
+  const {id}=await hub.foodCustomerCommand(f.db,{action:'create_customer',commandId:crypto.randomUUID(),firstName:'New',lastName:'Buyer',email:'new@example.test',phone:'4195550199'},'seller');
+  const customer=(await hub.readFoodCustomerHub(f.db,{id})).customers[0];
+  assert.equal(customer.addresses.length,0);
+  assert.equal(customer.dog_count,null);
+  assert.equal(count(f,'dog_food_customer_messages'),0);
 });
 test('customer, profile and address commit once without invitations or a portal password',async()=>{
   const f=fixture(),body=customerBody(),saved=await hub.foodCustomerCommand(f.db,body,'seller');
@@ -69,7 +74,12 @@ test('office edits preserve historical order addresses, reject stale changes and
   assert.notEqual(c.addresses[0].id,oldAddress);assert.equal(f.sql.prepare('SELECT address_id FROM dog_food_orders WHERE customer_id=?').get(saved.id).address_id,oldAddress);
   await assert.rejects(hub.foodCustomerCommand(f.db,{...update,commandId:crypto.randomUUID()},'owner',{office:true}),/changed/);
   f.sql.prepare("INSERT INTO dog_food_accounts(id,email,customer_id,password_hash) VALUES('new-account',?,?,'keep-this-hash')").run(body.email,saved.id);
-  await assert.rejects(hub.foodCustomerCommand(f.db,{...update,commandId:crypto.randomUUID(),revision:c.revision,version:c.version,email:'different@example.test'},'owner',{office:true}),/verification/);
+  await hub.foodCustomerCommand(f.db,{action:'update_customer',customerId:c.id,commandId:crypto.randomUUID(),revision:c.revision,version:c.version,email:'different@example.test',firstName:'',lastName:'',phone:''},'owner',{office:true});
+  c=(await hub.readFoodCustomerHub(f.db,{id:saved.id})).customers[0];
+  assert.equal(c.email,'different@example.test');
+  assert.equal(c.first_name+c.last_name+c.phone,'');
+  assert.equal(c.addresses[0].line1,'789 Updated Street');
+  assert.equal(f.sql.prepare("SELECT email FROM dog_food_accounts WHERE id='new-account'").get().email,body.email);
   assert.equal(f.sql.prepare("SELECT password_hash FROM dog_food_accounts WHERE id='new-account'").get().password_hash,'keep-this-hash');
 });
 test('staff cannot edit other customer records or administer the customer hub; an office header requires owner MFA',async()=>{

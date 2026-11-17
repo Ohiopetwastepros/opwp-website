@@ -95,7 +95,7 @@ test('customer portal signup links the imported email only after email verificat
   await accounts.beginFoodEmail(f.db,{email:'known@example.test',kind:'verify',origin:'https://example.test',send:async m=>{message=m;}},1800000000);
   assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM dog_food_accounts').get().n,before);
   const temporary=message.text.match(/Temporary password: (\S+)/)[1],restricted=await accounts.loginFoodAccount(f.db,{email:'known@example.test',password:temporary},1800000001);
-  await accounts.redeemFoodEmail(f.db,{token:restricted.setupToken,password:'A long account password!',passwordConfirm:'A long account password!'},1800000002);
+  await accounts.redeemFoodEmail(f.db,{token:restricted.setupToken,password:'A long account password!',passwordConfirm:'A long account password!',phone:'4195550197'},1800000002);
   assert.equal(f.sql.prepare("SELECT customer_id FROM dog_food_accounts WHERE email='known@example.test'").get().customer_id,id);
   assert.equal(f.sql.prepare("SELECT COUNT(*) n FROM dog_food_accounts a JOIN dog_food_customers c ON c.id=a.customer_id WHERE c.email=''").get().n,0);
 });

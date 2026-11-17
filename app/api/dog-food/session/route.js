@@ -55,6 +55,6 @@ export async function POST(request) {
     } else if (body.action === 'redeem') result = await redeemFoodEmail(db, body);
     else result = await loginFoodAccount(db, body);
     if(result.sessionToken)await linkStaffFoodPortalProfile(db,result.sessionToken);
-    return reply({ ok: true, message: result.message || 'Signed in.', ...(result.passwordChangeRequired ? { passwordChangeRequired: true, setupToken: result.setupToken } : {}) }, 200, result.sessionToken ? foodCookie(result.sessionToken) : null);
+    return reply({ ok: true, message: result.message || 'Signed in.', ...(result.passwordChangeRequired ? { passwordChangeRequired: true, signupDetailsRequired: result.signupDetailsRequired, setupToken: result.setupToken } : {}) }, 200, result.sessionToken ? foodCookie(result.sessionToken) : null);
   } catch (error) { return reply({ ok: false, error: error instanceof FoodAccountError ? error.message : 'Account service is temporarily unavailable.' }, error instanceof FoodAccountError ? error.status : 503); }
 }

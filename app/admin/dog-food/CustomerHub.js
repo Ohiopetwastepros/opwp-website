@@ -25,7 +25,7 @@ export default function CustomerHub(){
   async function changeStatus(e){e.preventDefault();if(statusPending.current)return;statusPending.current=true;setBusy(true);setError('');const body=statusDialog.payload||{action:'set_customer_status',commandId:crypto.randomUUID(),customerId:detail.id,expectedStatus:detail.status,statusVersion:detail.statusVersion,status:detail.status==='active'?'inactive':'active',reason:statusDialog.reason,confirm:true};setStatusDialog(d=>({...d,payload:body}));try{const d=await post(body);setNotice(detail.status==='active'?'Customer deactivated.':'Customer reactivated.');setStatusDialog(null);setVersion(v=>v+1);}catch(e){setError(e.message);}finally{statusPending.current=false;setBusy(false);}}
   const fresh=resultKey===search+'|'+status+'|'+offset,rows=fresh?records:[],waiting=loading||!fresh;
   const orders=detail?.orders||[],legacy=detail?.legacySales||[],total=(detail?.orderSummary?.total_cents||0)+legacy.reduce((n,o)=>n+(o.totalCents||0),0),balance=(detail?.orderSummary?.balance_cents||0)+legacy.reduce((n,o)=>n+(o.balanceCents||0),0);
-  const primaryAddress=detail?.addresses?.find(address=>address.is_primary)||detail?.addresses?.[0];
+  const primaryAddress=detail?.addresses?.find(address=>address.is_primary);
   const profileComplete=Boolean(detail&&foodStaffCustomerComplete(detail,primaryAddress,detail.preferred_fulfillment));
   return <section className={s.hub}>
     {dialog&&<FoodCustomerDialog endpoint={endpoint} customer={dialog.customer} onClose={()=>setDialog(null)} onRefresh={()=>{setDialog(null);setDetail(null);setVersion(v=>v+1);setNotice('Reloading the customer record.');}} onSaved={async customer=>{setDialog(null);choose(customer);setVersion(value=>value+1);setNotice('Customer saved.');}}/>}

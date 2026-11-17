@@ -18,8 +18,8 @@ const label = s => String(s || '').replaceAll('_', ' ');
 const blankProfile = { firstName:'',lastName:'',phone:'',address:'',city:'',state:'OH',zip:'',placement:'',placementOther:'',fulfillmentMethod:'delivery',dogCount:'',frequency:'' };
 export default function FoodAccountClient() {
   const [data,setData] = useState(null), [requestedTab,setTab] = useState('home'), [authMode,setAuthMode] = useState('login');
-  const tab=data?.authenticated&&data.profileRequired&&requestedTab!=='orders'?'profile':requestedTab;
-  const [email,setEmail] = useState(''), [linkToken,setLinkToken] = useState('');
+  const tab=requestedTab;
+  const [email,setEmail] = useState(''), [linkToken,setLinkToken] = useState(''), [signupDetailsRequired,setSignupDetailsRequired] = useState(false);
   const [verification,setVerification] = useState(''), [reset,setReset] = useState(0), [busy,setBusy] = useState(false), [notice,setNotice] = useState(''), [error,setError] = useState('');
   const [profile,setProfile] = useState(blankProfile), [quantities,setQuantities] = useState({}), [plan,setPlan] = useState('on_demand');
   const [deliverySpeed,setDeliverySpeed] = useState('route_day');
@@ -31,7 +31,7 @@ export default function FoodAccountClient() {
   const [repeatReview,setRepeatReview] = useState(false), [reorderInfo,setReorderInfo] = useState({missing:[],priceChanged:false});
   const [returnToOrder,setReturnToOrder] = useState(false);
   const [focusedOrderId,setFocusedOrderId] = useState('');
-  function navigate(id) { setFocusedOrderId('');if(id==='order'){setCheckoutMode(false);setRepeatReview(false);} if(data?.profileRequired&&id!=='orders'&&id!=='profile'){setNotice('Complete and save your profile to continue.');if(id==='order')setReturnToOrder(true);} setTab(id); }
+  function navigate(id) { setFocusedOrderId('');if(id==='order'){setCheckoutMode(false);setRepeatReview(false);} setTab(id); }
   function viewOrder(id) { setFocusedOrderId(id); setTab('orders'); }
   const dialogRef = useRef(null);
   const headingRef = useRef(null);
@@ -72,7 +72,6 @@ export default function FoodAccountClient() {
       const c = result.customer, a = result.addresses[0];
       setProfile({ firstName:c.first_name||'',lastName:c.last_name||'',phone:c.phone||'',address:a?.line1 || '',city:a?.city || '',state:a?.state || 'OH',zip:a?.postal_code || '',placement:a?.placement_preference || '',placementOther:a?.placement_other || '',fulfillmentMethod:result.preferredFulfillment||'delivery',dogCount:result.foodPreferences?.dog_count||'',frequency:result.foodPreferences?.service_frequency||'' });
       setFulfillmentMethod(result.preferredFulfillment||'delivery');if(result.preferredFulfillment==='pickup'){setCadence('fixed_day');setDeliverySpeed('route_day');}setDeliveryChoices(result.deliveryChoices);
-      if(result.profileRequired)setTab('profile');
     }
     return result;
   }
@@ -94,7 +93,7 @@ export default function FoodAccountClient() {
     } catch { /* Cart-only local storage is optional and never establishes identity or price. */ }
     setCartLoaded(true);
     const fragment = new URLSearchParams(window.location.hash.slice(1)), token = fragment.get('verify') || fragment.get('reset');
-    if (token) { setLinkToken(token); setAuthMode('redeem'); window.history.replaceState(null,'','/dog-food/account/'); }
+    if (token) { setLinkToken(token); setSignupDetailsRequired(Boolean(fragment.get('verify'))); setAuthMode('redeem'); window.history.replaceState(null,'','/dog-food/account/'); }
     reload().then(result => {
       if (hasDraft && result.authenticated) {
         const c = result.customer;
@@ -126,13 +125,13 @@ export default function FoodAccountClient() {
     const password=String(values.get('password')||''), passwordConfirm=String(values.get('passwordConfirm')||'');
     if(authMode==='redeem'&&!foodPasswordValid(password)){setError('Use at least 8 characters, including one capital letter and one special character.');return;}
     if(authMode==='redeem'&&password!==passwordConfirm){setError('Both passwords must match.');return;}
-    const result = await api('/api/dog-food/session/', { action:authMode,email:String(values.get('email')||''),password,passwordConfirm,token:linkToken,turnstileToken:verification });
+    const result = await api('/api/dog-food/session/', { action:authMode,email:String(values.get('email')||''),password,passwordConfirm,...(authMode==='redeem'&&signupDetailsRequired?Object.fromEntries(['firstName','lastName','phone'].map(name=>[name,String(values.get(name)||'')])):{}),token:linkToken,turnstileToken:verification });
     if(result){for(const name of ['password','passwordConfirm']){const field=form.elements.namedItem(name);if(field)field.value='';}}
     setReset(n => n + 1); setVerification('');
-    if (result?.passwordChangeRequired) { setLinkToken(result.setupToken); setAuthMode('redeem'); }
+    if (result?.passwordChangeRequired) { setLinkToken(result.setupToken); setSignupDetailsRequired(result.signupDetailsRequired); setAuthMode('redeem'); }
     else if (result && ['login','redeem'].includes(authMode)) {
       setLinkToken(''); setAuthMode('login');
-      setTab(result.portal?.profileRequired?'profile':recommendationDraft?'order':'home');
+      setTab(recommendationDraft?'order':'home');
     }
     else if (result && authMode === 'signup') { setAuthMode('login'); setNotice('Check your email for a one-use temporary password. It expires in 30 minutes. Sign in here to choose your own password.'); }
   }
@@ -157,8 +156,9 @@ export default function FoodAccountClient() {
       {notice && <div className={styles.notice} role='status'><span>{notice}</span><button type='button' aria-label='Dismiss notification' onClick={() => setNotice('')}>×</button></div>}{error && !(data?.authenticated&&tab==='profile') && <div className={styles.error} role='alert'>{error}</div>}
       {!data ? <div className={styles.card}><h1>My dog food</h1><p>{error ? 'Your account could not be loaded.' : 'Loading your account…'}</p>{error && <button onClick={() => reload().catch(e => setError(e.message))}>Try again</button>}</div> : !data.authenticated ? <section className={styles.loginLayout}>
         <div className={styles.welcome}><span className={styles.eyebrow}>Good food. one less errand.</span><h1>Their favorite fuel.<br/><em>Your kind of easy.</em></h1><p>Full bowls and fewer bag runs. Your dog food, delivery and monthly plan, together in one simple place.</p><div className={styles.bagStage}><div className={styles.bags}>{data.products.map(p => <img key={p.id} src={`/assets/edf/${p.formula_code}.webp`} width='130' height='200' alt={`${p.name}, ${p.bag_weight_lb} lb bag`}/>)}</div><span className={styles.stageCaption}>Extreme dog fuel <span>Delivered by your local team</span></span></div><div className={styles.welcomeBenefits}><span><AccountIcon name='check'/>Free route-day delivery</span><span><AccountIcon name='check'/>One-time or monthly</span></div></div>
-        <form key={authMode} className={`${styles.card} ${styles.authCard}`} onSubmit={authenticate}><span className={styles.loginIcon}><AccountIcon name='lock'/></span><span className={styles.eyebrow}>Your dog food account</span><h2>{authMode === 'signup' ? 'Create your account' : authMode === 'forgot' ? 'Reset your password' : authMode === 'redeem' ? 'Choose your password' : 'Welcome back'}</h2><p className={styles.muted}>{authMode === 'signup' ? 'We’ll email a one-use temporary password. Use the email on your existing dog-food orders to link your profile. You’ll choose your own password after signing in.' : authMode === 'forgot' ? 'Enter your account email for a secure reset link.' : authMode === 'redeem' ? 'Use at least 8 characters, one capital letter and one special character. Type it twice to confirm.' : 'Sign in to order, track deliveries and manage your monthly plan.'}</p>
+        <form key={authMode} className={`${styles.card} ${styles.authCard}`} onSubmit={authenticate}><span className={styles.loginIcon}><AccountIcon name='lock'/></span><span className={styles.eyebrow}>Your dog food account</span><h2>{authMode === 'signup' ? 'Create your account' : authMode === 'forgot' ? 'Reset your password' : authMode === 'redeem' ? 'Choose your password' : 'Welcome back'}</h2><p className={styles.muted}>{authMode === 'signup' ? 'We’ll verify your email first. Then finish signup with your name, phone number and a password. Use the email on any existing dog food orders to link your profile.' : authMode === 'forgot' ? 'Enter your account email for a secure reset link.' : authMode === 'redeem' ? 'Use at least 8 characters, one capital letter and one special character. Type it twice to confirm.' : 'Sign in to order, track deliveries and manage your monthly plan.'}</p>
           {authMode !== 'redeem' && <label>Email<input name='email' type='email' autoComplete='email' required maxLength={254} defaultValue={email} onChange={e => setEmail(e.target.value)} /></label>}
+          {authMode==='redeem'&&signupDetailsRequired&&<><label>First name<input name='firstName' autoComplete='given-name' maxLength={80} required /></label><label>Last name<input name='lastName' autoComplete='family-name' maxLength={80} required /></label><label>Phone number<input name='phone' type='tel' autoComplete='tel' maxLength={40} required /></label></>}
           {['login','redeem'].includes(authMode) && <PasswordFields creating={authMode==='redeem'}/> }
           <TurnstileWidget action='dog_food_account' onToken={setVerification} resetKey={reset} /><button className={styles.primary} disabled={busy || !verification}>{busy ? 'Please wait…' : authMode === 'signup' ? 'Send verification email' : authMode === 'forgot' ? 'Send reset link' : authMode === 'redeem' ? 'Save password & sign in' : 'Sign in'}</button>
           <div className={styles.authLinks}><button type='button' onClick={() => {setAuthMode(authMode === 'login' ? 'signup' : 'login');setError('');setNotice('');}}>{authMode === 'login' ? 'Create an account' : 'Back to sign in'}</button>{authMode === 'login' && <button type='button' onClick={() => setAuthMode('forgot')}>Forgot password?</button>}</div><p className={styles.authFine}>Having trouble? <a href='tel:+14192622371'>419-262-2371</a>. Sweep & Go credentials do not sign you into this portal.</p>

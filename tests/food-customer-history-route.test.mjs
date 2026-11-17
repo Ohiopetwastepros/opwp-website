@@ -9,7 +9,7 @@ import {FoodError} from '../lib/dog-food-operations.mjs';
 
 test('owner customer history retains exact formula, quantity, receipt and handoff details without another customer\'s sale',async()=>{
   const fixture=setup(),first=await fixture.save();
-  const secondCustomer=await hub.foodCustomerCommand(fixture.db,customerBody({firstName:'Second',lastName:'Buyer',phone:'4195550197',email:'',dogCount:'',frequency:'',smsConsent:false}),'owner',{office:true});
+  const secondCustomer=await hub.foodCustomerCommand(fixture.db,customerBody({firstName:'Second',lastName:'Buyer',phone:'4195550197',email:'second@example.test',dogCount:'',frequency:'',smsConsent:false}),'owner',{office:true});
   const second=await fixture.save({customerId:secondCustomer.id,items:[{productId:'edf-22-12-pink-40',quantity:2}]});
   fixture.sql.prepare("INSERT INTO dog_food_payments(id,order_id,provider,idempotency_key,amount_cents,status) VALUES('synthetic-receipt',?,'staff_cash','synthetic-receipt',6357,'captured')").run(first.orderId);
   let authorized=false;
