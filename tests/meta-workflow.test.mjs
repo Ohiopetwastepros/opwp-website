@@ -89,6 +89,26 @@ test("storage is transactional and retries resolve to one lead, one Airtable rec
   assert.equal(select(db, "submissions").length, 2);
 });
 
+test("confirmation storage, mocked Quo delivery and message history preserve the exact copy and newlines", async () => {
+  const db = database(); approve(db); const env = environment(db);
+  await storeMetaLead(db, env, form("lead-1", { full_name: "Jason Example", zip_code: "43551" }), event());
+  const expected = buildMetaConfirmation({ name: "Jason Example", number_of_dogs: 2, zip: "43551", clean_up_frequency: "Weekly" });
+  const queued = select(db, "meta_sms_jobs").find((job) => job.purpose === "confirmation");
+  assert.equal(queued.message_body, expected);
+  assert.match(expected, /\n\nReply STOP to opt out$/);
+  assert.ok(expected.length <= 1000);
+  const sent = [];
+  const result = await processMetaConfirmations(env, { now: noon, fetcher: async (url, request) => {
+    assert.equal(url, "https://api.openphone.com/v1/messages");
+    sent.push(JSON.parse(request.body).content);
+    return Response.json({ data: { id: "copy-preserved-sms" } });
+  } });
+  assert.equal(result.sent, 1);
+  assert.deepEqual(sent, [expected]);
+  assert.equal(select(db, "meta_sms_jobs").find((job) => job.id === queued.id).message_body, expected);
+  assert.equal(select(db, "lead_messages").find((message) => message.provider_message_id === "copy-preserved-sms").body, expected);
+});
+
 test("release gates, no consent, email preference, missing data, quiet hours and suppression fail closed", async () => {
   for (const [name, extra, change] of [
     ["no consent", { sms_consent: "" }, {}], ["email preference", { contact_preference: "email" }, {}],
@@ -167,6 +187,8 @@ test("reply branches and exact website pricing progress to audited signup withou
   }
   const correction = nextMetaResponse({ lead, text: "actually 3 dogs", confirmationSent: true });
   assert.equal(correction.state.details.number_of_dogs, 3); assert.equal(correction.state.expected, "confirm");
+  assert.equal(correction.response, "Hello ExampleLead, this is Craig with Ohio Pet Waste Pros. Thanks for clarifying. You have 3 dogs, live in 43615, and would like cleanups weekly. Is that correct?\n\nReply STOP to opt out");
+  assert.doesNotMatch(correction.response, /automated confirmation|[\u2013\u2014]/i);
 });
 
 test("streamed webhook size is bounded before buffering the whole body", async () => {
