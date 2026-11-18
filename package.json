@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:cloudflare": "opennextjs-cloudflare build && node scripts/patch-open-next-worker.mjs && node scripts/patch-quote-follow-up-worker.mjs",
+    "build:cloudflare": "opennextjs-cloudflare build && node scripts/patch-open-next-worker.mjs && node scripts/patch-quote-follow-up-worker.mjs && node scripts/check-quote-follow-up-worker.mjs",
     "check:worker-startup": "wrangler check startup",
-    "preview": "opennextjs-cloudflare build && node scripts/patch-open-next-worker.mjs && node scripts/patch-quote-follow-up-worker.mjs && opennextjs-cloudflare preview",
+    "preview": "opennextjs-cloudflare build && node scripts/patch-open-next-worker.mjs && node scripts/patch-quote-follow-up-worker.mjs && node scripts/check-quote-follow-up-worker.mjs && opennextjs-cloudflare preview",
     "deploy": "node scripts/deploy.mjs",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv",
     "db:migrate:local": "node scripts/require-private-migrations.mjs && wrangler d1 migrations apply opwp-backend --local",

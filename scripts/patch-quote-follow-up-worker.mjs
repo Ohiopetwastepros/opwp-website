@@ -1,36 +1,39 @@
 import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { checkQuoteFollowUpWorker } from "./check-quote-follow-up-worker.mjs";
 
-const workerPath = new URL("../.open-next/worker.js", import.meta.url);
-let source = await fs.readFile(workerPath, "utf8");
-
-if (!source.includes('from "../lib/quote-follow-up-delivery.js"')) {
+export function patchQuoteFollowUpWorker(source) {
   const importMarker = "export default {";
+  const scheduledMarker = "async scheduled(controller, env, ctx) {";
   if (!source.includes(importMarker)) throw new Error("OpenNext worker export marker was not found for quote follow-up scheduling.");
-  source = source.replace(importMarker, `import { runScheduledQuoteFollowUps } from "../lib/quote-follow-up-delivery.js";\n${importMarker}`);
+  if (!source.includes(scheduledMarker)) throw new Error("OpenNext scheduled handler marker was not found for quote follow-up scheduling.");
+
+  for (const [name, file] of [
+    ["runScheduledQuoteFollowUps", "quote-follow-up-delivery.js"],
+    ["runScheduledYardOps", "lead-assistant.js"],
+    ["runFailedPaymentRecovery", "failed-payment-reconciliation.js"],
+    ["processFieldMessages", "field-messages.js"],
+  ]) {
+    if (!source.includes(`from "../lib/${file}"`)) {
+      source = source.replace(importMarker, `import { ${name} } from "../lib/${file}";\n${importMarker}`);
+    }
+  }
+
+  // Other independent */10 tasks must not suppress quote processing.
+  if (!/\brunScheduledQuoteFollowUps\s*\(\s*env\b/.test(source)) {
+    source = source.replace(scheduledMarker, `${scheduledMarker}
+        if (controller.cron === "*/10 * * * *") ctx.waitUntil(
+            runWithCloudflareRequestContext(new Request("https://opwp.internal/quote-follow-ups"), env, ctx,
+                () => Promise.all([runScheduledQuoteFollowUps(env), runScheduledYardOps(env), runFailedPaymentRecovery(env), processFieldMessages(env)]))
+        );`);
+  }
+  checkQuoteFollowUpWorker(source);
+  return source;
 }
 
-if (!source.includes('from "../lib/lead-assistant.js"')) {
-  const importMarker = "export default {";
-  if (!source.includes(importMarker)) throw new Error("OpenNext worker export marker was not found for YardOps scheduling.");
-  source = source.replace(importMarker, `import { runScheduledYardOps } from "../lib/lead-assistant.js";\n${importMarker}`);
-}
-
-if (!source.includes('controller.cron === "*/10 * * * *"')) {
-  const taskMarker = "const task = ";
-  if (!source.includes(taskMarker)) throw new Error("OpenNext scheduled task marker was not found for quote follow-up scheduling.");
-  source = source.replace(taskMarker, `const task = controller.cron === "*/10 * * * *"\n            ? runWithCloudflareRequestContext(new Request("https://opwp.internal/quote-follow-ups"), env, ctx, () => Promise.all([runScheduledQuoteFollowUps(env), runScheduledYardOps(env)]))\n            : `);
-}
-
-await fs.writeFile(workerPath, source);
-
-if (!source.includes('from "../lib/failed-payment-reconciliation.js"')) {
-  source=source.replace('export default {','import { runFailedPaymentRecovery } from "../lib/failed-payment-reconciliation.js";\nexport default {');
-  source=source.replace('runScheduledQuoteFollowUps(env), runScheduledYardOps(env)', 'runScheduledQuoteFollowUps(env), runScheduledYardOps(env), runFailedPaymentRecovery(env)');
-  await fs.writeFile(workerPath,source);
-}
-
-if (!source.includes('from "../lib/field-messages.js"')) {
-  source=source.replace('export default {','import { processFieldMessages } from "../lib/field-messages.js";\nexport default {');
-  source=source.replace('runScheduledQuoteFollowUps(env), runScheduledYardOps(env)', 'runScheduledQuoteFollowUps(env), runScheduledYardOps(env), processFieldMessages(env)');
-  await fs.writeFile(workerPath,source);
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const workerPath = new URL("../.open-next/worker.js", import.meta.url);
+  const source = await fs.readFile(workerPath, "utf8");
+  await fs.writeFile(workerPath, patchQuoteFollowUpWorker(source));
 }
