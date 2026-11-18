@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TurnstileWidget from "@/components/TurnstileWidget";
 import MonthlyPriceBreakdown from "./MonthlyPriceBreakdown";
+import { accountSubmitState, questionSubmitState } from "@/lib/quote-form-state.mjs";
 import {
   PRICING, YARD_TIERS, CHARGE_LABEL,
   isInArea, haulAwayPrice, calcLocalQuote,
@@ -106,6 +107,7 @@ export default function QuoteForm() {
   const [additionalComments,  setAdditionalComments]  = useState("");
   const [cardChoice,          setCardChoice]          = useState("");
   const [serviceQuestion,     setServiceQuestion]     = useState("");
+  const [createAccountBeforeCard, setCreateAccountBeforeCard] = useState(false);
   const [termsAgreed,         setTermsAgreed]         = useState(false);
 
   // ── OOA lead capture ────────────────────────────────────────────────────
@@ -155,10 +157,11 @@ export default function QuoteForm() {
     sync("first_name", firstName, setFirstName);
     sync("last_name", lastName, setLastName);
     sync("email", email, setEmail);
+    sync("cell_phone_number", phone, setPhone);
     sync("home_address", address, setAddress);
     sync("city", city, setCity);
     sync("state", usState, setUsState, (value) => value.toUpperCase().slice(0, 2));
-  }, [firstName, lastName, email, address, city, usState]);
+  }, [firstName, lastName, email, phone, address, city, usState]);
 
   useEffect(() => {
     if (step !== 2) return undefined;
@@ -296,6 +299,7 @@ export default function QuoteForm() {
             follow_up_consent: true,
             dogs, frequency, last_cleaned: lastCleaned, yard_size: yardSize,
             quote_monthly: monthlyTotal,
+            quote_one_time_range: base.oneTimeRange,
             selected_addons: Object.keys(selected).filter((key) => selected[key]),
             coupon: coupon || undefined,
           }),
@@ -309,7 +313,7 @@ export default function QuoteForm() {
     };
     capture();
     return () => { cancelled = true; };
-  }, [funnelId, inArea, phoneReady, emailReady, followupConsent, zipClean, phone, email, dogs, frequency, lastCleaned, yardSize, monthlyTotal, selected, coupon, step, partialRetry]);
+  }, [funnelId, inArea, phoneReady, emailReady, followupConsent, zipClean, phone, email, dogs, frequency, lastCleaned, yardSize, monthlyTotal, base.oneTimeRange, selected, coupon, step, partialRetry]);
 
   // If the dog count pushes the current frequency past its cap (e.g. Monthly + 2 dogs),
   // fall back to Weekly so the form never sits on a disabled option.
@@ -320,13 +324,12 @@ export default function QuoteForm() {
     }
   }, [dogs, frequency]);
 
-  // Step 2 gate
-  const step2Valid =
-    firstName.trim() && lastName.trim() &&
-    email.trim().includes("@") &&
-    address.trim() && city.trim() && usState.trim() &&
-    safeDog && gateLocation.trim() && garbageCan.trim() &&
-    heardAbout && cardChoice && (cardChoice !== "no" || serviceQuestion.trim()) && termsAgreed;
+  const accountState = accountSubmitState({
+    firstName, lastName, email, phone, address, city, usState, safeDog,
+    gateLocation, garbageCan, heardAbout, cardChoice, serviceQuestion,
+    createAccountBeforeCard, termsAgreed, token: onboardTurnstileToken, busy: submitting,
+  });
+  const showAccountFields = cardChoice === "yes" || createAccountBeforeCard;
 
   // ── Build account note ──────────────────────────────────────────────────
   const buildAccountNote = () => {
@@ -394,8 +397,13 @@ export default function QuoteForm() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
+    if (submitting) return;
+    if (!accountState.valid) {
+      setSubmitError(accountState.error);
+      return;
+    }
     if (!onboardTurnstileToken) {
-      setSubmitError("Please complete the verification before starting service.");
+      setSubmitError("Please complete the verification before creating your account.");
       return;
     }
     setSubmitting(true);
@@ -450,10 +458,17 @@ export default function QuoteForm() {
     }
   };
 
-  const qValid = qName.trim() && qText.trim() &&
-    (qPhone.replace(/\D/g, "").length >= 10 || qEmail.trim().includes("@"));
-  const handleQuestionSubmit = async () => {
-    if (!qValid || !qTurnstileToken || qSending) return;
+  const questionState = questionSubmitState({ name: qName, phone: qPhone, email: qEmail, question: qText, token: qTurnstileToken, busy: qSending });
+  const signupQuestion = { name: [firstName, lastName].filter(Boolean).join(" ").trim(), phone, email, question: serviceQuestion };
+  const signupQuestionState = questionSubmitState({ ...signupQuestion, token: qTurnstileToken, busy: qSending });
+  const handleQuestionSubmit = async (fromSignup = false) => {
+    if (qSending) return;
+    const state = fromSignup ? signupQuestionState : questionState;
+    if (!state.ready) {
+      setQError(state.error);
+      return;
+    }
+    const contact = fromSignup ? signupQuestion : { name: qName, phone: qPhone, email: qEmail, question: qText };
     setQSending(true);
     setQError("");
     // Reuse the lead endpoint so the question rides in with the live quote context.
@@ -464,9 +479,10 @@ export default function QuoteForm() {
         body: JSON.stringify({
           source: "question",
           funnel_id: funnelId,
-          name: qName, phone: qPhone, email: qEmail, question: qText,
+          ...contact,
           zip: zipClean, dogs, frequency, last_cleaned: lastCleaned, yard_size: yardSize,
           quote_monthly: monthlyTotal,
+          quote_one_time_range: base.oneTimeRange,
           coupon: coupon || undefined,
           selected_addons: Object.keys(selected).filter((k) => selected[k]),
           turnstileToken: qTurnstileToken,
@@ -475,6 +491,7 @@ export default function QuoteForm() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.ok !== true) throw new Error(data.error || "We could not send your question.");
       setQSent(true);
+      if (fromSignup) setStep("question-sent");
     } catch (error) {
       setQError(error?.message || `Please retry or call/text ${ORG_PHONE}.`);
       setQTurnstileReset((value) => value + 1);
@@ -484,6 +501,15 @@ export default function QuoteForm() {
   };
 
   // ── Terminal states ────────────────────────────────────────────────────
+  if (step === "question-sent") {
+    return (
+      <div role="status" style={{ background: "#fff", borderRadius: "22px", padding: "40px 34px", textAlign: "center" }}>
+        <h2 style={{ color: "#1A3C5A" }}>We received your question.</h2>
+        <p style={{ color: "#46545d", lineHeight: 1.6 }}>We&apos;ll contact you with an answer using the phone or email you provided. Your quote details are included.</p>
+      </div>
+    );
+  }
+
   if (step === "done") {
     return (
       <div style={{ background: "#fff", borderRadius: "22px", padding: "40px 34px", boxShadow: "0 30px 60px -28px rgba(0,0,0,.5)", textAlign: "center" }}>
@@ -892,7 +918,7 @@ export default function QuoteForm() {
           {/* CTA */}
           <button
             type="button"
-            onClick={() => { if (canContinue) { window.scrollTo(0, 0); setStep(2); } }}
+            onClick={() => { if (canContinue) { setQTurnstileToken(""); setOnboardTurnstileToken(""); window.scrollTo(0, 0); setStep(2); } }}
             style={{
               display: "block", width: "100%", textAlign: "center",
               background: canContinue ? "#4F9E3A" : "#bcd3b1", color: "#fff",
@@ -924,6 +950,7 @@ export default function QuoteForm() {
                   if (!qPhone && phone) setQPhone(phone);
                   if (!qEmail && email) setQEmail(email);
                 }
+                setQTurnstileToken("");
                 setShowQuestions((v) => !v);
               }}
               style={{
@@ -989,18 +1016,23 @@ export default function QuoteForm() {
                     {qError ? <div role="alert" style={{ color: "#8a3b36", fontSize: "12px", margin: "8px 0" }}>{qError}</div> : null}
                     <button
                       type="button"
-                      onClick={handleQuestionSubmit}
-                      disabled={!qValid || !qTurnstileToken || qSending}
+                      onClick={() => handleQuestionSubmit()}
+                      disabled={questionState.disabled}
+                      aria-disabled={!questionState.ready}
+                      aria-describedby="quote-question-missing"
                       style={{
                         display: "block", width: "100%", textAlign: "center",
-                        background: qValid && !qSending ? "#4F9E3A" : "#bcd3b1", color: "#fff",
+                        background: questionState.ready ? "#4F9E3A" : "#bcd3b1", color: "#fff",
                         border: "none", borderRadius: "11px", padding: "14px",
                         fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: "16px",
-                        cursor: qValid && !qSending ? "pointer" : "not-allowed",
+                        cursor: questionState.ready ? "pointer" : "not-allowed",
                       }}
                     >
                       {qSending ? "Sending…" : "Send my question"}
                     </button>
+                    <p id="quote-question-missing" style={{ color: "#63727c", fontSize: "12px" }}>
+                      {qSending ? "Sending your question…" : questionState.missing.length ? `To send your question: ${questionState.missing.join(", ")}.` : "Ready to send your question."}
+                    </p>
                   </>
                 )}
               </div>
@@ -1018,7 +1050,7 @@ export default function QuoteForm() {
     <form ref={signupFormRef} onSubmit={(event) => event.preventDefault()} onInput={syncSignupAutofill} autoComplete="on" style={{ background: "#fff", borderRadius: "22px", padding: "34px", boxShadow: "0 30px 60px -28px rgba(0,0,0,.5)" }}>
       <StepBar />
 
-      <button type="button" onClick={() => setStep(1)} style={{
+      <button type="button" onClick={() => { setQTurnstileToken(""); setOnboardTurnstileToken(""); setStep(1); }} style={{
         background: "none", border: "none", color: "#4F9E3A", fontWeight: 700,
         fontSize: "13px", cursor: "pointer", padding: 0, marginBottom: "18px", fontFamily: "inherit",
       }}>
@@ -1026,6 +1058,13 @@ export default function QuoteForm() {
       </button>
 
       {/* Quote summary */}
+      {frequency === "one_time" && (
+        <div style={{ background: "#f3f9f0", border: "1.5px solid #c8e0be", borderRadius: "12px", padding: "14px 16px", marginBottom: "22px", fontSize: "13.5px", color: "#36424b" }}>
+          <strong style={{ color: "#1A3C5A" }}>Your one-time cleanup: </strong>
+          {dogs} dog{dogs > 1 ? "s" : ""}
+          <div style={{ marginTop: "10px" }}>{base.oneTimeRange ? `Estimated cleanup: ${rngStr(base.oneTimeRange)}.` : "We’ll confirm your cleanup estimate with you."}</div>
+        </div>
+      )}
       {monthlyTotal != null && frequency !== "one_time" && (
         <div style={{ background: "#f3f9f0", border: "1.5px solid #c8e0be", borderRadius: "12px", padding: "14px 16px", marginBottom: "22px", fontSize: "13.5px", color: "#36424b" }}>
           <strong style={{ color: "#1A3C5A" }}>Your plan: </strong>
@@ -1037,6 +1076,15 @@ export default function QuoteForm() {
         </div>
       )}
 
+      <div style={{ marginBottom: "22px" }}>
+        <div style={lbl}>How would you like to continue? {req}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+          <Btn active={cardChoice === "yes"} onClick={() => { if (cardChoice === "yes") return; setCardChoice("yes"); setCreateAccountBeforeCard(false); setQTurnstileToken(""); setOnboardTurnstileToken(""); setQError(""); }}>Sign up and add a card</Btn>
+          <Btn active={cardChoice === "no"} onClick={() => { if (cardChoice === "no") return; setCardChoice("no"); setCreateAccountBeforeCard(false); setQTurnstileToken(""); setOnboardTurnstileToken(""); setQError(""); }}>I have a question first</Btn>
+        </div>
+        <p style={{ color: "#63727c", fontSize: "13px", lineHeight: 1.5 }}>You can send a question before signing up. A card on file is required before service can start.</p>
+      </div>
+
       {/* ── Contact ── */}
       <div style={secHead(true)}>Contact Information</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
@@ -1045,14 +1093,41 @@ export default function QuoteForm() {
           <input name="first_name" autoComplete="given-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} style={inp} />
         </div>
         <div>
-          <label style={lbl}>Last Name {req}</label>
+          <label style={lbl}>Last Name {cardChoice === "no" && !createAccountBeforeCard ? opt : req}</label>
           <input name="last_name" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)} style={inp} />
         </div>
       </div>
       <div style={{ marginBottom: "14px" }}>
-        <label style={lbl}>Email Address {req}</label>
+        <label style={lbl}>Email Address {cardChoice === "no" && !createAccountBeforeCard ? opt : req}</label>
         <input name="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@example.com" style={inp} />
       </div>
+      <div style={{ marginBottom: "14px" }}>
+        <label style={lbl}>Phone Number {cardChoice === "no" && !createAccountBeforeCard ? opt : req}</label>
+        <input name="cell_phone_number" autoComplete="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={inp} />
+      </div>
+
+      {cardChoice === "no" && (
+        <div style={{ background: "#f7f9fb", border: "1.5px solid #e3e9ef", borderRadius: "14px", padding: "18px", marginBottom: "22px" }}>
+          <h3 style={{ marginTop: 0, color: "#1A3C5A" }}>Ask before you commit</h3>
+          <p style={{ color: "#63727c", fontSize: "13px", lineHeight: 1.5 }}>Enter your name, a phone or email, and your question. We&apos;ll include your quote details and contact you with an answer.</p>
+          <label htmlFor="signup-service-question" style={lbl}>What would you like to ask? {req}</label>
+          <textarea id="signup-service-question" value={serviceQuestion} onChange={(event) => setServiceQuestion(event.target.value)} maxLength={1500} placeholder="Enter your question." style={{ ...inp, resize: "vertical", minHeight: "88px", marginBottom: "12px" }} />
+          <TurnstileWidget action="quote_question" onToken={setQTurnstileToken} resetKey={qTurnstileReset} />
+          {qError && <p role="alert" style={{ color: "#8a3b36", fontSize: "13px" }}>{qError}</p>}
+          <button type="button" onClick={() => handleQuestionSubmit(true)} disabled={signupQuestionState.disabled} aria-disabled={!signupQuestionState.ready} aria-describedby="signup-question-missing" style={{ width: "100%", background: signupQuestionState.ready ? "#4F9E3A" : "#bcd3b1", color: "#fff", border: "none", borderRadius: "11px", padding: "15px", fontWeight: 800, fontSize: "17px", fontFamily: "inherit", cursor: signupQuestionState.ready ? "pointer" : "not-allowed" }}>
+            {qSending ? "Sending…" : "Send my question"}
+          </button>
+          <p id="signup-question-missing" style={{ color: "#63727c", fontSize: "12px" }}>
+            {qSending ? "Sending your question…" : signupQuestionState.missing.length ? `To send your question: ${signupQuestionState.missing.join(", ")}.` : "Ready to send your question."}
+          </p>
+          <label style={{ display: "flex", gap: "10px", alignItems: "flex-start", fontSize: "13px", color: "#46545d", lineHeight: 1.5, marginTop: "20px", cursor: "pointer" }}>
+            <input type="checkbox" checked={createAccountBeforeCard} onChange={(event) => { setCreateAccountBeforeCard(event.target.checked); setOnboardTurnstileToken(""); }} style={{ marginTop: "3px" }} />
+            <span>Optional: create my account now and contact me before adding a card. I&apos;ll complete the signup details below.</span>
+          </label>
+        </div>
+      )}
+
+      {showAccountFields && <>
       <div style={{ marginBottom: "14px" }}>
         <label style={lbl}>Home Address {req}</label>
         <input name="home_address" autoComplete="street-address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St" style={inp} />
@@ -1153,26 +1228,6 @@ export default function QuoteForm() {
       </div>
 
       {/* ── How heard + comments ── */}
-      <div style={{ marginBottom: "22px" }}>
-        <label style={lbl}>A card on file is required before service can start. Would you like to add one now? {req}</label>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-          <Btn active={cardChoice === "yes"} onClick={() => { setCardChoice("yes"); setServiceQuestion(""); }}>Yes</Btn>
-          <Btn active={cardChoice === "no"} onClick={() => setCardChoice("no")}>No, I have a question first</Btn>
-        </div>
-        {cardChoice === "no" && (
-          <div style={{ marginTop: "12px" }}>
-            <label style={lbl}>What would you like to ask before adding a card? {req}</label>
-            <textarea
-              value={serviceQuestion}
-              onChange={(event) => setServiceQuestion(event.target.value)}
-              maxLength={1500}
-              placeholder="Enter your question and we'll contact you before service begins."
-              style={{ ...inp, resize: "vertical", minHeight: "88px" }}
-            />
-          </div>
-        )}
-      </div>
-
       <div style={{ marginBottom: "14px" }}>
         <label style={lbl}>How did you hear about us? {req}</label>
         <select value={heardAbout} onChange={(e) => setHeardAbout(e.target.value)} style={inp}>
@@ -1201,7 +1256,7 @@ export default function QuoteForm() {
 
       {/* Error */}
       <div style={{ fontSize: "12px", fontWeight: 700, color: "#63727c", marginBottom: "7px" }}>Security verification</div>
-      <TurnstileWidget action="onboarding" onToken={setOnboardTurnstileToken} resetKey={onboardTurnstileReset} />
+      <TurnstileWidget key={cardChoice} action="onboarding" onToken={setOnboardTurnstileToken} resetKey={onboardTurnstileReset} />
       {submitError && (
         <div style={{ background: "#fff5f4", border: "1.5px solid #f1c9c5", borderRadius: "12px", padding: "14px 16px", marginBottom: "18px", fontSize: "13.5px", color: "#8a3b36", lineHeight: 1.5 }}>
           {submitError}
@@ -1211,22 +1266,28 @@ export default function QuoteForm() {
       {/* Submit */}
       <button
         type="button"
-        onClick={() => { if (step2Valid && !submitting) handleSubmit(); }}
-        disabled={!step2Valid || !onboardTurnstileToken || submitting}
+        onClick={handleSubmit}
+        disabled={accountState.disabled}
+        aria-disabled={!accountState.ready}
+        aria-describedby="signup-missing"
         style={{
           display: "block", width: "100%", textAlign: "center",
-          background: step2Valid ? "#4F9E3A" : "#bcd3b1", color: "#fff",
+          background: accountState.ready ? "#4F9E3A" : "#bcd3b1", color: "#fff",
           border: "none", borderRadius: "12px", padding: "17px",
           fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: "18px",
-          cursor: step2Valid ? "pointer" : "not-allowed",
-          boxShadow: step2Valid ? "0 14px 28px -12px rgba(79,158,58,.7)" : "none",
+          cursor: accountState.ready ? "pointer" : "not-allowed",
+          boxShadow: accountState.ready ? "0 14px 28px -12px rgba(79,158,58,.7)" : "none",
         }}
       >
-        {submitting ? "Setting up your account…" : "Confirm & Start My Service →"}
+        {submitting ? "Setting up your account…" : cardChoice === "no" ? "Create my account & contact me" : "Confirm & Start My Service →"}
       </button>
+      <p id="signup-missing" style={{ color: "#63727c", fontSize: "12px", lineHeight: 1.5 }}>
+        {submitting ? "Setting up your account…" : accountState.missing.length ? `To create your account: ${accountState.missing.join(", ")}.` : "Ready to create your account."}
+      </p>
       <div style={{ textAlign: "center", fontSize: "12px", color: "#9aa6ae", marginTop: "12px" }}>
-        Next step: payment setup on Sweep &amp; Go · 🔒 Secure
+        {cardChoice === "no" ? "We’ll answer your question and contact you before card setup or service begins." : "Next step: payment setup on Sweep & Go · Secure"}
       </div>
+      </>}
     </form>
   );
 }

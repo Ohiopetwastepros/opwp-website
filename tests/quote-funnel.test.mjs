@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import fs from "node:fs";
+import vm from "node:vm";
+import { accountSubmitState, questionSubmitState } from "../lib/quote-form-state.mjs";
 import { buildCustomerQuoteFollowUpEmail, buildCustomerQuoteFollowUpSms, buildSubmissionNotification, escapeEmailHtml, normalizeFunnelId, normalizeFunnelStage, PARTIAL_QUOTE_FOLLOW_UP_DELAY_MINUTES } from "../lib/quote-funnel.mjs";
 import {
   OPWP_SNG_FORM_OPTIONS,
@@ -156,4 +159,89 @@ test("onboarding failures distinguish an existing SNG account without exposing p
   const other = publicOnboardingFailure({ configured: true, data: { error: "Internal provider detail" } });
   assert.equal(other.code, "provider_rejected");
   assert.equal(other.message.includes("Internal provider detail"), false);
+});
+
+test("questions need only a name, question, and a valid phone or email", () => {
+  const base = { source: "question", name: "Test", question: "Do you remove the waste?" };
+  for (const contact of [{ phone: "4195550100" }, { email: "test@example.com" }]) {
+    const result = validateLeadInput({ ...base, ...contact });
+    assert.equal(result.ok, true);
+    assert.equal(result.value.follow_up_allowed, false);
+  }
+  assert.equal(validateLeadInput({ ...base, phone: "4195550100", question: " " }).ok, false);
+  assert.equal(validateLeadInput(base).ok, false);
+  assert.equal(validateLeadInput({ ...base, phone: "bad", email: "bad" }).ok, false);
+});
+
+test("one-time lead context preserves the estimate and coupon without a zero monthly price", () => {
+  const base = { source: "question", name: "Test", question: "Do you remove the waste?", email: "test@example.com" };
+  for (const price of [null, undefined, ""]) {
+    assert.equal(validateLeadInput({ ...base, quote_monthly: price }).value.quote_context.quote_monthly, null);
+  }
+  const result = validateLeadInput({ ...base, frequency: "one_time", quote_monthly: 0, quote_one_time_range: [75, 100], coupon: "TEST", dogs: 2, selected_addons: ["haul_away"] });
+  assert.equal(result.value.quote_context.quote_monthly, null);
+  assert.deepEqual(result.value.quote_context.quote_one_time_range, [75, 100]);
+  assert.equal(result.value.quote_context.coupon, "TEST");
+  assert.deepEqual(result.value.quote_context.selected_addons, ["haul_away"]);
+  assert.equal(validateLeadInput({ ...base, frequency: "one_time", quote_one_time_range: [100, 75] }).value.quote_context.quote_one_time_range, null);
+  assert.equal(validateLeadInput({ ...base, frequency: "once_a_week", quote_monthly: 100 }).value.quote_context.quote_monthly, 100);
+});
+
+const questionContact = { name: "Test Customer", phone: "4195550100", email: "", token: "verified" };
+const signupFields = {
+  firstName: "Test", lastName: "Customer", email: "test@example.com", phone: "4195550100",
+  address: "123 Main St", city: "Toledo", usState: "OH", safeDog: "yes", gateLocation: "left",
+  garbageCan: "right", heardAbout: "search_engine", termsAgreed: true, cardChoice: "no",
+  serviceQuestion: "Do you remove the waste?", token: "verified",
+};
+
+test("question-first cannot start service and does not require signup fields to ask", () => {
+  assert.equal(questionSubmitState({ ...questionContact, question: " " }).ready, false);
+  const questionOnly = questionSubmitState({ ...questionContact, question: "Do you remove the waste?" });
+  assert.equal(questionOnly.ready, true);
+  assert.equal(accountSubmitState({ cardChoice: "no", serviceQuestion: "Do you remove the waste?", token: "verified" }).ready, false);
+  assert.equal(accountSubmitState(signupFields).ready, false, "full signup fields do not silently opt the customer into an account");
+  assert.equal(accountSubmitState({ ...signupFields, createAccountBeforeCard: true }).ready, true);
+  assert.equal(accountSubmitState({ ...signupFields, createAccountBeforeCard: true, serviceQuestion: " " }).ready, false);
+});
+
+test("missing verification stays visibly unavailable and a tap can explain the error", () => {
+  for (const state of [
+    questionSubmitState({ ...questionContact, question: "Do you remove the waste?", token: "" }),
+    accountSubmitState({ ...signupFields, createAccountBeforeCard: true, token: "" }),
+  ]) {
+    assert.equal(state.ready, false, "ready controls green button styling");
+    assert.equal(state.disabled, false, "a verification-only problem must reach the submit handler");
+    assert.ok(state.missing.includes("complete the security check"));
+    assert.match(state.error, /Please complete the verification/);
+  }
+  const empty = questionSubmitState({ ...questionContact, question: "", token: "" });
+  assert.equal(empty.disabled, true);
+  assert.equal(empty.ready, false);
+  assert.deepEqual(empty.missing, ["enter your question", "complete the security check"]);
+  assert.equal(questionSubmitState({ ...questionContact, question: "Question?", busy: true }).ready, false);
+});
+
+test("question endpoint verifies quote_question, stores kind=question and never starts onboarding", async () => {
+  const source = fs.readFileSync(new URL("../app/api/lead/route.js", import.meta.url), "utf8").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "");
+  const calls = [];
+  const body = { source: "question", funnel_id: "1234567890abcdef", name: "Test Customer", phone: "4195550100", question: "Do you remove the waste?", frequency: "one_time", quote_monthly: null, quote_one_time_range: [75, 100], turnstileToken: "verified" };
+  const api = vm.runInNewContext(source + "\n({POST})", {
+    Response, validateLeadInput,
+    protectJsonRequest: async () => ({ body }),
+    verifyTurnstile: async (_request, token, action) => { calls.push({ action, token }); return { ok: true }; },
+    saveSubmission: async (value) => { calls.push(value); return { configured: true, id: "test-question" }; },
+    queueSubmissionNotificationSafe: async (value) => { calls.push(value); return { status: "queued" }; },
+    upsertPartialQuoteSubmission: async () => { throw new Error("Question must not update a partial quote instead of being stored"); },
+    queuePartialQuoteFollowUp: async () => { throw new Error("Question must not queue customer follow-up SMS"); },
+  });
+  const response = await api.POST(new Request("https://example.test/api/lead", { method: "POST" }));
+  assert.equal(response.status, 200);
+  assert.equal(calls[0].action, "quote_question");
+  assert.equal(calls[1].kind, "question");
+  assert.equal(calls[1].funnelId, body.funnel_id);
+  assert.equal(calls[1].body.question, body.question);
+  assert.equal(calls[1].body.quote_context.quote_monthly, null);
+  assert.equal(calls[2].type, "question");
+  assert.equal((await response.json()).smsFollowup, null);
 });
