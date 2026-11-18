@@ -23,14 +23,16 @@ const fixture = `export default {
     },
 };`;
 
-async function executeWorker(source, cron) {
+async function executeWorker(source, cron, rejectedProcessor = "") {
   const calls = [];
   const contexts = [];
+  const logs = [];
   const env = { fixture: true };
   const waits = [];
   const ctx = { waitUntil(task) { waits.push(task); } };
   const scope = {
     Request,
+    console: { log: value => logs.push(JSON.parse(value)), error: value => logs.push(JSON.parse(value)) },
     isEasternMidnight: () => false,
     isUtcHour: () => false,
     runWithCloudflareRequestContext(request, actualEnv, actualCtx, run) {
@@ -42,13 +44,15 @@ async function executeWorker(source, cron) {
     ...Object.fromEntries([...processors, ...existingTasks].map(name => [name, async actualEnv => {
       assert.equal(actualEnv, env);
       calls.push(name);
+      if (name === rejectedProcessor) throw new Error("Fixture processor failed");
+      return name;
     }])),
   };
   const runnable = source.replace(/^import .*;\r?\n/gm, "").replace("export default", "globalThis.worker =");
   vm.runInNewContext(runnable, scope);
   await scope.worker.scheduled({ cron, scheduledTime: Date.now() }, env, ctx);
-  await Promise.all(waits);
-  return { calls, contexts, waits };
+  const outcomes = await Promise.allSettled(waits);
+  return { calls, contexts, waits, logs, outcomes };
 }
 
 test("all four processors run once on */10 alongside other */10 blocks, even with preexisting imports", async () => {
@@ -59,10 +63,25 @@ test("all four processors run once on */10 alongside other */10 blocks, even wit
     assert.deepEqual(result.calls.sort(), [...processors, ...existingTasks].sort());
     assert.deepEqual(result.contexts, ["https://opwp.internal/quote-follow-ups"]);
     assert.equal(result.waits.length, existingTasks.length + 2, "quote group has its own waitUntil");
+    assert.deepEqual(result.logs, processors.map(processor => ({ event: "scheduled_follow_up_processor", processor, success: true })));
+    assert.ok(result.outcomes.every(outcome => outcome.status === "fulfilled"));
+    assert.deepEqual(Array.from(result.outcomes[0].value), processors, "completion logging preserves processor results");
     for (const cron of ["0 * * * *", "5 * * * *", "15 * * * *", "35 * * * *"]) {
-      assert.deepEqual((await executeWorker(patched, cron)).calls, []);
+      const skipped = await executeWorker(patched, cron);
+      assert.deepEqual(skipped.calls, []);
+      assert.deepEqual(skipped.logs, []);
     }
   }
+});
+
+test("processor failures are observable without logging error details or swallowing the rejection", async () => {
+  const result = await executeWorker(patchQuoteFollowUpWorker(fixture), "*/10 * * * *", "runFailedPaymentRecovery");
+  assert.deepEqual(result.logs, processors.map(processor => ({
+    event: "scheduled_follow_up_processor", processor, success: processor !== "runFailedPaymentRecovery",
+  })));
+  assert.equal(result.outcomes[0].status, "rejected");
+  assert.match(result.outcomes[0].reason.message, /Fixture processor failed/);
+  assert.equal(JSON.stringify(result.logs).includes("Fixture processor failed"), false);
 });
 
 test("missing worker markers fail before writing an incomplete patch", () => {

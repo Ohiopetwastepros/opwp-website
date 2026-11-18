@@ -25,7 +25,21 @@ export function patchQuoteFollowUpWorker(source) {
     source = source.replace(scheduledMarker, `${scheduledMarker}
         if (controller.cron === "*/10 * * * *") ctx.waitUntil(
             runWithCloudflareRequestContext(new Request("https://opwp.internal/quote-follow-ups"), env, ctx,
-                () => Promise.all([runScheduledQuoteFollowUps(env), runScheduledYardOps(env), runFailedPaymentRecovery(env), processFieldMessages(env)]))
+                () => {
+                    const report = (processor, task) => task.then(result => {
+                        console.log(JSON.stringify({ event: "scheduled_follow_up_processor", processor, success: true }));
+                        return result;
+                    }, error => {
+                        console.error(JSON.stringify({ event: "scheduled_follow_up_processor", processor, success: false }));
+                        throw error;
+                    });
+                    return Promise.all([
+                        report("runScheduledQuoteFollowUps", runScheduledQuoteFollowUps(env)),
+                        report("runScheduledYardOps", runScheduledYardOps(env)),
+                        report("runFailedPaymentRecovery", runFailedPaymentRecovery(env)),
+                        report("processFieldMessages", processFieldMessages(env)),
+                    ]);
+                })
         );`);
   }
   checkQuoteFollowUpWorker(source);
