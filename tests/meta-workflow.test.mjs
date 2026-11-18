@@ -373,6 +373,21 @@ test("test sending needs its own approval and exact tester phone and form allowl
   assert.equal(select(db, "meta_sms_jobs").find((job) => job.block_reason === "not_an_approved_test_lead").status, "cancelled");
 });
 
+test("test release approval does not override disabled assistant or required human review", async () => {
+  for (const [assistantEnabled, humanReviewRequired] of [[0, 1], [0, 0], [1, 1]]) {
+    const db = database();
+    db.sqlite.exec(`INSERT INTO meta_automation_releases VALUES ('test-only','org-opwp','meta-confirmation-v2-test','test-owner','test plan only',datetime('now','-1 minute'),NULL)`);
+    db.sqlite.prepare("UPDATE lead_automation_settings SET assistant_enabled=?,human_review_required=?").run(assistantEnabled, humanReviewRequired);
+    const env = { ...environment(db, false), META_TEST_MODE: "true", META_TEST_APPROVAL_ID: "test-only", META_TEST_RECIPIENTS: "+14195550100", META_TEST_FORM_IDS: "form-1" };
+    await storeMetaLead(db, env, form(), event());
+    let calls = 0;
+    const result = await processMetaConfirmations(env, { now: noon, fetcher: async () => { calls++; throw new Error("Review-gated job must not contact Quo"); } });
+    assert.deepEqual(result, { enabled: true, deferred: "review_or_quiet_hours", sent: 0 });
+    assert.equal(calls, 0);
+    assert.equal(select(db, "meta_sms_jobs")[0].status, "queued");
+  }
+});
+
 test("Airtable failures retry by stable ID and concurrent changes cannot be lost", async () => {
   const db = database(), env = environment(db, false), api = await handlers();
   const saved = await storeMetaLead(db, env, form(), event());
