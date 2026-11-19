@@ -37,6 +37,12 @@ import { workdayInsights } from "../lib/field-workday-insights.mjs";
 import { reviewCloseoutIdentity } from "../lib/field-sync-review.mjs";
 import { assertDeviceSession,adoptServerWorkday } from "../lib/field-workday-device.mjs";
 
+// Workday actions advance time; start every case at noon Eastern so these
+// service-day fixtures remain deterministic when the suite runs near midnight.
+test.beforeEach(t => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.parse("2026-10-13T16:00:00Z") });
+});
+
 test('successful first sign-in without an assigned route opens an empty workday safely',()=>{
   const result={day:null,member:{id:'member',organizationId:'org'},changes:[],messages:[],offlineUntil:'2026-10-13T23:00:00Z'};
   for(const saved of [null,undefined]){
@@ -647,9 +653,7 @@ test("a different authenticated account cannot replay the original account devic
     );
 });
 
-test("office safety clearance expires and wrapping cannot accept additional visits", async t => {
-  // Keep the 31-minute expiry check within one service date, even near midnight.
-  t.mock.timers.enable({ apis: ["Date"], now: Date.parse("2026-10-13T16:00:00Z") });
+test("office safety clearance expires and wrapping cannot accept additional visits", async () => {
   const f = fixture();
   await f.init();
   await f.start();
