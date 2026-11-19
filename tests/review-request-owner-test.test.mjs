@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { createHash } from 'node:crypto';
 import vm from 'node:vm';
-import { OWNER_REVIEW_TEST, assertOwnerReviewTestRecipients, runOwnerReviewTest } from '../lib/review-request-owner-test.mjs';
+import { OWNER_REVIEW_TEST, OWNER_REVIEW_RETEST, assertOwnerReviewTestRecipients, runOwnerReviewTest, runOwnerReviewRetest } from '../lib/review-request-owner-test.mjs';
 import { reviewRequestPageUrl, reviewRequestImageUrl } from '../lib/review-request-content.mjs';
 import { readBoundedBytes, readBoundedProviderJson } from '../lib/bounded-body.mjs';
 import { outboundFetch } from '../lib/outbound-request.js';
@@ -31,7 +31,7 @@ const UNCERTAIN_REASON = 'manual_owner_test_http_none_provider_acceptance_uncert
 const DELIVERY_VERIFICATION = Object.freeze({ checkedAt: new Date(NOW.getTime() - 60_000).toISOString(),
   quoNoMessagesAfter0600Z: true, outlookNoReviewEmail: true, gmailNoReviewEmail: true });
 
-function fixture() {
+function fixture(identity = OWNER_REVIEW_TEST) {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('PRAGMA foreign_keys=ON');
   sqlite.exec(readFileSync(new URL('../schema-proposals/0067_review_requests.sql', import.meta.url), 'utf8'));
@@ -79,13 +79,13 @@ function fixture() {
     RESEND_API_BASE_URL: 'https://api.resend.com', EMAIL_FROM: 'Craig@ohiopetwastepros.com',
     EMAIL_FROM_NAME: 'Craig | Ohio Pet Waste Pros', OWNER_NOTIFICATION_EMAIL: OWNER_REVIEW_TEST.email,
   };
-  function authorize(overrides = {}) {
+  function authorize(overrides = {}, selectedIdentity = identity) {
     const payload = JSON.stringify({
       tokenHash: createHash('sha256').update(CAPABILITY).digest('hex'),
       expiresAt: new Date(NOW.getTime() + 15 * 60_000).toISOString(), workerVersion: VERSION, ...overrides,
     });
     sqlite.prepare('INSERT OR REPLACE INTO airtable_cockpit_snapshots(snapshot_key,payload,status) VALUES(?,?,?)')
-      .run(OWNER_REVIEW_TEST.approvalKey, payload, 'success');
+      .run(selectedIdentity.approvalKey, payload, 'success');
   }
   let previewFailure = null, previewTech = 'tony', failureChannel = null, networkFailureChannel = null, missingIdChannel = null, malformedIdChannel = null, transportFailureName = 'Error';
   let inspectDispatch = null;
@@ -118,7 +118,7 @@ function fixture() {
     throw new Error('Unexpected provider destination');
   };
   authorize();
-  const run = (options = {}) => runOwnerReviewTest(env, {
+  const run = (options = {}, selectedIdentity = identity) => (selectedIdentity === OWNER_REVIEW_RETEST ? runOwnerReviewRetest : runOwnerReviewTest)(env, {
     phone: OWNER_REVIEW_TEST.phone, email: OWNER_REVIEW_TEST.email,
     authorization: `Bearer ${CAPABILITY}`, now: NOW, ...options,
   }, { preparePreview, verifyPreview, fetchProvider, sendSms, sendEmail });
@@ -287,6 +287,89 @@ test('one-use approval and the unique manual ledger prevent repeated and concurr
     await assert.rejects(f.run(), error => error.status === 409);
     assert.equal(f.calls.length, 2);
   } finally { f.sqlite.close(); }
+});
+
+test('the separate locked retest sends once with an old sent job present and preserves its ledger', async () => {
+  const f = fixture(OWNER_REVIEW_RETEST);
+  try {
+    assert.equal(OWNER_REVIEW_RETEST.jobId, 'manual-owner-review-test-2026-11-19-ios-preview');
+    assert.equal(OWNER_REVIEW_RETEST.approvalKey, 'manual_owner_review_test:2026-11-19-ios-preview');
+    assert.ok(Object.isFrozen(OWNER_REVIEW_RETEST));
+    for (const key of ['phone', 'email', 'from', 'phoneId']) assert.equal(OWNER_REVIEW_RETEST[key], OWNER_REVIEW_TEST[key]);
+    f.authorize({}, OWNER_REVIEW_TEST);
+    const original = await f.run({}, OWNER_REVIEW_TEST);
+    const originalRequest = f.sqlite.prepare('SELECT * FROM review_requests WHERE id=?').get(original.requestId);
+    const originalDeliveries = f.sqlite.prepare('SELECT * FROM review_request_deliveries WHERE request_id=? ORDER BY channel').all(original.requestId);
+    assert.ok(originalDeliveries.every(row => row.status === 'sent' && row.provider_message_id));
+    f.authorize({}, OWNER_REVIEW_TEST);
+    await assert.rejects(f.run({}, OWNER_REVIEW_TEST), error => error.status === 409);
+
+    f.authorize();
+    const result = await f.run();
+    assert.notEqual(result.requestId, original.requestId);
+    assert.notEqual(result.requestId, UNSENT_REQUEST_ID);
+    assert.equal(f.env.REVIEW_REQUESTS_ENABLED, 'false');
+    assert.equal(result.sms.accepted, true); assert.equal(result.email.accepted, true);
+    assert.equal(f.calls.length, 4);
+    assert.equal(f.previews.length, 2);
+    assert.deepEqual(f.previews[1], { token: result.requestId, firstName: 'Craig', tech: 'Tony' });
+    const emailCalls = f.calls.filter(call => call.channel === 'email');
+    assert.equal(emailCalls[0].options.headers['Idempotency-Key'], `manual-owner-review-test/${OWNER_REVIEW_TEST.jobId}`);
+    assert.equal(emailCalls[1].options.headers['Idempotency-Key'], `manual-owner-review-test/${OWNER_REVIEW_RETEST.jobId}`);
+    assert.notEqual(emailCalls[0].options.headers['Idempotency-Key'], emailCalls[1].options.headers['Idempotency-Key']);
+    const sms = f.calls.filter(call => call.channel === 'sms')[1].body;
+    assert.deepEqual(sms.to, [OWNER_REVIEW_TEST.phone]); assert.equal(sms.from, OWNER_REVIEW_TEST.from);
+    assert.equal(sms.content.split('\n').filter(line => line.trim()).at(-1), result.previewPageUrl);
+    assert.ok(sms.content.endsWith(`\n\nReply STOP to opt out\n\n${result.previewPageUrl}`));
+    assert.doesNotMatch(sms.content, /[\u2013\u2014]|five[- ]star/i);
+    assert.equal(f.sqlite.prepare('SELECT template_version FROM review_requests WHERE job_id=?').get(OWNER_REVIEW_RETEST.jobId).template_version,
+      'review-request-initial-cleanup-v2');
+    assert.deepEqual(f.sqlite.prepare('SELECT * FROM review_requests WHERE id=?').get(original.requestId), originalRequest);
+    assert.deepEqual(f.sqlite.prepare('SELECT * FROM review_request_deliveries WHERE request_id=? ORDER BY channel').all(original.requestId), originalDeliveries);
+    f.authorize();
+    await assert.rejects(f.run(), error => error.status === 409);
+    f.authorize({}, OWNER_REVIEW_TEST);
+    await assert.rejects(f.run({}, OWNER_REVIEW_TEST), error => error.status === 409);
+    assert.equal(f.calls.length, 4);
+    assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM review_requests').get().n, 2);
+    assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM review_request_customers').get().n, 0);
+    assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM review_request_settings').get().n, 0);
+  } finally { f.sqlite.close(); }
+});
+
+test('the retest cannot acquire the original preparation or verified-unsent continuation capability', async t => {
+  for (const approval of [
+    { preparationContinuation: true, resumeRequestId: UNSENT_REQUEST_ID },
+    { verifiedUnsentCompletion: true, resumeRequestId: UNSENT_REQUEST_ID, deliveryVerification: DELIVERY_VERIFICATION },
+    { preparationContinuation: false }, { verifiedUnsentCompletion: false }, { resumeRequestId: UNSENT_REQUEST_ID },
+  ]) await t.test(Object.keys(approval)[0], async () => {
+    const f = fixture(OWNER_REVIEW_RETEST);
+    try {
+      f.authorize(approval);
+      await assert.rejects(f.run(), error => error.status === 409);
+      assert.equal(f.calls.length, 0); assert.equal(f.previews.length, 0);
+      assert.equal(f.deliveries().length, 0);
+      assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM review_requests').get().n, 0);
+    } finally { f.sqlite.close(); }
+  });
+});
+
+test('the retest enforces the same fixed recipients and disabled automation flag before preparation', async t => {
+  for (const [name, options, flag] of [
+    ['another phone', { phone: '+12025550100' }, 'false'],
+    ['another email', { email: 'someone@example.test' }, 'false'],
+    ['multiple recipients', { phone: [OWNER_REVIEW_TEST.phone, '+12025550100'] }, 'false'],
+    ['flag true', {}, 'true'], ['flag missing', {}, undefined],
+  ]) await t.test(name, async () => {
+    const f = fixture(OWNER_REVIEW_RETEST);
+    try {
+      f.env.REVIEW_REQUESTS_ENABLED = flag;
+      await assert.rejects(f.run(options), error => error.status === (flag === 'false' ? 400 : 403));
+      assert.equal(f.calls.length, 0); assert.equal(f.previews.length, 0);
+      assert.equal(f.deliveries().length, 0);
+      assert.equal(f.writes.length, 0);
+    } finally { f.sqlite.close(); }
+  });
 });
 
 test('the one-time preparation continuation reuses the original unsent request and delivery rows', async () => {
@@ -644,28 +727,55 @@ test('a malformed provider ID on HTTP success remains uncertain with the real HT
   });
 });
 
-test('the owner endpoint requires same-origin bounded requests and never accepts extra send controls', async () => {
-  const source = readFileSync(new URL('../app/api/review-requests/owner-test/route.js', import.meta.url), 'utf8')
-    .replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, '');
+test('both owner endpoints require same-origin bounded requests and never accept extra send controls', async t => {
   const inputs = [
     [{}, {}, 403],
     [{ origin: 'https://other.example.test' }, {}, 403],
     [{ origin: 'https://www.ohiopetwastepros.com', 'sec-fetch-site': 'cross-site' }, {}, 403],
     [{ origin: 'https://www.ohiopetwastepros.com' }, { phone: OWNER_REVIEW_TEST.phone, email: OWNER_REVIEW_TEST.email, enabled: true }, 400],
     [{ origin: 'https://www.ohiopetwastepros.com' }, { phone: OWNER_REVIEW_TEST.phone, email: OWNER_REVIEW_TEST.email, content: 'override' }, 400],
+    [{ origin: 'https://www.ohiopetwastepros.com' }, { phone: OWNER_REVIEW_TEST.phone, email: OWNER_REVIEW_TEST.email, jobId: OWNER_REVIEW_TEST.jobId }, 400],
+    [{ origin: 'https://www.ohiopetwastepros.com' }, { phone: OWNER_REVIEW_TEST.phone, email: OWNER_REVIEW_TEST.email, preparationContinuation: true }, 400],
     [{ origin: 'https://www.ohiopetwastepros.com', 'content-length': '1000' }, {}, 400],
   ];
-  for (const [headers, body, status] of inputs) {
+  for (const endpoint of ['owner-test', 'owner-retest']) await t.test(endpoint, async () => {
+    const source = readFileSync(new URL(`../app/api/review-requests/${endpoint}/route.js`, import.meta.url), 'utf8')
+      .replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, '');
+    for (const [headers, body, status] of inputs) {
     let invoked = 0;
     const POST = vm.runInNewContext(`${source}\nPOST`, {
       Response, URL, Number, TextDecoder, Object, JSON, readBoundedBytes,
       getRuntimeEnv: () => ({}),
       runOwnerReviewTest: async () => { invoked++; throw new Error('Unexpected runner invocation'); },
+      runOwnerReviewRetest: async () => { invoked++; throw new Error('Unexpected runner invocation'); },
     });
-    const response = await POST(new Request('https://www.ohiopetwastepros.com/api/review-requests/owner-test/', {
+    const response = await POST(new Request(`https://www.ohiopetwastepros.com/api/review-requests/${endpoint}/`, {
       method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body),
     }));
     assert.equal(response.status, status); assert.equal(invoked, 0);
     assert.equal(response.headers.get('cache-control'), 'private, no-store');
-  }
+    }
+  });
+});
+
+test('the retest endpoint invokes only its fixed wrapper and forwards no caller send controls', async () => {
+  const source = readFileSync(new URL('../app/api/review-requests/owner-retest/route.js', import.meta.url), 'utf8')
+    .replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, '');
+  const calls = [], env = { fixed: true };
+  const POST = vm.runInNewContext(`${source}\nPOST`, {
+    Response, URL, Number, TextDecoder, Object, JSON, readBoundedBytes,
+    getRuntimeEnv: () => env,
+    runOwnerReviewTest: async () => { throw new Error('The original capability must not be selected'); },
+    runOwnerReviewRetest: async (...args) => { calls.push(args); return { kind: 'manual_owner_test' }; },
+  });
+  const response = await POST(new Request('https://www.ohiopetwastepros.com/api/review-requests/owner-retest/', {
+    method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://www.ohiopetwastepros.com', authorization: `Bearer ${CAPABILITY}` },
+    body: JSON.stringify({ phone: OWNER_REVIEW_TEST.phone, email: OWNER_REVIEW_TEST.email }),
+  }));
+  assert.equal(response.status, 200); assert.equal(calls.length, 1); assert.equal(calls[0][0], env);
+  assert.deepEqual(JSON.parse(JSON.stringify(calls[0][1])), {
+    phone: OWNER_REVIEW_TEST.phone, email: OWNER_REVIEW_TEST.email, authorization: `Bearer ${CAPABILITY}`,
+  });
+  assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
 });
