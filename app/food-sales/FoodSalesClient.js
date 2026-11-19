@@ -22,6 +22,7 @@ export default function FoodSalesClient({embedded=false}) {
   const [customerOpen,setCustomerOpen]=useState(false),[customerEdit,setCustomerEdit]=useState(null),[customerVersion,setCustomerVersion]=useState(0),[customerLoading,setCustomerLoading]=useState(false),[searchResult,setSearchResult]=useState({query:'',customers:[]}),[searchBusy,setSearchBusy]=useState(false);
   const [data,setData]=useState(null),[draft,setDraft]=useState(blank),[query,setQuery]=useState(''),[customer,setCustomer]=useState(null),[quote,setQuote]=useState(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState(''),[pending,setPending]=useState(null),[tab,setTab]=useState('sale'),[login,setLogin]=useState({email:'',password:''}),[loaded,setLoaded]=useState(false),[recentAction,setRecentAction]=useState(null);
   const [setupToken,setSetupToken]=useState(''),[passwordSetup,setPasswordSetup]=useState({password:'',passwordConfirm:''});
+  const [showLoginPassword,setShowLoginPassword]=useState(false),[showSetupPasswords,setShowSetupPasswords]=useState(false);
   useEffect(()=>{const match=/^#setup=([a-f0-9]{64})$/.exec(window.location.hash);if(match){setSetupToken(match[1]);window.history.replaceState(null,'',window.location.pathname+window.location.search);}},[]);
   const member=useRef(null),searchVersion=useRef(0),notice=useRef(null);
   useEffect(()=>{if(message||error)notice.current?.scrollIntoView({block:'nearest'});},[message,error]);
@@ -96,9 +97,10 @@ export default function FoodSalesClient({embedded=false}) {
   }
   async function signIn(event) {
     event.preventDefault();setBusy(true);setError('');
-    try{await call('/api/food-sales/session/',login);setLogin({email:'',password:''});await refresh();}catch(e){setError(e.message);}finally{setBusy(false);}
+    const normalizedLogin={...login,email:login.email.trim().toLowerCase()};setLogin(normalizedLogin);
+    try{await call('/api/food-sales/session/',normalizedLogin);setLogin({email:'',password:''});setShowLoginPassword(false);await refresh();}catch(e){setError(e.message);}finally{setBusy(false);}
   }
-  async function setStaffPassword(event){event.preventDefault();setBusy(true);setError('');try{const d=await call('/api/food-sales/session/',{action:'set_password',token:setupToken,...passwordSetup});setPasswordSetup({password:'',passwordConfirm:''});setSetupToken('');setMessage(d.message);}catch(e){setError(e.message);}finally{setBusy(false);}}
+  async function setStaffPassword(event){event.preventDefault();setBusy(true);setError('');try{const d=await call('/api/food-sales/session/',{action:'set_password',token:setupToken,...passwordSetup});setPasswordSetup({password:'',passwordConfirm:''});setShowSetupPasswords(false);setSetupToken('');setMessage(d.message);}catch(e){setError(e.message);}finally{setBusy(false);}}
   async function signOut() {
     setBusy(true);try{await call('/api/food-sales/session/',{},'DELETE');sessionStorage.removeItem('opwp-food-sales:'+member.current+':draft');setData(null);setDraft(blank());setCustomer(null);setQuote(null);setPending(null);setMessage('Signed out.');}catch(e){setError(e.message);}finally{setBusy(false);}
   }
@@ -110,7 +112,22 @@ export default function FoodSalesClient({embedded=false}) {
     {data?.office&&customerOpen&&<FoodCustomerDialog customer={customerEdit} endpoint={data?.office?'/api/admin/dog-food/customers/':'/api/food-sales/customers/'} onClose={()=>setCustomerOpen(false)} onSaved={async(c,messages)=>{setCustomer(c);setDraft(d=>({...d,customerId:c.id,newCustomer:null,addressId:'',saleCustomerType:d.customerId===c.id?d.saleCustomerType:c.customer_type==='route_partner'?'route_partner':'individual'}));setQuote(null);setCustomerOpen(false);setCustomerEdit(null);setCustomerVersion(v=>v+1);setMessage('Customer saved. '+messages.map(m=>m.channel+': '+invitationLabel(m.status)).join('; '));await refresh();}}/>}
     {!embedded&&<header className={styles.header}><a href='/food-sales/' className={styles.brand}><span className={styles.mark}>OP</span><span>OHIO PET WASTE PROS<small>Extreme Dog Fuel · Staff sales</small></span></a>{data&&<button className={styles.quiet} onClick={signOut} disabled={busy}>Sign out</button>}</header>}
     <div className={styles.content}>
-      {!data?<section className={styles.login}><span className={styles.eyebrow}>YOUR INDIVIDUAL STAFF ACCESS</span><h1>Good food.<br/>One simple sale.</h1><p>Find an existing client and record a new dog-food sale.</p>{loaded&&(setupToken?<form onSubmit={setStaffPassword}><h2>Choose your password</h2><p>Use at least 12 characters, including one capital letter and one symbol. This link can be used once.</p><label>New password<input type='password' autoComplete='new-password' minLength={12} maxLength={256} required value={passwordSetup.password} onChange={e=>setPasswordSetup({...passwordSetup,password:e.target.value})}/></label><label>Confirm password<input type='password' autoComplete='new-password' minLength={12} maxLength={256} required value={passwordSetup.passwordConfirm} onChange={e=>setPasswordSetup({...passwordSetup,passwordConfirm:e.target.value})}/></label><button className={styles.primary} disabled={busy}>Set my password</button></form>:<form onSubmit={signIn}><label>Email<input type='email' autoComplete='username' required value={login.email} onChange={e=>setLogin({...login,email:e.target.value})}/></label><label>Password<input type='password' maxLength={256} autoComplete='current-password' required value={login.password} onChange={e=>setLogin({...login,password:e.target.value})}/></label><button className={styles.primary} disabled={busy}>Sign in securely</button></form>)}<small>Access is provided by the office. Your session expires after 30 minutes of inactivity.</small></section>:<>
+      {!data?<section className={styles.login}>
+        <span className={styles.eyebrow}>YOUR INDIVIDUAL STAFF ACCESS</span><h1>Good food.<br/>One simple sale.</h1><p>Find an existing client and record a new dog-food sale.</p>
+        {loaded&&(setupToken?<form onSubmit={setStaffPassword}>
+          <h2>Choose your password</h2><p>Use at least 12 characters, including one capital letter and one symbol. This link can be used once.</p>
+          <label>New password<input type={showSetupPasswords?'text':'password'} autoComplete='new-password' minLength={12} maxLength={256} required value={passwordSetup.password} onChange={e=>setPasswordSetup({...passwordSetup,password:e.target.value})}/></label>
+          <label>Confirm password<input type={showSetupPasswords?'text':'password'} autoComplete='new-password' minLength={12} maxLength={256} required value={passwordSetup.passwordConfirm} onChange={e=>setPasswordSetup({...passwordSetup,passwordConfirm:e.target.value})}/></label>
+          <label className={`${styles.check} ${styles.passwordVisibility}`}><input type='checkbox' checked={showSetupPasswords} onChange={e=>setShowSetupPasswords(e.target.checked)}/>Show passwords</label>
+          <button className={styles.primary} disabled={busy}>Set my password</button>
+        </form>:<form onSubmit={signIn}>
+          <label>Email<input type='email' autoComplete='username' autoCapitalize='none' spellCheck={false} required value={login.email} onChange={e=>setLogin({...login,email:e.target.value})} onBlur={()=>setLogin({...login,email:login.email.trim().toLowerCase()})}/></label>
+          <label>Password<input type={showLoginPassword?'text':'password'} maxLength={256} autoComplete='current-password' required value={login.password} onChange={e=>setLogin({...login,password:e.target.value})}/></label>
+          <label className={`${styles.check} ${styles.passwordVisibility}`}><input type='checkbox' checked={showLoginPassword} onChange={e=>setShowLoginPassword(e.target.checked)}/>Show password</label>
+          <button className={styles.primary} disabled={busy}>Sign in securely</button>
+        </form>)}
+        <small>Access is provided by the office. Your session expires after 30 minutes of inactivity.</small>
+      </section>:<>
       <div className={styles.intro}><div><span className={styles.eyebrow}>EXTREME DOG FUEL</span><h1>{tab==='sale'?'Record a sale':'Your recent entries'}</h1><p>Signed in as <strong>{data.member.name}</strong></p></div><span className={styles.live}><i/>Shared customer & stock records</span></div>
       <nav className={styles.tabs} aria-label='Food sales'><button aria-current={tab==='sale'?'page':undefined} onClick={()=>setTab('sale')}>New sale</button><button aria-current={tab==='recent'?'page':undefined} onClick={()=>setTab('recent')}>Recent entries <span>{data.recent.length}</span></button></nav>
       <div ref={notice}>{message&&<div className={styles.notice} role='status'>{message}</div>}{error&&<div className={styles.error} role='alert'>{error}</div>}</div>

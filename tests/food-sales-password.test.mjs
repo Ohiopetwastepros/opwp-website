@@ -34,7 +34,7 @@ test('one-time setup enforces password bounds, stores scrypt hashes and supports
   await auth.activateFoodSalesPassword(f.db,{token,password,passwordConfirm:password});
   const stored=f.sql.prepare('SELECT password_hash FROM dog_food_sales_credentials WHERE member_id=?').get(invited.memberId).password_hash;
   assert.ok(stored.startsWith('scrypt:16384:8:5:'));assert.notEqual(stored,password);
-  const login=await auth.authenticateFoodSales(f.db,'NEW-STAFF@EXAMPLE.TEST',password);assert.equal(login.authorized,true);
+  const login=await auth.authenticateFoodSales(f.db,' \tNEW-STAFF@EXAMPLE.TEST \r\n',password);assert.equal(login.authorized,true);
   assert.equal((await auth.authenticateFoodSales(f.db,invited.email,'123456')).authorized,false);
   await assert.rejects(auth.activateFoodSalesPassword(f.db,{token,password,passwordConfirm:password}),/invalid or expired/);
   assert.equal((await auth.verifyFoodSalesRequest(new Headers({cookie:auth.FOOD_SALES_COOKIE+'='+login.token}),f.db)).authorized,true);
@@ -90,6 +90,18 @@ test('password API rejects PIN requests and cross-site requests; setup works onl
   assert.equal((await route.POST(request({email:'seller@example.test',password},'https://evil.test'))).status,403);
   const invite=await staff.inviteFoodSalesStaff(f.db,body(),'owner',origin);
   assert.equal((await route.POST(request({action:'set_password',token:tokenOf(invite),password,passwordConfirm:password}))).status,200);
+});
+
+test('password API authenticates spaced mixed-case emails and rate limits the normalized account identity',async()=>{
+  const f=setup(),invite=await staff.inviteFoodSalesStaff(f.db,body(),'owner',origin),identities=[],authEmails=[];
+  await auth.activateFoodSalesPassword(f.db,{token:tokenOf(invite),password,passwordConfirm:password});
+  const route=vm.runInNewContext(source('app/api/food-sales/session/route.js')+'\n({POST})',{...auth,authenticateFoodSales:async(db,email,value)=>{authEmails.push(email);return auth.authenticateFoodSales(db,email,value);},foodSalesContext:async()=>({env:{DB:f.db}}),salesHeaders:{'Cache-Control':'no-store'},salesError:error=>Response.json({error:error.message},{status:error.status||400}),checkRateLimit:async(_request,options)=>{identities.push(options.identity);return {allowed:true};},rateLimitResponse:()=>Response.json({error:'limited'},{status:429}),readBoundedBytes:async r=>new Uint8Array(await r.arrayBuffer()),NextResponse:{json:(body,options)=>Object.assign(Response.json(body,options),{cookies:{set(){}}})},Response,TextEncoder,TextDecoder});
+  for(const email of ['  New-Staff@Example.Test  ','\tNEW-STAFF@EXAMPLE.TEST\r\n']){
+    const result=await route.POST(new Request(origin+'/api/food-sales/session/',{method:'POST',headers:{origin},body:JSON.stringify({email,password})}));
+    assert.equal(result.status,200);assert.equal((await result.json()).member.id,invite.memberId);
+  }
+  assert.deepEqual(authEmails,['new-staff@example.test','new-staff@example.test']);
+  assert.deepEqual(identities,authEmails);
 });
 test('food staff sessions cannot administer staff access; owner MFA and same-origin checks are mandatory',async()=>{
   const f=setup();let owner=false;

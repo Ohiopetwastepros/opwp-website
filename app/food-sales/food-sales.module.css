@@ -4,6 +4,7 @@
 .customerDetails{padding:12px 16px;background:#f6f8f2;border:1px solid #dae5d4;border-radius:10px;margin-top:12px}.customerDetails p{font-size:12px;overflow-wrap:anywhere}.customerDetails button{margin-top:8px}
 
 .saleDetailsGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.shell .passwordVisibility{align-items:center;min-height:44px;margin-top:-9px;cursor:pointer}
 .pending a{display:inline-flex;align-items:center;min-height:44px;color:#224536;font-weight:700;text-decoration:underline}
 @media(max-width:700px){.saleDetailsGrid{grid-template-columns:minmax(0,1fr)}}
 
