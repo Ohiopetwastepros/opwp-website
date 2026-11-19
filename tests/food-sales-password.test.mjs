@@ -14,8 +14,10 @@ const source=path=>fs.readFileSync(new URL('../'+path,import.meta.url),'utf8').r
 test('staff identity preparation is read-only; invitation grants only viewer plus food permissions',async()=>{
   const f=setup(),before=f.sql.prepare('SELECT count(*) n FROM route_partner_members').get().n;
   const plan=await staff.prepareFoodSalesStaff(f.db,{email:'New-Staff@Example.Test'});assert.equal(plan.newMember,true);assert.equal(plan.baseRole,'viewer');
+  assert.deepEqual(plan.permissions,['Find an existing client','Add a new dog-food customer','Edit customer intake details before portal takeover','Record a new dog-food sale']);
   assert.equal(f.sql.prepare('SELECT count(*) n FROM route_partner_members').get().n,before);
   const request=body(),invited=await staff.inviteFoodSalesStaff(f.db,request,'owner',origin),token=tokenOf(invited);
+  assert.deepEqual(invited.permissions,plan.permissions);
   assert.equal(token.length,64);assert.equal(f.sql.prepare('SELECT role FROM route_partner_members WHERE id=?').get(invited.memberId).role,'viewer');
   assert.equal(f.sql.prepare('SELECT count(*) n FROM route_partner_field_credentials WHERE member_id=?').get(invited.memberId).n,0);
   assert.equal((await auth.authenticateFoodSales(f.db,request.email,password)).authorized,false);

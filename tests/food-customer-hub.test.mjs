@@ -82,11 +82,23 @@ test('office edits preserve historical order addresses, reject stale changes and
   assert.equal(f.sql.prepare("SELECT email FROM dog_food_accounts WHERE id='new-account'").get().email,body.email);
   assert.equal(f.sql.prepare("SELECT password_hash FROM dog_food_accounts WHERE id='new-account'").get().password_hash,'keep-this-hash');
 });
-test('staff cannot edit other customer records or administer the customer hub; an office header requires owner MFA',async()=>{
+test('an update without the narrow staff intake capability is denied; an office header and the admin hub require owner MFA',async()=>{
   const f=fixture(),created=await hub.foodCustomerCommand(f.db,customerBody(),'seller');await assert.rejects(hub.foodCustomerCommand(f.db,customerBody({action:'update_customer',customerId:created.id}),'seller'),/office/);
   const api=vm.runInNewContext(source('lib/food-sales-api.js')+'\n({foodSalesContext})',{getRuntimeEnv:()=>({DB:f.db,FOOD_SALES_NATIVE_ENABLED:'true'}),verifyFoodSalesRequest:async()=>({authorized:true,member:{id:'seller'}}),verifyAdminRequest:async()=>({authorized:false}),checkRateLimit:async()=>({allowed:true}),rateLimitResponse:()=>{},Response,URL});
   const denied=await api.foodSalesContext(new Request('https://example.test/api/food-sales/',{headers:{'x-food-office':'1'}}));assert.equal(denied.response.status,401);
   const owner=vm.runInNewContext(source('app/api/admin/dog-food/customers/route.js')+'\n({GET,POST})',{verifyAdminRequest:async()=>({authorized:false}),salesHeaders:{},salesError:e=>{throw e;},Response});assert.equal((await owner.GET(new Request('https://example.test/api/admin/dog-food/customers/'))).status,401);
+});
+test('staff intake permits eligible contact edits while keeping invitations, status, linking and portal takeover protected',async()=>{
+  const f=fixture(),body=customerBody(),created=await hub.foodCustomerCommand(f.db,body,'seller',{staffIntake:true});
+  const customer=await hub.readStaffFoodCustomerIntake(f.db,created.id);assert.equal(customer.canEditIntake,true);
+  const update={...body,action:'update_customer',customerId:created.id,commandId:crypto.randomUUID(),revision:customer.revision,version:customer.version,notes:'Staff revised intake'};
+  await hub.foodCustomerCommand(f.db,update,'seller',{staffIntake:true});
+  assert.equal((await hub.readStaffFoodCustomerIntake(f.db,created.id)).notes,'Staff revised intake');
+  for(const action of ['invite_customer','set_customer_status','link_portal_account','delete_customer'])await assert.rejects(hub.foodCustomerCommand(f.db,{action,commandId:crypto.randomUUID(),customerId:created.id},'seller',{staffIntake:true}),e=>e.status===403&&/office/.test(e.message));
+  f.sql.prepare("INSERT INTO dog_food_accounts(id,email,customer_id,password_hash,profile_completed_at) VALUES('taken-over',?,?,'fixture-hash',CURRENT_TIMESTAMP)").run(body.email,created.id);
+  const takenOver=await hub.readStaffFoodCustomerIntake(f.db,created.id);assert.equal(takenOver.canEditIntake,false);
+  await assert.rejects(hub.foodCustomerCommand(f.db,{...update,commandId:crypto.randomUUID(),revision:takenOver.revision,version:takenOver.version},'seller',{staffIntake:true}),e=>e.status===409&&/taken over/.test(e.message));
+  assert.equal(count(f,'dog_food_customer_messages'),0);assert.equal(count(f,'dog_food_orders'),0);assert.equal(count(f,'dog_food_payments'),0);
 });
 test('Airtable projection attaches the native ID to the known source customer without making a duplicate',async()=>{
   const f=fixture(),fields=f.service.foodSchema.tables.Customers.fields,id='rec00000000000001';

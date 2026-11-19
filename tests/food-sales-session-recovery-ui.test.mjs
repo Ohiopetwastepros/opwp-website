@@ -110,7 +110,7 @@ test('signing in as another account keeps the first account submission private a
 for(const field of ['first_name','last_name'])test('a disabled save explains missing '+field+' beside the save button without demanding phone',async()=>{
   const f=await app({selectedCustomer:{...customer,[field]:'',phone:'',contactComplete:false}});await f.prepare();
   const summary=nodes(f.render()).find(n=>n.type==='section'&&n.props.className==='summary');
-  assert.match(text(summary),/Ask the office to complete their name before saving/);
+  assert.match(text(summary),/Ask the customer or office to complete their name before saving/);
   assert.ok(nodes(summary).some(n=>n.props?.role==='status'&&/first name and last name/.test(text(n))));
   assert.doesNotMatch(text(summary),/phone/i);
   assert.equal(nodes(summary).find(n=>n.type==='button'&&text(n).startsWith('Save sale')).props.disabled,true);

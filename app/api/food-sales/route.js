@@ -24,7 +24,7 @@ export async function GET(request) {
     const products=(await db.prepare('SELECT id,name,color,formula_code,bag_weight_lb,retail_price_cents FROM dog_food_products WHERE is_active=1 AND retail_price_cents>0 ORDER BY formula_code').all()).results||[];
     const addresses=customers.length?(await db.prepare(`SELECT id,customer_id,line1,city,state,postal_code FROM dog_food_addresses WHERE customer_id IN(${customers.map(()=>'?').join(',')}) AND postal_code<>'00000' ORDER BY is_primary DESC LIMIT 60`).bind(...customers.map(c=>c.id)).all()).results||[]:[];
     const inventory=await foodSalesService.inventory(db,staffStockOptions(c.env));
-    return Response.json({ok:true,member:c.auth.member,office:Boolean(c.auth.office),policy,recordingEnabled:c.env.FOOD_SALES_RECORDING_ENABLED==='true',inventoryConfigured:inventory.configured,stockBasis:inventory.basis,customers,addresses,products:products.map(p=>({...p,available:inventory.products.find(s=>s.id===p.id)?.available??null})),recent},{headers:salesHeaders});
+    return Response.json({ok:true,member:c.auth.member,office:Boolean(c.auth.office),canEditCustomerIntake:Boolean(c.auth.office||c.auth.canEditCustomerIntake),policy,recordingEnabled:c.env.FOOD_SALES_RECORDING_ENABLED==='true',inventoryConfigured:inventory.configured,stockBasis:inventory.basis,customers,addresses,products:products.map(p=>({...p,available:inventory.products.find(s=>s.id===p.id)?.available??null})),recent},{headers:salesHeaders});
   }catch(error){return salesError(error);}
 }
 export async function POST(request) {
@@ -33,7 +33,7 @@ export async function POST(request) {
     const body=JSON.parse(new TextDecoder().decode(await readBoundedBytes(request,16384)));
     if(!body||typeof body!=='object'||Array.isArray(body))throw new FoodError('Invalid request.');
     if(!['quote','save','receipt','handoff','correction'].includes(body.action))throw new FoodError('Action is not permitted.',403);
-    if(!c.auth.office&&(!['quote','save'].includes(body.action)||body.action==='save'&&body.newCustomer))throw Object.assign(new FoodError('This staff account can only record a new food sale for an existing client. Contact the office for changes.',403),{definitive:true});
+    if(!c.auth.office&&(!['quote','save'].includes(body.action)||body.action==='save'&&body.newCustomer))throw Object.assign(new FoodError('Use the customer form to add or edit a customer. Contact the office for changes to existing sales.',403),{definitive:true});
     if(body.action==='save'&&c.env.FOOD_SALES_RECORDING_ENABLED!=='true')return Response.json({error:'New food-sale recording is paused while the office verifies inventory.',uncertain:false,definitive:true},{status:503,headers:salesHeaders});
     const result=body.action==='quote'?await foodSalesService.quote(c.env.DB,body):await foodSalesService.command(c.env.DB,body,c.auth.member.id,{office:Boolean(c.auth.office),...staffStockOptions(c.env)});
     return Response.json({ok:true,result},{headers:salesHeaders});

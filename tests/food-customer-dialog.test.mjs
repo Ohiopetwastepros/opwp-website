@@ -87,3 +87,13 @@ test('stale edit recovery is wired to a reload action rather than another save',
   const hub=fs.readFileSync(new URL('../app/admin/dog-food/CustomerHub.js',import.meta.url),'utf8');
   assert.match(hub,/onRefresh=\{\(\)=>\{setDialog\(null\);setDetail\(null\);setVersion\(v=>v\+1\)/);
 });
+
+test('the shared customer dialog posts staff add and edit submissions to its dedicated default endpoint',async()=>{
+  const requests=[],fetch=async(url,options)=>{requests.push({url,options,body:JSON.parse(options.body)});return Response.json({customer:{id:'synthetic-customer'},messages:[]});};
+  const add=dialog(fetch);fill(add,customerBody());await add.submit();
+  const edit=dialog(fetch,{customer:{id:'synthetic-customer',first_name:'Synthetic',last_name:'Buyer',revision:2,version:'synthetic-version',addresses:[]}});await edit.submit();
+  assert.equal(requests.length,2);
+  assert.deepEqual(requests.map(request=>request.body.action),['create_customer','update_customer']);
+  for(const request of requests){assert.equal(request.url,'/api/food-sales/customers/');assert.equal(request.options.method,'POST');assert.equal(request.options.headers['X-Food-Office'],undefined);}
+  assert.equal(requests[1].body.customerId,'synthetic-customer');assert.equal(requests[1].body.revision,2);assert.equal(requests[1].body.version,'synthetic-version');
+});
