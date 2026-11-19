@@ -25,7 +25,7 @@ export function renderTestMigrations(root,mode){
   // it cancels. Copy reviewed schema-only proposals into ignored test scaffolding;
   // never edit the historical templates or use this directory for production.
   const additions=read('data/production-schema-changes.json');
-  for(const number of ['0067','0068']){
+  for(const number of ['0067','0068','0069']){
     const entry=additions.files.find(row=>row.reviewedSource.startsWith('schema-proposals/'+number+'_'));
     if(!entry)throw Error('Missing reviewed inbox test schema '+number);
     const bytes=fs.readFileSync(path.join(root,entry.reviewedSource));

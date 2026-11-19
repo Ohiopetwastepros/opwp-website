@@ -125,3 +125,27 @@ FOOD_SALES_USE_PREVIOUS_COUNTS=false
 FOOD_SALES_LEGACY_WRITES_FROZEN=false
 # Separate review of actual SNG evidence is required before replacing legacy reconciliation.
 FOOD_SALES_SNG_RECONCILIATION_ENABLED=false
+
+# Lead playbook Phase 1. Leave disabled until Craig approves migration 0069 and release.
+LEAD_PLAYBOOK_ENABLED=false
+LEAD_PLAYBOOK_NOTIFY_ENABLED=false
+LEAD_CLASSIFIER_ENABLED=false
+LEAD_CLASSIFIER_PROVIDER="workers_ai"
+LEAD_CLASSIFIER_MODEL="@cf/meta/llama-3.1-8b-instruct"
+LEAD_CLASSIFIER_DAILY_CAP="100"
+LEAD_CLASSIFIER_KILL_SWITCH=true
+# Optional Workers AI binding AI must be configured separately before enabling classification.
+# Private comma-separated IDs, reviewed against real Quo payloads. Unknown authors are Sona.
+QUO_HUMAN_USER_IDS=""
+QUO_SONA_USER_IDS=""
+# Comma-separated learning-only phone numbers, in E.164 format. Never used for sending.
+QUO_LEARNING_NUMBERS=""
+QUO_BUSINESS_PHONE_NUMBER_ID=""
+QUO_INDUSTRY_PHONE_NUMBER_ID=""
+META_ALLOWED_INSTAGRAM_IDS=""
+LEAD_PLAYBOOK_HASH_KEY=""
+LEAD_PLAYBOOK_LINK_SECRET=""
+LEAD_PLAYBOOK_CRAIG_CELL=""
+LEAD_PLAYBOOK_ADMIN_ORIGIN="https://www.ohiopetwastepros.com"
+AIRTABLE_PLAYBOOK_DRAFTS_TABLE_ID=""
+AIRTABLE_PLAYBOOK_LIBRARY_TABLE_ID=""

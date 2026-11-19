@@ -39,6 +39,7 @@
   ],
   "vars": {
     "APP_ENV": "production",
+    "LEAD_PLAYBOOK_ENABLED": "false",
     "FOOD_SALES_NATIVE_ENABLED": "true",
     "FOOD_SALES_RECORDING_ENABLED": "true",
     "FOOD_SALES_USE_PREVIOUS_COUNTS": "true",

@@ -54,6 +54,14 @@ export function patchQuoteFollowUpWorker(source) {
         );`);
   }
   checkQuoteFollowUpWorker(source);
+  if (!source.includes('from "../lib/lead-playbook-ingest.js"')) {
+    source = source.replace(importMarker, `import { runScheduledPlaybook } from "../lib/lead-playbook-ingest.js";\n${importMarker}`);
+    source = source.replace(scheduledMarker, `${scheduledMarker}
+        if (controller.cron === "0 * * * *") ctx.waitUntil(
+            runWithCloudflareRequestContext(new Request("https://opwp.internal/lead-playbook"), env, ctx,
+                () => runScheduledPlaybook(env, controller.scheduledTime))
+        );`);
+  }
   return source;
 }
 

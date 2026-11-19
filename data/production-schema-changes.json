@@ -45,6 +45,11 @@
       "path": "migrations/0068_lead_inbox_trash.sql",
       "reviewedSource": "schema-proposals/0068_lead_inbox_trash.sql",
       "sha256": "f704a60455a2cac8eada1de6cc73c7125ec976545bdc2c780c6942d6e91b9643"
+    },
+    {
+      "path": "migrations/0069_lead_playbook.sql",
+      "reviewedSource": "schema-proposals/0069_lead_playbook.sql",
+      "sha256": "09a74ab79bb3cc2bf22dfda4a97c090805010f5b5c24a7e74b528bc5d4f94af3"
     }
   ]
 }

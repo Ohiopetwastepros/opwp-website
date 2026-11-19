@@ -13,6 +13,10 @@ for (const path of ["/admin/", "/office/", "/field/"]) {
 for (const path of ["/api/admin/operations-audit/", "/api/field/today/", "/api/office/route-assignment/"]) {
   assert.equal(await status(path), 401, path + " should reject unauthenticated requests");
 }
+for (const path of ["/api/admin/playbook/", "/api/admin/playbook/drafts/example-draft/", "/api/admin/playbook/library/example-candidate/"]) {
+  assert.ok([401,405].includes(await status(path)), path + " must not expose or approve drafts without MFA");
+  assert.ok([401,403].includes(await status(path, jsonPost({action:'approve'}, {origin:'https://attacker.test','sec-fetch-site':'cross-site'}))), path + " must reject cross-site approvals");
+}
 assert.ok([401,503].includes(await status('/api/food-sales/')));
 assert.equal(await status('/api/admin/dog-food/sales-review/'),401);
 assert.equal(await status('/api/admin/dog-food/staff-access/'),401);
