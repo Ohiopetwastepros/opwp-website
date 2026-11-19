@@ -119,6 +119,37 @@ test('real Dispatch type, cell_phone, numeric marketing flag and assignment enri
   } finally { f.sqlite.close(); }
 });
 
+test('review ledger and both provider messages use only Tony or Craig with Craig fallback', async t => {
+  for (const [tech, slug] of [['Tony B', 'tony'], ['Craig Bridgman', 'craig'], ['Chad', 'craig'], ['Unknown Tech', 'craig'], ['', 'craig']]) await t.test(tech || 'missing technician', async () => {
+    const f = fixture();
+    try {
+      await f.queue(f.job({ assigned_to_name: tech }));
+      assert.ok(f.rows().every(row => row.page_slug === slug));
+      assert.equal((await f.run()).sent, 2);
+      assert.ok(f.rows().every(row => row.page_slug === slug));
+      const sms = f.sends.find(send => send.channel === 'sms').options.content;
+      const email = f.sends.find(send => send.channel === 'email').options;
+      assert.ok(sms.includes(`${content.REVIEW_SITE_ORIGIN}/review/${slug}/`));
+      assert.ok(email.text.includes(`${content.REVIEW_SITE_ORIGIN}/review/${slug}/`));
+      assert.ok(email.html.includes(`${content.REVIEW_SITE_ORIGIN}/assets/photos/review-${slug}-og.jpg`));
+      assert.doesNotMatch(sms + email.text + email.html, /review\/(chad|team)\/|review-(chad|team)|photo is coming soon/);
+    } finally { f.sqlite.close(); }
+  });
+});
+
+test('a refreshed unsupported technician changes the pending page link and photo to Craig', async () => {
+  const f = fixture();
+  try {
+    const job = f.job(); await f.queue(job);
+    assert.ok(f.rows().every(row => row.page_slug === 'tony'));
+    job.assigned_to_name = 'Chad';
+    assert.equal((await f.run()).sent, 2);
+    assert.ok(f.rows().every(row => row.page_slug === 'craig'));
+    assert.match(f.sends.find(send => send.channel === 'sms').options.content, /\/review\/craig\//);
+    assert.match(f.sends.find(send => send.channel === 'email').options.html, /review-craig-og\.jpg/);
+  } finally { f.sqlite.close(); }
+});
+
 test('fresh Dispatch aliases override an older webhook job type instead of inheriting its stale initial type', async () => {
   const f = fixture();
   try {

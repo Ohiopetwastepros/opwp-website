@@ -55,7 +55,6 @@ export default function ReviewRequestsClient() {
       <strong>Review requests: {data ? (data.enabled ? "ENABLED" : "DISABLED") : "Loading status..."}</strong>
       <p>{data?.enabled ? "Eligible requests may send between 9:00 AM and 8:00 PM America/New_York." : "Review texts and emails are disabled. Public technician pages remain available."}</p>
       <p>First enabled: {data?.enabledAt ? timestamp(data.enabledAt) : "Not recorded"}. Earlier completed jobs are excluded from automatic sending.</p>
-      <p><strong>Chad's photo is missing.</strong> His public page uses a clearly labeled team-photo placeholder.</p>
     </section>
     <div className={styles.toolbar}>
       <label>Status <select value={status} onChange={event => setStatus(event.target.value)}><option value="all">All ({rows.length})</option>{STATUSES.map(value => <option key={value} value={value}>{value} ({rows.filter(row => row.status === value).length})</option>)}</select></label>
