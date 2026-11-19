@@ -647,7 +647,9 @@ test("a different authenticated account cannot replay the original account devic
     );
 });
 
-test("office safety clearance expires and wrapping cannot accept additional visits", async () => {
+test("office safety clearance expires and wrapping cannot accept additional visits", async t => {
+  // Keep the 31-minute expiry check within one service date, even near midnight.
+  t.mock.timers.enable({ apis: ["Date"], now: Date.parse("2026-10-13T16:00:00Z") });
   const f = fixture();
   await f.init();
   await f.start();
