@@ -31,7 +31,10 @@ function wrangler(args) {
 function d1(sql, name) {
   const file = path.join(receiptDir, `${name}.sql`);
   fs.writeFileSync(file, sql + '\n', { flag: 'wx' });
-  return wrangler(['d1', 'execute', 'opwp-backend', '--remote', '--file', file, '--yes', '--json']);
+  // --file uses Wrangler's bulk-import API and does not return SELECT rows.
+  // Pass SQL as one spawnSync argument so JSON contains query results while
+  // retaining the private SQL file as the local audit record.
+  return wrangler(['d1', 'execute', 'opwp-backend', '--remote', '--command', sql, '--yes', '--json']);
 }
 
 function assertSafeProductionVersion(expectedVersion) {

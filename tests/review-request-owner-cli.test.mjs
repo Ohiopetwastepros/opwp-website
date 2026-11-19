@@ -46,7 +46,11 @@ function fixture({ wrongVersion = false, priorRequest = false, providerReject = 
       if (args[1] === 'deployments') value = [{ created_on: '2026-11-19T06:00:00Z', versions: [{ version_id: wrongVersion ? requestId : versionId, percentage: 100 }] }];
       else if (args[1] === 'versions') value = { id: versionId, resources: { bindings } };
       else if (args[1] === 'd1') {
-        const sql = files.get(args[args.indexOf('--file') + 1]);
+        assert.ok(args.includes('--command'), 'D1 must use the query API that returns SELECT rows');
+        assert.ok(!args.includes('--file'), 'D1 bulk import does not return SELECT rows');
+        const sql = args[args.indexOf('--command') + 1];
+        assert.equal(typeof sql, 'string');
+        assert.ok([...files.values()].some(value => value === sql + '\n'), 'each command retains its private SQL audit file');
         value = sql.startsWith('SELECT r.id') ? [{ results: ledgerAccepted ? ['sms', 'email'].map(channel => ({
           request_id: requestId, job_type: 'manual_owner_test', channel, status: 'sent',
           reason: `manual_owner_test_http_${channel === 'sms' ? 202 : 200}_provider_accepted_delivery_not_confirmed`,
@@ -100,6 +104,11 @@ test('owner CLI preflights deployed version and sends one same-origin fixed-reci
   for (const value of f.files.values()) assert.ok(!value.includes(bearer));
   assert.equal(f.commands.filter(args => args[1] === 'deployments').length, 2);
   assert.equal(f.commands.filter(args => args[1] === 'd1').length, 2);
+  for (const args of f.commands.filter(args => args[1] === 'd1')) {
+    assert.deepEqual(Array.from(args).slice(1, 6), ['d1', 'execute', 'opwp-backend', '--remote', '--command']);
+    assert.equal(args.at(-1), '--json');
+    assert.ok(!args.includes('--file'));
+  }
   assert.ok(f.commands.every(args => !args.includes('secret') && !args.includes('deploy') && !args.includes('migrations')));
   const result = f.result();
   assert.equal(result.sms.accepted, true); assert.equal(result.sms.httpStatus, 202);
