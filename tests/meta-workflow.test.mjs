@@ -20,8 +20,8 @@ async function fixtureAdminSession(email) {
   return result.sessionToken;
 }
 import { storeMetaLead, processMetaConfirmations, recordMetaReply, recordQuoDelivery, metaReleaseApproved, markMetaNoResponse } from "../lib/meta-lead-workflow.mjs";
-import { exactDogs, mapMetaAnswers, metaQuietHours, metaConsentEvidence, buildMetaConfirmation } from "../lib/meta-lead-policy.mjs";
-import { nextMetaResponse, metaWebsiteQuote } from "../lib/meta-conversation.mjs";
+import { exactDogs, mapMetaAnswers, metaCadenceQuietHours, metaConsentEvidence, buildMetaConfirmation, formatMetaSms } from "../lib/meta-lead-policy.mjs";
+import { nextMetaResponse, metaWebsiteQuote, META_RESPONSES } from "../lib/meta-conversation.mjs";
 import { auditMetaRoute, routeGuidanceFromSnapshot } from "../lib/meta-route-guidance.mjs";
 import { readBoundedBytes } from "../lib/bounded-body.mjs";
 import { recordVerifiedMetaPayment, reconcileMetaConversions } from "../lib/meta-conversion.mjs";
@@ -110,7 +110,167 @@ test("confirmation storage, mocked Quo delivery and message history preserve the
   assert.equal(select(db, "lead_messages").find((message) => message.provider_message_id === "copy-preserved-sms").body, expected);
 });
 
-test("release gates, no consent, email preference, missing data, quiet hours and suppression fail closed", async () => {
+test("Meta cadence uses 8 AM through 9 PM New York time across standard, daylight and transition dates", () => {
+  for (const [timestamp, quiet] of [
+    ["2026-01-15T12:59:00Z", true], ["2026-01-15T13:00:00Z", false],
+    ["2026-01-16T01:59:00Z", false], ["2026-01-16T02:00:00Z", true],
+    ["2026-07-15T11:59:00Z", true], ["2026-07-15T12:00:00Z", false],
+    ["2026-07-16T00:59:00Z", false], ["2026-07-16T01:00:00Z", true],
+    ["2026-03-08T06:59:00Z", true], ["2026-03-08T07:00:00Z", true],
+    ["2026-11-01T05:59:00Z", true], ["2026-11-01T06:00:00Z", true],
+  ]) assert.equal(metaCadenceQuietHours(new Date(timestamp)), quiet, timestamp);
+  assert.equal(metaCadenceQuietHours(new Date(NaN)), true);
+});
+
+test("complete first confirmations send overnight in winter and summer regardless of shared quiet settings", async () => {
+  for (const timestamp of ["2026-01-15T06:00:00Z", "2026-01-16T02:00:00Z", "2026-07-15T05:00:00Z", "2026-07-16T01:00:00Z"]) {
+    const db = database(); approve(db); const env = { ...environment(db), META_CADENCE_APPROVAL_ID: "" };
+    db.sqlite.exec("UPDATE lead_automation_settings SET quiet_hours_enabled=1,quiet_hours_start='20:00',quiet_hours_end='08:00'");
+    await storeMetaLead(db, env, form(), event());
+    const queued = select(db, "meta_sms_jobs")[0];
+    const content = [];
+    const result = await processMetaConfirmations(env, { now: new Date(timestamp), fetcher: async (_url, request) => {
+      content.push(JSON.parse(request.body).content); return Response.json({ data: { id: "overnight-first" } });
+    } });
+    assert.equal(result.sent, 1, timestamp); assert.deepEqual(content, [queued.message_body]);
+    assert.match(content[0], /You have 2 dogs, live in 43615, and would like cleanups weekly\. Is that correct\?\n\nReply STOP to opt out$/);
+    assert.equal(select(db, "lead_messages")[0].body, queued.message_body);
+    assert.equal(select(db, "meta_sms_jobs").filter((job) => job.purpose === "follow_up").length, 0);
+  }
+});
+
+test("only cadence waits overnight and the legacy shared 8 PM setting does not shorten its window", async () => {
+  for (const [timestamp, expectedSent] of [
+    ["2026-01-15T12:59:00Z", 0], ["2026-01-15T13:00:00Z", 1],
+    ["2026-01-16T01:59:00Z", 1], ["2026-01-16T02:00:00Z", 0],
+    ["2026-07-15T11:59:00Z", 0], ["2026-07-15T12:00:00Z", 1],
+    ["2026-07-16T00:59:00Z", 1], ["2026-07-16T01:00:00Z", 0],
+  ]) {
+    const db = database(); approve(db); const env = environment(db);
+    db.sqlite.exec("UPDATE lead_automation_settings SET quiet_hours_enabled=1,quiet_hours_start='20:00',quiet_hours_end='08:00'");
+    await storeMetaLead(db, env, form(), event());
+    await processMetaConfirmations(env, { now: noon, fetcher: async () => Response.json({ data: { id: "initial" } }) });
+    db.sqlite.exec("UPDATE meta_sms_jobs SET due_at=datetime('now','-1 minute') WHERE purpose='follow_up' AND sequence_step=1");
+    const content = [];
+    const result = await processMetaConfirmations(env, { now: new Date(timestamp), fetcher: async (_url, request) => {
+      content.push(JSON.parse(request.body).content); return Response.json({ data: { id: "cadence-window" } });
+    } });
+    assert.equal(result.sent, expectedSent, timestamp);
+    assert.equal(content.length, expectedSent, timestamp);
+    assert.equal(select(db, "meta_sms_jobs").find((job) => job.purpose === "follow_up" && job.sequence_step === 1).status, expectedSent ? "sent" : "queued", timestamp);
+    assert.equal(select(db, "lead_automation_settings")[0].quiet_hours_start, "20:00");
+  }
+});
+
+async function queueInboundReply(db, saved, text, trigger = "night-inbound") {
+  const conversation = select(db, "lead_conversations").find((row) => row.submission_id === saved.id);
+  db.sqlite.prepare(`INSERT INTO lead_messages (id,conversation_id,organization_id,direction,channel,provider_message_id,body,delivery_status,automated,created_by)
+    VALUES (?,?,'org-opwp','inbound','quo_sms',?,?,'recorded',0,'quo-webhook')`).run(trigger, conversation.id, trigger, text);
+  db.sqlite.prepare("UPDATE lead_conversations SET last_inbound_at=CURRENT_TIMESTAMP WHERE id=?").run(conversation.id);
+  await recordMetaReply(db, saved.id, { providerMessageId: trigger, text, from: "+14195550100" });
+}
+
+test("identity, assistant, handoff, correction and pricing replies send at night with the exact standalone STOP footer", async () => {
+  for (const [text, response] of [
+    ["are you a real person?", META_RESPONSES.human_help],
+    ["yes", META_RESPONSES.yard],
+    ["I have lots of poop buildup", META_RESPONSES.buildup],
+    ["actually 3 dogs", "Thanks for clarifying."],
+    ["what is the price?", "$100.00 per month"],
+  ]) {
+    const db = database(); approve(db); const env = { ...environment(db), META_CADENCE_APPROVAL_ID: "" };
+    db.sqlite.exec("UPDATE lead_automation_settings SET quiet_hours_enabled=1,quiet_hours_start='20:00',quiet_hours_end='08:00'");
+    const saved = await storeMetaLead(db, env, form(), event());
+    await processMetaConfirmations(env, { now: noon, fetcher: async () => Response.json({ data: { id: "initial" } }) });
+    if (text.includes("price")) db.sqlite.prepare("UPDATE meta_lead_intakes SET response_state=? WHERE submission_id=?").run(JSON.stringify({ details: { number_of_dogs: 2, zip: "43615", clean_up_frequency: "Weekly", yard_size_tier: "tiny", last_cleaned: "one_month" }, details_confirmed: true }), saved.id);
+    await queueInboundReply(db, saved, text);
+    const queued = select(db, "meta_sms_jobs").find((job) => job.purpose === "reply");
+    assert.ok(queued, text); assert.ok(queued.message_body.includes(response), text);
+    assert.match(queued.message_body, /\n\nReply STOP to opt out$/);
+    assert.equal((queued.message_body.match(/Reply STOP/g) || []).length, 1);
+    assert.doesNotMatch(queued.message_body, /[\u2013\u2014]/);
+    const sent = [];
+    const result = await processMetaConfirmations(env, { now: new Date("2026-11-19T06:00:00Z"), fetcher: async (_url, request) => {
+      sent.push(JSON.parse(request.body).content); return Response.json({ data: { id: "night-reply" } });
+    } });
+    assert.equal(result.sent, 1, text); assert.deepEqual(sent, [queued.message_body]);
+    assert.equal(select(db, "lead_messages").find((row) => row.provider_message_id === "night-reply").body, queued.message_body);
+    assert.equal(select(db, "meta_sms_jobs").filter((job) => job.purpose === "follow_up").length, 0);
+  }
+});
+
+test("deferred cadence jobs cannot consume the night batch ahead of a customer reply", async () => {
+  const db = database(); approve(db); const env = environment(db);
+  await storeMetaLead(db, env, form(), event());
+  await processMetaConfirmations(env, { now: noon, fetcher: async () => Response.json({ data: { id: "first-initial" } }) });
+  const second = await storeMetaLead(db, env, form("second", { phone_number: "+14195550101" }), event("second"));
+  await processMetaConfirmations(env, { submissionId: second.id, now: noon, fetcher: async () => Response.json({ data: { id: "second-initial" } }) });
+  await queueInboundReply(db, second, "are you a bot?", "second-inbound");
+  db.sqlite.exec("UPDATE meta_sms_jobs SET due_at=datetime('now','-1 minute'),created_at=datetime('now','-1 hour') WHERE purpose='follow_up' AND status='queued'");
+  const sent = [];
+  const result = await processMetaConfirmations(env, { limit: 1, now: new Date("2026-11-19T06:00:00Z"), fetcher: async (_url, request) => {
+    sent.push(JSON.parse(request.body).content); return Response.json({ data: { id: "night-priority" } });
+  } });
+  assert.equal(result.sent, 1);
+  assert.deepEqual(sent, [`${META_RESPONSES.human_help}\n\nReply STOP to opt out`]);
+  assert.equal(select(db, "meta_sms_jobs").filter((job) => job.purpose === "follow_up" && job.status === "queued").length, 3);
+});
+
+test("disabled cadence neither queues new touches nor sends existing queued touches during permitted hours", async () => {
+  const db = database(); approve(db); const env = environment(db);
+  const first = await storeMetaLead(db, env, form(), event());
+  await processMetaConfirmations(env, { submissionId: first.id, now: noon, fetcher: async () => Response.json({ data: { id: "first-initial" } }) });
+  db.sqlite.exec("UPDATE meta_sms_jobs SET due_at=datetime('now','-1 minute') WHERE purpose='follow_up'");
+  const disabled = { ...env, META_CADENCE_APPROVAL_ID: "" };
+  const second = await storeMetaLead(db, disabled, form("second", { phone_number: "+14195550101" }), event("second"));
+  const content = [];
+  await processMetaConfirmations(disabled, { now: noon, fetcher: async (_url, request) => {
+    content.push(JSON.parse(request.body).content); return Response.json({ data: { id: "second-initial" } });
+  } });
+  assert.equal(content.length, 1); assert.match(content[0], /I received your Facebook form/);
+  assert.equal(select(db, "meta_sms_jobs").filter((job) => job.submission_id === second.id && job.purpose === "follow_up").length, 0);
+  assert.equal(select(db, "meta_sms_jobs").filter((job) => job.purpose === "follow_up" && job.status === "queued").length, 3);
+  assert.equal((await markMetaNoResponse(disabled)).marked, 0);
+});
+
+test("Meta static answers normalize dashes and an existing inline STOP footer before storage and night delivery", async () => {
+  const db = database(); approve(db); const env = { ...environment(db), META_CADENCE_APPROVAL_ID: "" };
+  const saved = await storeMetaLead(db, env, form(), event());
+  await processMetaConfirmations(env, { now: noon, fetcher: async () => Response.json({ data: { id: "initial" } }) });
+  db.sqlite.prepare(`INSERT INTO lead_answer_library (answer_key,organization_id,category,question,answer_template,keywords,approval_status,auto_send_allowed,response_mode,updated_by)
+    VALUES ('static-night','org-opwp','access','Gate question',?,?,'approved',1,'static','test-owner')`).run("Gate access\u2014please unlock it\u2013thank you. Reply STOP to opt out.", JSON.stringify(["sandboxzxpolicy"]));
+  await queueInboundReply(db, saved, "What about sandboxzxpolicy?");
+  const expected = "Gate access-please unlock it-thank you.\n\nReply STOP to opt out";
+  assert.equal(select(db, "meta_sms_jobs").find((job) => job.purpose === "reply").message_body, expected);
+  const result = await processMetaConfirmations(env, { now: new Date("2026-11-19T06:00:00Z"), fetcher: async (_url, request) => {
+    assert.equal(JSON.parse(request.body).content, expected); return Response.json({ data: { id: "static-night" } });
+  } });
+  assert.equal(result.sent, 1);
+  assert.equal(select(db, "lead_messages").find((row) => row.provider_message_id === "static-night").body, expected);
+  const bounded = formatMetaSms(`${"x".repeat(1100)} Reply STOP to opt out.`);
+  assert.equal(bounded.length, 1000); assert.match(bounded, /\n\nReply STOP to opt out$/);
+  assert.equal(formatMetaSms(expected), expected);
+});
+
+test("a route-audited signup invitation sends at night with the standalone STOP footer", async () => {
+  const db = database(); approve(db); const env = { ...environment(db), META_CADENCE_APPROVAL_ID: "" };
+  const saved = await storeMetaLead(db, env, form(), event());
+  await processMetaConfirmations(env, { now: noon, fetcher: async () => Response.json({ data: { id: "initial" } }) });
+  const snapshotAt = new Date().toISOString();
+  db.sqlite.prepare("INSERT INTO airtable_cockpit_snapshots(snapshot_key,payload,status,captured_at) VALUES ('business_cockpit',?,'success',?)").run(JSON.stringify({ opwp: { customers: [{ fields: { Status: "Active", ZIP: "43615", "Service Day": "Tuesday" } }] } }), snapshotAt);
+  db.sqlite.prepare("UPDATE meta_lead_intakes SET response_state=? WHERE submission_id=?").run(JSON.stringify({ details: { zip: "43615", clean_up_frequency: "Weekly", address: "123 Maple Street, Toledo" }, ready_for_route_audit: true }), saved.id);
+  const lead = { id: saved.id, source: "facebook", conversation_id: select(db, "lead_conversations")[0].id, payload: select(db, "submissions")[0].payload };
+  await auditMetaRoute(db, lead, { days: ["Tuesday"], snapshotAt }, "test-owner");
+  const expected = "Craig has reviewed Tuesday as your service day. You can complete signup at https://www.ohiopetwastepros.com/free-quote/ . Your start date is confirmed during setup.\n\nReply STOP to opt out";
+  assert.equal(select(db, "meta_sms_jobs").find((job) => job.purpose === "signup").message_body, expected);
+  const result = await processMetaConfirmations(env, { now: new Date("2026-11-19T06:00:00Z"), fetcher: async (_url, request) => {
+    assert.equal(JSON.parse(request.body).content, expected); return Response.json({ data: { id: "night-signup" } });
+  } });
+  assert.equal(result.sent, 1);
+  assert.equal(select(db, "lead_messages").find((row) => row.provider_message_id === "night-signup").body, expected);
+});
+
+test("release and consent gates stay closed while incomplete confirmations can send after hours", async () => {
   for (const [name, extra, change] of [
     ["no consent", { sms_consent: "" }, {}], ["email preference", { contact_preference: "email" }, {}],
     ["unknown disclosure", {}, { META_APPROVED_SMS_FORMS: "{}" }], ["unknown page", {}, { META_APPROVED_SMS_FORMS: "null" }],
@@ -124,11 +284,11 @@ test("release gates, no consent, email preference, missing data, quiet hours and
   const db = database(); approve(db); const env = environment(db);
   await storeMetaLead(db, env, form("lead-1", { number_of_dogs: "4 or more", zip_code: "", service_frequency: "" }), event());
   let calls = 0;
-  await processMetaConfirmations(env, { now: new Date("2026-09-17T05:00:00Z"), fetcher: async () => { calls++; } });
-  assert.equal(calls, 0); assert.match(select(db, "meta_sms_jobs")[0].message_body, /How many dogs exactly/);
+  await processMetaConfirmations(env, { now: new Date("2026-09-17T05:00:00Z"), fetcher: async () => { calls++; return Response.json({ data: { id: "night-confirmation" } }); } });
+  assert.equal(calls, 1); assert.match(select(db, "meta_sms_jobs")[0].message_body, /How many dogs exactly/);
   db.sqlite.exec("UPDATE meta_automation_releases SET revoked_at=CURRENT_TIMESTAMP");
   assert.equal(await metaReleaseApproved(db, env), false);
-  assert.equal(metaQuietHours(null), true);
+  assert.equal(metaCadenceQuietHours(new Date(NaN)), true);
 });
 
 test("concurrent dispatch sends once; delivery receipts can arrive before acceptance is persisted", async () => {
@@ -182,7 +342,7 @@ test("Meta personal-text requests queue one owner email and pause the thread wit
   try {
     await recordMetaReply(db, saved.id, { providerMessageId: "identity-question", text: "are you a real person?", from: "+14195550100" }, { env });
     const disclosure = select(db, "meta_sms_jobs").find((job) => job.purpose === "reply");
-    assert.equal(disclosure.message_body, "Good question! These first texts are automated to help me get your info quickly, but I'm a real person and I read every conversation. Want me to text you personally? Reply STOP to opt out.");
+    assert.equal(disclosure.message_body, "Good question! These first texts are automated to help me get your info quickly, but I'm a real person and I read every conversation. Want me to text you personally?\n\nReply STOP to opt out");
     assert.equal((disclosure.message_body.match(/Reply STOP/g) || []).length, 1);
     assert.equal(select(db, "submission_notifications").length, 0);
     const yes = { providerMessageId: "identity-yes", text: "yes please", from: "+14195550100" };
@@ -485,7 +645,7 @@ test("test release approval does not override disabled assistant or required hum
     await storeMetaLead(db, env, form(), event());
     let calls = 0;
     const result = await processMetaConfirmations(env, { now: noon, fetcher: async () => { calls++; throw new Error("Review-gated job must not contact Quo"); } });
-    assert.deepEqual(result, { enabled: true, deferred: "review_or_quiet_hours", sent: 0 });
+    assert.deepEqual(result, { enabled: true, deferred: "review_required", sent: 0 });
     assert.equal(calls, 0);
     assert.equal(select(db, "meta_sms_jobs")[0].status, "queued");
   }
