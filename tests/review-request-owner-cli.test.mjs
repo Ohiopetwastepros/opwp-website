@@ -14,10 +14,13 @@ let source = fs.readFileSync(scriptUrl, 'utf8').replace(/^import .*;\r?\n/gm, ''
 source = source.slice(0, source.lastIndexOf('if (process.argv[1]')) + '\nglobalThis.ownerTestMain = main;';
 const versionId = '168a07ec-7ef4-414f-90c4-e32a0d3cc7be';
 const requestId = '50c0385f-327e-4f2c-9ed4-617a246b02ce';
+const completionRequestId = '61f7de2b-f6b6-4c2c-ace5-726424736168';
 const origin = 'https://www.ohiopetwastepros.com';
 
 function fixture({ wrongVersion = false, priorRequest = false, providerReject = false, transportFailure = false, ledgerAccepted = false,
-  continuation = false, continuationRow = {}, continuationCount = 2, localProviderAttempt = false } = {}) {
+  continuation = false, continuationRow = {}, continuationCount = 2, localProviderAttempt = false,
+  completion = false, verification = {}, localOutcome = {}, localPrevious = {}, localContinuation = {}, ledgerReason = null } = {}) {
+  const requestId = completion ? completionRequestId : '50c0385f-327e-4f2c-9ed4-617a246b02ce';
   const files = new Map(), commands = [], requests = [], output = [];
   const receiptDir = 'D:/Codex Projects/_agent-runs/2026-11-19-owner-review-test';
   const fakeFs = {
@@ -38,8 +41,10 @@ function fixture({ wrongVersion = false, priorRequest = false, providerReject = 
     { name: 'DB', type: 'd1' }, { name: 'FIELD_PROOFS', type: 'r2_bucket' },
     { name: 'QUO_API_KEY', type: 'secret_text' }, { name: 'RESEND_API_KEY', type: 'secret_text' },
   ]);
-  const fakeProcess = { argv: [process.execPath, scriptPath, '--worker-version', versionId, ...(continuation ? ['--continue-preparation'] : [])], execPath: process.execPath, exitCode: 0 };
-  if (continuation) {
+  const verificationFile = path.join(receiptDir, 'delivery-verification.json');
+  const fakeProcess = { argv: [process.execPath, scriptPath, '--worker-version', versionId,
+    ...(completion ? ['--complete-verified-unsent', '--verification-file', verificationFile] : continuation ? ['--continue-preparation'] : [])], execPath: process.execPath, exitCode: 0 };
+  if (continuation || completion) {
     const recipients = { phone: OWNER_REVIEW_TEST.phone, email: OWNER_REVIEW_TEST.email };
     files.set(path.join(receiptDir, 'send-attempt.json'), JSON.stringify({ kind: 'manual_owner_test', workerVersion: versionId, recipients, postInitiatedAt: '2026-11-19T06:00:00Z', retryAllowed: false }));
     const outcome = { accepted: false, httpStatus: null, id: null, status: 'not_attempted', error: 'source_line_verification_failed' };
@@ -47,6 +52,21 @@ function fixture({ wrongVersion = false, priorRequest = false, providerReject = 
       sms: localProviderAttempt ? { ...outcome, status: 'acceptance_uncertain' } : outcome, email: outcome }));
     files.set(path.join(receiptDir, 'receipt.md'), 'Original source preflight receipt; neither provider attempted.');
     files.set(path.join(receiptDir, 'report.md'), 'Original source preflight report.');
+    if (completion) {
+      const priorVersion = '3c831148-ba24-484e-a566-295bd2f15762';
+      const previousOutcome = { accepted: false, httpStatus: null, id: null, status: 'acceptance_uncertain', error: 'provider_acceptance_uncertain_verify_before_retry' };
+      files.set(path.join(receiptDir, 'preparation-continuation.json'), JSON.stringify({ kind: 'manual_owner_test', workerVersion: priorVersion,
+        recipients, postInitiatedAt: '2026-11-19T06:46:44.087Z', retryAllowed: false, preparationContinuation: true, requestId, ...localContinuation }));
+      files.set(path.join(receiptDir, 'result.json'), JSON.stringify({ kind: 'manual_owner_test', workerVersion: priorVersion,
+        recipients, requestId, preparationContinuation: true, postInitiatedAt: '2026-11-19T06:46:44.087Z',
+        sms: { ...previousOutcome, ...localOutcome }, email: previousOutcome, ...localPrevious }));
+      files.set(path.join(receiptDir, 'receipt.md'), 'Uncertain provider attempt receipt.');
+      files.set(path.join(receiptDir, 'report.md'), 'Uncertain provider attempt report.');
+      files.set(path.join(receiptDir, 'source-preflight-result.json'), 'Original source-preflight evidence is immutable.');
+      files.set(path.join(receiptDir, 'preflight-refusal-receipt.md'), 'Prior refusal evidence is immutable.');
+      files.set(verificationFile, JSON.stringify({ requestId, recipients, checkedAt: new Date().toISOString(),
+        quoNoMessagesAfter0600Z: true, outlookNoReviewEmail: true, gmailNoReviewEmail: true, ...verification }));
+    }
   }
   const context = {
     fs: fakeFs, path, randomBytes, createHash, fileURLToPath, OWNER_REVIEW_TEST, assertOwnerReviewTestRecipients,
@@ -65,14 +85,14 @@ function fixture({ wrongVersion = false, priorRequest = false, providerReject = 
         assert.ok([...files.values()].some(value => value === sql + '\n'), 'each command retains its private SQL audit file');
         value = sql.includes('r.job_type,r.payload,r.customer_key,d.channel') ? [{ results: Array.from({ length: continuationCount }, (_, index) => {
           const channel = index === 0 ? 'sms' : 'email';
-          return { request_id: requestId, job_type: 'manual_owner_test', customer_key: null, payload: JSON.stringify({ kind: 'manual_owner_test', firstName: 'Craig', tech: 'Tony' }),
-            channel, status: 'failed', reason: 'manual_owner_test_http_none_source_line_verification_failed',
+          return { request_id: requestId, job_type: 'manual_owner_test', customer_key: null, payload: JSON.stringify({ kind: 'manual_owner_test', firstName: 'Craig', tech: 'Tony', ...(completion ? { preparationContinuation: true } : {}) }),
+            channel, status: 'failed', reason: completion ? 'manual_owner_test_http_none_provider_acceptance_uncertain_verify_before_retry' : 'manual_owner_test_http_none_source_line_verification_failed',
             recipient: channel === 'sms' ? OWNER_REVIEW_TEST.phone : OWNER_REVIEW_TEST.email,
-            provider_message_id: null, sent_at: null, prior_approvals: 0, ...(index === 0 ? continuationRow : {}) };
-        }), success: true }] : sql.startsWith('SELECT r.id') ? [{ results: ledgerAccepted ? ['sms', 'email'].map(channel => ({
-          request_id: requestId, job_type: 'manual_owner_test', channel, status: 'sent',
-          reason: `manual_owner_test_http_${channel === 'sms' ? 202 : 200}_provider_accepted_delivery_not_confirmed`,
-          provider_message_id: `${channel}_fixture_recovered`,
+            provider_message_id: null, sent_at: null, prior_approvals: 0, customer_request_count: 0, ...(index === 0 ? continuationRow : {}) };
+        }), success: true }] : sql.startsWith('SELECT r.id') ? [{ results: ledgerAccepted || ledgerReason ? ['sms', 'email'].map(channel => ({
+          request_id: requestId, job_type: 'manual_owner_test', channel, status: ledgerReason ? 'failed' : 'sent',
+          reason: ledgerReason || `manual_owner_test_http_${channel === 'sms' ? 202 : 200}_provider_accepted_delivery_not_confirmed`,
+          provider_message_id: ledgerReason ? null : `${channel}_fixture_recovered`,
         })) : [], success: true }] : sql.startsWith('SELECT') ? [{ results: [{ prior_requests: priorRequest ? 1 : 0, prior_approvals: 0 }], success: true }]
           : [{ results: [], success: true, meta: { changes: 1 } }];
       } else throw new Error('fixture_unexpected_command');
@@ -195,6 +215,21 @@ test('owner CLI recovers provider IDs and HTTP acceptance from a read-only ledge
   assert.equal(f.process.exitCode, 1, 'the original transport error stays visible after recovery');
 });
 
+test('read-only recovery preserves safe transport and missing-ID categories as unknown acceptance', async t => {
+  for (const category of ['network', 'timeout', 'internal', 'missing_provider_id', 'rejected_or_missing_id']) await t.test(category, async () => {
+    const f = fixture({ transportFailure: true, ledgerReason: `manual_owner_test_http_none_provider_${category}_verify_before_retry` });
+    await f.run();
+    for (const channel of ['sms', 'email']) {
+      assert.equal(f.result()[channel].accepted, null);
+      assert.equal(f.result()[channel].status, 'acceptance_uncertain');
+      assert.equal(f.result()[channel].error, `provider_${category}_verify_before_retry`);
+    }
+    assert.equal(f.requests.filter(request => request.options.method === 'POST').length, 1);
+    assert.match(f.read('receipt.md'), /Unknown \/ not confirmed/);
+    await assert.rejects(f.run(), /already_recorded_no_retry/);
+  });
+});
+
 test('explicit preparation continuation preserves original guards/evidence and targets the same request once', async () => {
   const f = fixture({ continuation: true });
   const initialAttempt = f.read('send-attempt.json'), initialResult = f.read('result.json'), initialReceipt = f.read('receipt.md');
@@ -267,4 +302,92 @@ test('preparation continuation requires original local evidence that neither pro
   assert.equal(f.requests.length, 0);
   assert.equal(f.read('result.json'), original);
   assert.ok(!f.read('preparation-continuation.json'));
+});
+
+test('verified-unsent completion binds fresh independent proof and preserves both earlier failure records', async () => {
+  const f = fixture({ completion: true });
+  const originals = new Map(['send-attempt.json', 'preparation-continuation.json', 'source-preflight-result.json', 'preflight-refusal-receipt.md'].map(name => [name, f.read(name)]));
+  const uncertainResult = f.read('result.json'), uncertainReceipt = f.read('receipt.md');
+  await f.run();
+  assert.equal(f.requests.filter(request => request.options.method === 'POST').length, 1);
+  assert.equal(f.result().requestId, completionRequestId);
+  assert.equal(f.result().verifiedUnsentCompletion, true);
+  assert.equal(f.result().preflight.reviewRequestsEnabled, 'false');
+  assert.equal(f.read('uncertain-attempt-result.json'), uncertainResult);
+  assert.equal(f.read('uncertain-attempt-receipt.md'), uncertainReceipt);
+  for (const [name, content] of originals) assert.equal(f.read(name), content, name);
+  const marker = JSON.parse(f.read('verified-unsent-completion.json'));
+  assert.equal(marker.requestId, completionRequestId); assert.equal(marker.retryAllowed, false);
+  assert.equal(marker.verifiedUnsentCompletion, true); assert.ok(marker.postInitiatedAt);
+  const sql = f.read('owner-test-verified-unsent-completion-approval.sql');
+  assert.ok(sql.includes(`"resumeRequestId":"${completionRequestId}"`));
+  assert.match(sql, /"verifiedUnsentCompletion":true/);
+  assert.match(sql, /"deliveryVerification":\{"checkedAt":/);
+  assert.match(sql, /"quoNoMessagesAfter0600Z":true,"outlookNoReviewEmail":true,"gmailNoReviewEmail":true/);
+  assert.match(sql, /manual_owner_test_http_none_provider_acceptance_uncertain_verify_before_retry/);
+  assert.match(sql, /provider_message_id IS NULL AND sent_at IS NULL/);
+  assert.ok(!f.read('owner-test-preparation-continuation-approval.sql'));
+  assert.ok(!f.read('owner-test-approval.sql'));
+  assert.match(f.read('receipt.md'), /Verified-unsent completion/);
+  assert.equal(f.process.exitCode, 0);
+  await assert.rejects(f.run(), /verified_unsent_completion_already_recorded_no_retry/);
+  assert.equal(f.requests.filter(request => request.options.method === 'POST').length, 1);
+});
+
+test('verified-unsent completion requires fresh complete proof for the locked request before any remote access', async t => {
+  const cases = [
+    { checkedAt: new Date(Date.now() - 5 * 60_000).toISOString() }, { checkedAt: new Date(Date.now() + 60_000).toISOString() },
+    { checkedAt: 'invalid' }, { quoNoMessagesAfter0600Z: false }, { outlookNoReviewEmail: false }, { gmailNoReviewEmail: false },
+    { requestId }, { recipients: { phone: '+12025550100', email: OWNER_REVIEW_TEST.email } },
+  ];
+  for (const verification of cases) await t.test(JSON.stringify(verification), async () => {
+    const f = fixture({ completion: true, verification });
+    const original = f.read('result.json');
+    await assert.rejects(f.run());
+    assert.equal(f.commands.length, 0); assert.equal(f.requests.length, 0);
+    assert.equal(f.read('result.json'), original);
+    assert.ok(!f.read('verified-unsent-completion.json'));
+  });
+  const f = fixture({ completion: true });
+  f.process.argv[6] = 'C:/public-delivery-verification.json';
+  await assert.rejects(f.run(), /requires_private_verification_file/);
+  assert.equal(f.commands.length, 0);
+});
+
+test('verified-unsent completion refuses any provider receipt, changed ledger, extra customer request or prior completion', async t => {
+  const cases = [
+    { provider_message_id: 'AC_existing' }, { provider_message_id: '' }, { sent_at: '2026-11-19 06:50:00' },
+    { status: 'sent' }, { status: 'sending' }, { reason: 'manual_owner_test_http_429_provider_rejected_or_missing_id' },
+    { recipient: '+12025550100' }, { request_id: requestId }, { job_type: 'initial' }, { customer_key: 'customer' },
+    { prior_approvals: 1 }, { customer_request_count: 1 },
+    { payload: JSON.stringify({ kind: 'manual_owner_test', firstName: 'Craig', tech: 'Tony' }) },
+    { payload: JSON.stringify({ kind: 'manual_owner_test', firstName: 'Craig', tech: 'Tony', preparationContinuation: true, verifiedUnsentCompletion: false }) },
+    { payload: JSON.stringify({ kind: 'manual_owner_test', firstName: 'Craig', tech: 'Tony', preparationContinuation: true, verifiedUnsentCompletionAt: null }) },
+  ];
+  for (const continuationRow of cases) await t.test(JSON.stringify(continuationRow), async () => {
+    const f = fixture({ completion: true, continuationRow });
+    const original = f.read('result.json'), receipt = f.read('receipt.md');
+    await f.run();
+    assert.equal(f.requests.length, 0); assert.equal(f.read('result.json'), original); assert.equal(f.read('receipt.md'), receipt);
+    assert.ok(!f.read('verified-unsent-completion.json')); assert.ok(!f.read('owner-test-verified-unsent-completion-approval.sql'));
+    assert.equal(f.process.exitCode, 1);
+  });
+  for (const continuationCount of [1, 3]) {
+    const f = fixture({ completion: true, continuationCount });
+    await f.run(); assert.equal(f.requests.length, 0); assert.ok(!f.read('verified-unsent-completion.json'));
+  }
+});
+
+test('verified-unsent completion refuses changed local uncertain evidence without archiving or sending', async t => {
+  for (const options of [
+    { localOutcome: { id: 'already_accepted' } }, { localOutcome: { accepted: true } }, { localOutcome: { httpStatus: 200 } },
+    { localOutcome: { status: 'rejected' } }, { localOutcome: { error: 'source_line_verification_failed' } },
+    { localPrevious: { preparationContinuation: false } }, { localPrevious: { requestId } },
+    { localPrevious: { verifiedUnsentCompletion: false } }, { localContinuation: { requestId } },
+  ]) await t.test(JSON.stringify(options), async () => {
+    const f = fixture({ completion: true, ...options });
+    const original = f.read('result.json');
+    await assert.rejects(f.run()); assert.equal(f.commands.length, 0); assert.equal(f.requests.length, 0);
+    assert.equal(f.read('result.json'), original); assert.ok(!f.read('uncertain-attempt-result.json'));
+  });
 });

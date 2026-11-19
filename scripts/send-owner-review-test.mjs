@@ -11,6 +11,9 @@ const origin = 'https://www.ohiopetwastepros.com';
 const endpoint = `${origin}/api/review-requests/owner-test/`;
 const attemptPath = path.join(receiptDir, 'send-attempt.json');
 const continuationPath = path.join(receiptDir, 'preparation-continuation.json');
+const completionPath = path.join(receiptDir, 'verified-unsent-completion.json');
+const completionRequestId = '61f7de2b-f6b6-4c2c-ace5-726424736168';
+const uncertainReason = 'manual_owner_test_http_none_provider_acceptance_uncertain_verify_before_retry';
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const quoteSql = value => "'" + String(value).replaceAll("'", "''") + "'";
 const eastern = value => new Intl.DateTimeFormat('en-US', {
@@ -169,8 +172,80 @@ function archivePreparationEvidence() {
   }
 }
 
+function assertFreshDeliveryVerification(verification) {
+  const age = Date.now() - Date.parse(verification?.checkedAt);
+  if (!Number.isFinite(age) || age < 0 || age >= 5 * 60_000 ||
+      verification.quoNoMessagesAfter0600Z !== true || verification.outlookNoReviewEmail !== true || verification.gmailNoReviewEmail !== true) {
+    throw new Error('verified_unsent_completion_delivery_checks_missing_or_stale');
+  }
+  return { checkedAt: verification.checkedAt, quoNoMessagesAfter0600Z: true, outlookNoReviewEmail: true, gmailNoReviewEmail: true };
+}
+
+function readVerifiedUnsentEvidence(verificationFile) {
+  const privateRoot = path.resolve(receiptDir) + path.sep;
+  if (!path.isAbsolute(verificationFile || '') || !path.resolve(verificationFile).startsWith(privateRoot)) {
+    throw new Error('verified_unsent_completion_requires_private_verification_file');
+  }
+  const verification = JSON.parse(fs.readFileSync(verificationFile, 'utf8'));
+  assertOwnerReviewTestRecipients(verification.recipients);
+  if (verification.requestId !== completionRequestId) throw new Error('verified_unsent_completion_verification_request_mismatch');
+  const deliveryVerification = assertFreshDeliveryVerification(verification);
+  const previous = JSON.parse(fs.readFileSync(path.join(receiptDir, 'result.json'), 'utf8'));
+  const continuation = JSON.parse(fs.readFileSync(continuationPath, 'utf8'));
+  for (const value of [previous, continuation]) {
+    assertOwnerReviewTestRecipients(value.recipients);
+    if (value.kind !== 'manual_owner_test' || value.requestId !== completionRequestId || value.preparationContinuation !== true ||
+        value.workerVersion !== '3c831148-ba24-484e-a566-295bd2f15762' || !value.postInitiatedAt ||
+        Object.keys(value).some(key => key.startsWith('verifiedUnsentCompletion'))) {
+      throw new Error('verified_unsent_completion_original_evidence_invalid');
+    }
+  }
+  for (const channel of ['sms', 'email']) {
+    const outcome = previous[channel];
+    if (outcome?.accepted !== false || outcome.httpStatus !== null || outcome.id !== null ||
+        outcome.status !== 'acceptance_uncertain' || outcome.error !== 'provider_acceptance_uncertain_verify_before_retry') {
+      throw new Error('verified_unsent_completion_original_outcome_not_eligible');
+    }
+  }
+  return { ...previous, deliveryVerification };
+}
+
+function verifiedUnsentCompletionPredicate(requestId, payload) {
+  const unchangedRequest = `EXISTS(SELECT 1 FROM review_requests WHERE id=${quoteSql(requestId)} AND job_id=${quoteSql(OWNER_REVIEW_TEST.jobId)} AND job_type='manual_owner_test' AND customer_key IS NULL AND payload=${quoteSql(payload)})`;
+  const recipient = `(channel='sms' AND recipient=${quoteSql(OWNER_REVIEW_TEST.phone)} OR channel='email' AND recipient=${quoteSql(OWNER_REVIEW_TEST.email)})`;
+  const unchangedRows = `(SELECT COUNT(*) FROM review_request_deliveries WHERE request_id=${quoteSql(requestId)} AND status='failed' AND reason=${quoteSql(uncertainReason)} AND provider_message_id IS NULL AND sent_at IS NULL AND ${recipient})=2`;
+  const exactlyTwo = `(SELECT COUNT(*) FROM review_request_deliveries WHERE request_id=${quoteSql(requestId)})=2`;
+  return `${unchangedRequest} AND ${unchangedRows} AND ${exactlyTwo}`;
+}
+
+function verifyVerifiedUnsentCompletion(previous) {
+  const response = d1(`SELECT r.id AS request_id,r.job_type,r.payload,r.customer_key,d.channel,d.status,d.reason,d.recipient,d.provider_message_id,d.sent_at,(SELECT COUNT(*) FROM airtable_cockpit_snapshots WHERE snapshot_key=${quoteSql(OWNER_REVIEW_TEST.approvalKey)}) AS prior_approvals,(SELECT COUNT(*) FROM review_requests WHERE job_type!='manual_owner_test') AS customer_request_count FROM review_requests r JOIN review_request_deliveries d ON d.request_id=r.id WHERE r.job_id=${quoteSql(OWNER_REVIEW_TEST.jobId)} LIMIT 3;`, `verified-unsent-completion-preflight-${Date.now()}`);
+  const rows = response?.[0]?.results;
+  if (!Array.isArray(rows) || rows.length !== 2 || new Set(rows.map(row => row.channel)).size !== 2 ||
+      rows.some(row => row.request_id !== completionRequestId || row.request_id !== previous.requestId || row.job_type !== 'manual_owner_test' || row.customer_key !== null ||
+        !['sms', 'email'].includes(row.channel) || row.status !== 'failed' || row.reason !== uncertainReason ||
+        row.provider_message_id !== null || row.sent_at !== null || row.prior_approvals !== 0 || row.customer_request_count !== 0 ||
+        row.recipient !== (row.channel === 'sms' ? OWNER_REVIEW_TEST.phone : OWNER_REVIEW_TEST.email))) {
+    throw new Error('verified_unsent_completion_ledger_not_eligible');
+  }
+  let payload;
+  try { payload = JSON.parse(rows[0].payload); } catch { throw new Error('verified_unsent_completion_payload_invalid'); }
+  if (rows.some(row => row.payload !== rows[0].payload) || payload.kind !== 'manual_owner_test' || payload.firstName !== 'Craig' ||
+      payload.tech !== 'Tony' || payload.preparationContinuation !== true ||
+      Object.keys(payload).some(key => key.startsWith('verifiedUnsentCompletion'))) {
+    throw new Error('verified_unsent_completion_payload_not_eligible');
+  }
+  return { requestId: completionRequestId, payload: rows[0].payload, deliveryVerification: previous.deliveryVerification };
+}
+
+function archiveUncertainEvidence() {
+  for (const name of ['result.json', 'receipt.md', 'report.md']) {
+    fs.writeFileSync(path.join(receiptDir, `uncertain-attempt-${name}`), fs.readFileSync(path.join(receiptDir, name)), { flag: 'wx' });
+  }
+}
+
 function recoverLedgerOutcome(result) {
-  const response = d1(`SELECT r.id AS request_id,r.job_type,d.channel,d.status,d.reason,d.provider_message_id FROM review_requests r LEFT JOIN review_request_deliveries d ON d.request_id=r.id WHERE r.job_id=${quoteSql(OWNER_REVIEW_TEST.jobId)} LIMIT 3;`, result.preparationContinuation ? 'owner-test-preparation-continuation-ledger-recovery' : 'owner-test-ledger-recovery');
+  const response = d1(`SELECT r.id AS request_id,r.job_type,d.channel,d.status,d.reason,d.provider_message_id FROM review_requests r LEFT JOIN review_request_deliveries d ON d.request_id=r.id WHERE r.job_id=${quoteSql(OWNER_REVIEW_TEST.jobId)} LIMIT 3;`, result.verifiedUnsentCompletion ? 'owner-test-verified-unsent-completion-ledger-recovery' : result.preparationContinuation ? 'owner-test-preparation-continuation-ledger-recovery' : 'owner-test-ledger-recovery');
   const rows = response?.[0]?.results;
   if (!Array.isArray(rows) || !rows.length) return { found: false, readOnly: true };
   const requestId = rows[0].request_id;
@@ -185,7 +260,8 @@ function recoverLedgerOutcome(result) {
     const reason = String(row.reason || '');
     const match = /^manual_owner_test_http_(\d{3}|none)_(.*)$/.exec(reason);
     const httpStatus = match && match[1] !== 'none' ? Number(match[1]) : null;
-    const accepted = row.status === 'sent' ? true : row.status === 'failed' && !reason.includes('uncertain') ? false : null;
+    const uncertain = /uncertain|provider_(?:network|timeout|internal|missing_provider_id|rejected_or_missing_id)(?:_|$)|missing_provider_id/.test(reason);
+    const accepted = row.status === 'sent' ? true : row.status === 'failed' && !uncertain ? false : null;
     result[row.channel] = safeProvider({ accepted, httpStatus, id: row.provider_message_id,
       status: accepted === true ? 'provider_accepted_delivery_not_confirmed' : accepted === false ? 'failed' : 'acceptance_uncertain',
       error: accepted === true ? null : match?.[2] || reason.replace(/^manual_owner_test_/, '') });
@@ -229,6 +305,7 @@ function writeReceipt(result) {
     `og:image URL: ${result.ogImageUrl || 'not returned'}`,
     `POST attempts: ${result.postAttempts}`,
     ...(result.preparationContinuation ? ['Preparation continuation: same request; original preparation stopped before either provider send.', 'Original evidence: source-preflight-result.json, source-preflight-receipt.md, source-preflight-report.md.'] : []),
+    ...(result.verifiedUnsentCompletion ? ['Verified-unsent completion: same locked request after fresh independent delivery checks.', 'Uncertain attempt evidence: uncertain-attempt-result.json, uncertain-attempt-receipt.md, uncertain-attempt-report.md.', `Delivery verification: ${JSON.stringify(result.deliveryVerification)}`] : []),
     ...(result.ledgerRecovery ? [`Read-only ledger recovery: ${result.ledgerRecovery.found === true ? 'provider results recovered' : 'provider results not recovered'}`] : []),
     ...(result.error ? [`Error: ${result.error}`] : []),
     ...(result.sms?.error ? [`Quo error: ${result.sms.error}`] : []),
@@ -244,6 +321,7 @@ function writeReceipt(result) {
     `Worker: ${result.workerVersion}. Global review automation flag: ${result.preflight?.reviewRequestsEnabled || 'not verified'}.`,
     `Endpoint POST attempts in this invocation: ${result.postAttempts}. Each provider may be attempted once.`,
     ...(result.preparationContinuation ? ['This continues the same manual request after the original source preflight stopped before either provider send. Original attempt and preparation evidence were retained.'] : []),
+    ...(result.verifiedUnsentCompletion ? ['This is the single authorized verified-unsent completion of the same locked request. Fresh Quo, Outlook and Gmail delivery checks found no review request. The earlier uncertain attempt evidence was retained.'] : []),
     `Quo: ${status(result.sms)}. Resend: ${status(result.email)}.`,
     'Recipients and source line are fixed in code. The test is identified separately in the review-request ledger.',
     'The CLI writes only a short-lived one-off approval record; it does not write Worker vars, secrets or migrations.',
@@ -257,27 +335,36 @@ function writeReceipt(result) {
 async function main() {
   const args = process.argv.slice(2);
   const continuation = args.length === 3 && args[2] === '--continue-preparation';
-  if ((!continuation && args.length !== 2) || args[0] !== '--worker-version' || !uuid.test(args[1])) {
+  const completion = args.length === 5 && args[2] === '--complete-verified-unsent' && args[3] === '--verification-file' && Boolean(args[4]);
+  if ((!continuation && !completion && args.length !== 2) || args[0] !== '--worker-version' || !uuid.test(args[1])) {
     throw new Error('usage_node_scripts_send_owner_review_test_mjs_worker_version_UUID_optional_continue_preparation');
   }
   fs.mkdirSync(receiptDir, { recursive: true });
   // An earlier uncertain send stays terminal. The explicit continuation accepts
   // only the proved source-preflight branch that attempted neither provider.
-  if (continuation) {
+  if (completion) {
+    if (!fs.existsSync(attemptPath) || !fs.existsSync(continuationPath)) throw new Error('verified_unsent_completion_original_attempt_missing');
+    if (fs.existsSync(completionPath)) throw new Error('verified_unsent_completion_already_recorded_no_retry');
+  } else if (continuation) {
     if (!fs.existsSync(attemptPath)) throw new Error('preparation_continuation_original_attempt_missing');
     if (fs.existsSync(continuationPath)) throw new Error('preparation_continuation_already_recorded_no_retry');
   } else if (fs.existsSync(attemptPath)) throw new Error('owner_test_attempt_already_recorded_no_retry');
-  const activeAttemptPath = continuation ? continuationPath : attemptPath;
-  const previous = continuation ? readPreparationEvidence() : null;
+  const activeAttemptPath = completion ? completionPath : continuation ? continuationPath : attemptPath;
+  const previous = completion ? readVerifiedUnsentEvidence(args[4]) : continuation ? readPreparationEvidence() : null;
   const result = { timestamp: new Date().toISOString(), workerVersion: args[1], postAttempts: 0,
     recipients: { phone: OWNER_REVIEW_TEST.phone, email: OWNER_REVIEW_TEST.email },
-    ...(continuation ? { preparationContinuation: true, requestId: previous.requestId } : {}) };
-  let mayWriteReceipt = !continuation;
+    ...(continuation ? { preparationContinuation: true, requestId: previous.requestId } : {}),
+    ...(completion ? { verifiedUnsentCompletion: true, requestId: previous.requestId, deliveryVerification: previous.deliveryVerification } : {}) };
+  let mayWriteReceipt = !continuation && !completion;
   try {
     assertOwnerReviewTestRecipients(result.recipients);
     result.preflight = assertSafeProductionVersion(result.workerVersion);
     let resume;
-    if (continuation) {
+    if (completion) {
+      resume = verifyVerifiedUnsentCompletion(previous);
+      archiveUncertainEvidence();
+      mayWriteReceipt = true;
+    } else if (continuation) {
       resume = verifyPreparationContinuation(previous);
       archivePreparationEvidence();
       mayWriteReceipt = true;
@@ -288,23 +375,27 @@ async function main() {
     }
     fs.writeFileSync(activeAttemptPath, JSON.stringify({ kind: 'manual_owner_test', timestamp: result.timestamp,
       workerVersion: result.workerVersion, recipients: result.recipients, retryAllowed: false,
-      ...(resume ? { preparationContinuation: true, requestId: resume.requestId } : {}) }, null, 2) + '\n', { flag: 'wx' });
+      ...(continuation ? { preparationContinuation: true, requestId: resume.requestId } : {}),
+      ...(completion ? { verifiedUnsentCompletion: true, requestId: resume.requestId, deliveryVerification: resume.deliveryVerification } : {}) }, null, 2) + '\n', { flag: 'wx' });
     const bearer = randomBytes(32).toString('hex');
     const approval = JSON.stringify({ tokenHash: createHash('sha256').update(bearer).digest('hex'),
       expiresAt: new Date(Date.now() + 15 * 60000).toISOString(), workerVersion: result.workerVersion,
-      ...(resume ? { preparationContinuation: true, resumeRequestId: resume.requestId } : {}) });
-    const predicate = resume ? preparationContinuationPredicate(resume.requestId, resume.payload) : `NOT EXISTS(SELECT 1 FROM review_requests WHERE job_id=${quoteSql(OWNER_REVIEW_TEST.jobId)})`;
-    const inserted = d1(`INSERT OR IGNORE INTO airtable_cockpit_snapshots(snapshot_key,payload,status,captured_at,updated_at) SELECT ${quoteSql(OWNER_REVIEW_TEST.approvalKey)},${quoteSql(approval)},'success',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP WHERE ${predicate};`, resume ? 'owner-test-preparation-continuation-approval' : 'owner-test-approval');
+      ...(continuation ? { preparationContinuation: true, resumeRequestId: resume.requestId } : {}),
+      ...(completion ? { verifiedUnsentCompletion: true, resumeRequestId: resume.requestId, deliveryVerification: resume.deliveryVerification } : {}) });
+    const predicate = completion ? verifiedUnsentCompletionPredicate(resume.requestId, resume.payload) : continuation ? preparationContinuationPredicate(resume.requestId, resume.payload) : `NOT EXISTS(SELECT 1 FROM review_requests WHERE job_id=${quoteSql(OWNER_REVIEW_TEST.jobId)})`;
+    const inserted = d1(`INSERT OR IGNORE INTO airtable_cockpit_snapshots(snapshot_key,payload,status,captured_at,updated_at) SELECT ${quoteSql(OWNER_REVIEW_TEST.approvalKey)},${quoteSql(approval)},'success',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP WHERE ${predicate};`, completion ? 'owner-test-verified-unsent-completion-approval' : continuation ? 'owner-test-preparation-continuation-approval' : 'owner-test-approval');
     if (inserted?.[0]?.meta?.changes !== 1) throw new Error('one_off_approval_not_inserted_no_send');
     // Recheck production after the approval write. No POST may target a newer or
     // partially rolled-out Worker, even if a deployment raced with preflight.
     assertSafeProductionVersion(result.workerVersion);
+    if (completion) assertFreshDeliveryVerification(resume.deliveryVerification);
     result.postAttempts = 1;
     result.postInitiatedAt = new Date().toISOString();
     fs.writeFileSync(activeAttemptPath, JSON.stringify({ kind: 'manual_owner_test', timestamp: result.timestamp,
       postInitiatedAt: result.postInitiatedAt, workerVersion: result.workerVersion,
       recipients: result.recipients, retryAllowed: false,
-      ...(resume ? { preparationContinuation: true, requestId: resume.requestId } : {}) }, null, 2) + '\n');
+      ...(continuation ? { preparationContinuation: true, requestId: resume.requestId } : {}),
+      ...(completion ? { verifiedUnsentCompletion: true, requestId: resume.requestId, deliveryVerification: resume.deliveryVerification } : {}) }, null, 2) + '\n');
     const response = await fetch(endpoint, {
       method: 'POST', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(60000),
       headers: { Authorization: `Bearer ${bearer}`, Origin: origin, 'Content-Type': 'application/json' },
@@ -316,7 +407,7 @@ async function main() {
     try { data = JSON.parse(new TextDecoder().decode(bytes)); }
     catch { throw new Error('test_endpoint_non_json_response_no_retry'); }
     if (!response.ok) throw new Error(`test_endpoint_rejected_http_${response.status}_no_retry`);
-    if (continuation && data?.requestId !== previous.requestId) throw new Error('preparation_continuation_response_request_changed');
+    if ((continuation || completion) && data?.requestId !== previous.requestId) throw new Error('owner_test_completion_response_request_changed');
     Object.assign(result, safeResult(data, result.workerVersion));
     try { result.previewVerification = await verifyPreview(result); }
     catch { result.previewVerification = { error: 'read_only_preview_verification_failed' }; }

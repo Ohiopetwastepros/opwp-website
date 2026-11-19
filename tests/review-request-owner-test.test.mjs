@@ -6,19 +6,37 @@ import { createHash } from 'node:crypto';
 import vm from 'node:vm';
 import { OWNER_REVIEW_TEST, assertOwnerReviewTestRecipients, runOwnerReviewTest } from '../lib/review-request-owner-test.mjs';
 import { reviewRequestPageUrl, reviewRequestImageUrl } from '../lib/review-request-content.mjs';
-import { readBoundedBytes } from '../lib/bounded-body.mjs';
+import { readBoundedBytes, readBoundedProviderJson } from '../lib/bounded-body.mjs';
+import { outboundFetch } from '../lib/outbound-request.js';
+
+// Execute the production helpers; only their application-specific import wiring
+// is replaced so the owner tests remain independent of the Next.js runtime.
+function helperSource(relative) {
+  return readFileSync(new URL(relative, import.meta.url), 'utf8')
+    .replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, '');
+}
+const sendSms = vm.runInNewContext(helperSource('../lib/quote-follow-up-delivery.js') + '\nsendQuoText', {
+  outboundFetch, readBoundedProviderJson, URL,
+});
+const sendEmail = vm.runInNewContext(helperSource('../lib/submission-notifications.js') + '\nsendTransactionalEmail', {
+  outboundFetch, readBoundedProviderJson, URL, crypto: globalThis.crypto,
+});
 
 const NOW = new Date('2026-11-19T06:00:00Z'); // 1 AM Eastern: normal automation is quiet.
 const VERSION = '123e4567-e89b-42d3-a456-426614174000';
 const CAPABILITY = 'ab'.repeat(32);
 const SOURCE_FAILURE_REASON = 'manual_owner_test_http_none_source_line_verification_failed';
+const UNSENT_REQUEST_ID = '61f7de2b-f6b6-4c2c-ace5-726424736168';
+const UNCERTAIN_REASON = 'manual_owner_test_http_none_provider_acceptance_uncertain_verify_before_retry';
+const DELIVERY_VERIFICATION = Object.freeze({ checkedAt: new Date(NOW.getTime() - 60_000).toISOString(),
+  quoNoMessagesAfter0600Z: true, outlookNoReviewEmail: true, gmailNoReviewEmail: true });
 
 function fixture() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('PRAGMA foreign_keys=ON');
   sqlite.exec(readFileSync(new URL('../schema-proposals/0067_review_requests.sql', import.meta.url), 'utf8'));
   sqlite.exec('CREATE TABLE airtable_cockpit_snapshots(snapshot_key TEXT PRIMARY KEY,payload TEXT,status TEXT,captured_at TEXT,updated_at TEXT)');
-  const writes = [], reads = [], calls = [], previews = [];
+  const writes = [], reads = [], calls = [], previews = [], verifications = [];
   let failSmsLedger = false;
   let beforeBatch = null;
   const db = {
@@ -69,20 +87,32 @@ function fixture() {
     sqlite.prepare('INSERT OR REPLACE INTO airtable_cockpit_snapshots(snapshot_key,payload,status) VALUES(?,?,?)')
       .run(OWNER_REVIEW_TEST.approvalKey, payload, 'success');
   }
-  let previewFailure = null, failureChannel = null, networkFailureChannel = null;
+  let previewFailure = null, previewTech = 'tony', failureChannel = null, networkFailureChannel = null, missingIdChannel = null, malformedIdChannel = null, transportFailureName = 'Error';
+  let inspectDispatch = null;
   const preparePreview = async (_env, options) => {
     previews.push(options);
     if (previewFailure) throw new Error(previewFailure);
-    return { token: options.token, tech: 'tony', pageUrl: reviewRequestPageUrl(options.token), imageUrl: reviewRequestImageUrl(options.token) };
+    return { token: options.token, tech: previewTech, pageUrl: reviewRequestPageUrl(options.token), imageUrl: reviewRequestImageUrl(options.token) };
+  };
+  const verifyPreview = async (_env, options) => {
+    verifications.push(options);
+    if (previewFailure) throw new Error(previewFailure);
+    return { token: options.token, tech: previewTech, pageUrl: reviewRequestPageUrl(options.token), imageUrl: reviewRequestImageUrl(options.token) };
   };
   const fetchProvider = async (url, init = {}) => {
     const parsed = new URL(url);
-    assert.equal(init.method, 'POST', 'the owner send uses its configured phone ID without a phone-number listing lookup');
+    assert.equal(init.method, 'POST', 'the shared sender uses its configured E.164 line without an extra phone-number lookup');
+    assert.notEqual(init.redirect, 'error', 'provider POST uses the proven outbound helper redirect behavior');
+    if (inspectDispatch) inspectDispatch();
     const channel = parsed.hostname === 'api.openphone.com' ? 'sms' : parsed.hostname === 'api.resend.com' ? 'email' : 'unexpected';
     const call = { channel, url: parsed.href, options: init, body: JSON.parse(init.body) };
     calls.push(call);
-    if (channel === networkFailureChannel) throw new Error('provider-private-network-error');
+    if (channel === networkFailureChannel) {
+      const error = new Error('provider-private-network-error'); error.name = transportFailureName; throw error;
+    }
     if (channel === failureChannel) return Response.json({ message: 'provider-private-payload-do-not-expose', api_key: 'provider-private-secret-do-not-expose' }, { status: 422 });
+    if (channel === missingIdChannel) return Response.json({}, { status: 202 });
+    if (channel === malformedIdChannel) return Response.json({ id: 'provider-private/malformed-id' }, { status: 202 });
     if (channel === 'sms') return Response.json({ data: { id: 'fixture-quo-message', status: 'queued' } }, { status: 202 });
     if (channel === 'email') return Response.json({ id: 'fixture-resend-message' }, { status: 200 });
     throw new Error('Unexpected provider destination');
@@ -91,10 +121,9 @@ function fixture() {
   const run = (options = {}) => runOwnerReviewTest(env, {
     phone: OWNER_REVIEW_TEST.phone, email: OWNER_REVIEW_TEST.email,
     authorization: `Bearer ${CAPABILITY}`, now: NOW, ...options,
-  }, { preparePreview, fetchProvider });
+  }, { preparePreview, verifyPreview, fetchProvider, sendSms, sendEmail });
   const deliveries = () => sqlite.prepare('SELECT * FROM review_request_deliveries ORDER BY channel').all();
-  function prepareSourceFailure() {
-    const requestId = 'ed4bd231-1111-4111-8111-111111111111';
+  function prepareSourceFailure(requestId = 'ed4bd231-1111-4111-8111-111111111111') {
     sqlite.prepare(`INSERT INTO review_requests(id,customer_name,job_id,job_date,completed_at,job_type,tech,page_slug,template_version,payload)
       VALUES(?,'Craig',?,'2026-11-19',?,'manual_owner_test','Tony','tony','initial-cleanup-v1',?)`)
       .run(requestId, OWNER_REVIEW_TEST.jobId, NOW.toISOString(), JSON.stringify({ kind: 'manual_owner_test', firstName: 'Craig', tech: 'Tony', quietHoursBypassed: true, workerVersion: VERSION }));
@@ -110,12 +139,23 @@ function fixture() {
     authorize({ preparationContinuation: true, resumeRequestId: requestId });
     return { requestId, oldUnsubscribeHash };
   }
+  function prepareUncertainFailure() {
+    const prior = prepareSourceFailure(UNSENT_REQUEST_ID);
+    sqlite.prepare("UPDATE review_requests SET payload=json_set(payload,'$.preparationContinuation',json('true'),'$.preparationContinuationAt',?,'$.preparationContinuationClaim','prior-preparation-claim')").run(NOW.toISOString());
+    sqlite.prepare('UPDATE review_request_deliveries SET reason=?').run(UNCERTAIN_REASON);
+    authorize({ verifiedUnsentCompletion: true, resumeRequestId: UNSENT_REQUEST_ID, deliveryVerification: DELIVERY_VERIFICATION });
+    return prior;
+  }
   return {
-    sqlite, db, env, writes, reads, calls, previews, authorize, run, deliveries, prepareSourceFailure,
+    sqlite, db, env, writes, reads, calls, previews, verifications, authorize, run, deliveries, prepareSourceFailure, prepareUncertainFailure,
     failPreview: () => { previewFailure = 'fixture storage unavailable'; },
+    changePreviewTech: tech => { previewTech = tech; },
     failProvider: channel => { failureChannel = channel; },
     failSmsLedger: () => { failSmsLedger = true; },
-    failNetwork: channel => { networkFailureChannel = channel; },
+    failNetwork: (channel, name = 'Error') => { networkFailureChannel = channel; transportFailureName = name; },
+    omitProviderId: channel => { missingIdChannel = channel; },
+    malformedProviderId: channel => { malformedIdChannel = channel; },
+    inspectDispatch: callback => { inspectDispatch = callback; },
     beforeNextBatch: callback => { beforeBatch = callback; },
   };
 }
@@ -191,7 +231,7 @@ test('the locked manual test bypasses quiet hours with flag false and records on
     assert.equal(result.email.accepted, true); assert.equal(result.email.httpStatus, 200); assert.equal(result.email.id, 'fixture-resend-message');
     const sms = f.calls.find(call => call.channel === 'sms').body;
     assert.deepEqual(sms.to, [OWNER_REVIEW_TEST.phone]);
-    assert.equal(sms.from, OWNER_REVIEW_TEST.phoneId);
+    assert.equal(sms.from, OWNER_REVIEW_TEST.from);
     assert.equal(sms.content, `Hi Craig, this is Craig with Ohio Pet Waste Pros. Thanks for letting Tony take care of your yard! If you were happy with the cleanup, would you take a minute to leave us a Google review? It really helps our small family business grow. 😃 ${result.previewPageUrl}\n\nReply STOP to opt out`);
     const email = f.calls.find(call => call.channel === 'email').body;
     assert.deepEqual(email.to, [OWNER_REVIEW_TEST.email]);
@@ -222,6 +262,21 @@ test('a persisted preview is required before either provider can be called', asy
   } finally { f.sqlite.close(); }
 });
 
+test('a preview for another technician aborts both channels before any provider send', async t => {
+  for (const completion of [false, true]) await t.test(completion ? 'existing approved preview' : 'new preview', async () => {
+    const f = fixture();
+    try {
+      if (completion) f.prepareUncertainFailure();
+      f.changePreviewTech('craig');
+      const result = await f.run();
+      assert.equal(f.calls.length, 0);
+      assert.equal(result.sms.status, 'not_attempted'); assert.equal(result.email.status, 'not_attempted');
+      assert.equal(result.sms.accepted, false); assert.equal(result.email.accepted, false);
+      assert.ok(f.deliveries().every(row => row.status === 'failed' && row.provider_message_id === null && row.sent_at === null));
+    } finally { f.sqlite.close(); }
+  });
+});
+
 test('one-use approval and the unique manual ledger prevent repeated and concurrent sends', async () => {
   const f = fixture();
   try {
@@ -244,7 +299,7 @@ test('the one-time preparation continuation reuses the original unsent request a
     assert.equal(result.ogImageUrl, reviewRequestImageUrl(requestId));
     assert.equal(f.calls.length, 2); assert.equal(f.previews.length, 1);
     assert.equal(f.previews[0].token, requestId);
-    assert.equal(f.calls.find(call => call.channel === 'sms').body.from, OWNER_REVIEW_TEST.phoneId);
+    assert.equal(f.calls.find(call => call.channel === 'sms').body.from, OWNER_REVIEW_TEST.from);
     const request = f.sqlite.prepare('SELECT * FROM review_requests').get();
     assert.equal(request.id, requestId); assert.equal(request.customer_key, null);
     assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM review_requests').get().n, 1);
@@ -341,6 +396,131 @@ test('a preparation continuation cannot repeat after its preview fails', async (
   } finally { f.sqlite.close(); }
 });
 
+test('verified-unsent completion claims the same locked request once and reuses its existing preview', async () => {
+  const f = fixture();
+  try {
+    const { requestId } = f.prepareUncertainFailure();
+    f.inspectDispatch(() => {
+      const payload = JSON.parse(f.sqlite.prepare('SELECT payload FROM review_requests').get().payload);
+      assert.equal(payload.verifiedUnsentCompletion, true, 'the one-use marker is stored before either provider POST');
+      assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM airtable_cockpit_snapshots').get().n, 0);
+    });
+    const result = await f.run();
+    assert.equal(result.requestId, UNSENT_REQUEST_ID);
+    assert.equal(result.requestId, requestId);
+    assert.equal(f.previews.length, 0, 'completion must not recreate the approved preview');
+    assert.equal(f.verifications.length, 1);
+    assert.equal(f.verifications[0].token, requestId);
+    assert.equal(f.calls.length, 2);
+    assert.equal(result.sms.accepted, true); assert.equal(result.sms.httpStatus, 202);
+    assert.equal(result.email.accepted, true); assert.equal(result.email.httpStatus, 200);
+    assert.equal(f.calls.find(call => call.channel === 'sms').body.from, OWNER_REVIEW_TEST.from);
+    assert.deepEqual(f.calls.find(call => call.channel === 'sms').body.to, [OWNER_REVIEW_TEST.phone]);
+    assert.deepEqual(f.calls.find(call => call.channel === 'email').body.to, [OWNER_REVIEW_TEST.email]);
+    assert.match(f.calls.find(call => call.channel === 'sms').body.content, /Reply STOP to opt out$/);
+    assert.match(f.calls.find(call => call.channel === 'email').body.text, /Email: craig@ohiopetwastepros\.com/);
+    const request = f.sqlite.prepare('SELECT * FROM review_requests').get();
+    const payload = JSON.parse(request.payload);
+    assert.equal(payload.preparationContinuation, true, 'prior preparation evidence remains present');
+    assert.equal(payload.verifiedUnsentCompletion, true);
+    assert.ok(f.deliveries().every(row => row.request_id === requestId && row.status === 'sent' && row.provider_message_id && row.sent_at));
+    assert.deepEqual(f.deliveries().map(row => row.id).sort(), ['original-email', 'original-sms']);
+    assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM review_requests').get().n, 1);
+    assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM review_request_customers').get().n, 0);
+    assert.equal(f.env.REVIEW_REQUESTS_ENABLED, 'false');
+    f.authorize({ verifiedUnsentCompletion: true, resumeRequestId: requestId, deliveryVerification: DELIVERY_VERIFICATION });
+    await assert.rejects(f.run(), error => error.status === 409);
+    assert.equal(f.calls.length, 2);
+  } finally { f.sqlite.close(); }
+});
+
+test('verified-unsent completion refuses missing, stale or contrary independent delivery evidence', async t => {
+  const approvals = [
+    ['missing evidence', { deliveryVerification: undefined }],
+    ['malformed check time', { deliveryVerification: { ...DELIVERY_VERIFICATION, checkedAt: 'invalid' } }],
+    ['stale evidence', { deliveryVerification: { ...DELIVERY_VERIFICATION, checkedAt: new Date(NOW.getTime() - 300_001).toISOString() } }],
+    ['future evidence', { deliveryVerification: { ...DELIVERY_VERIFICATION, checkedAt: new Date(NOW.getTime() + 1).toISOString() } }],
+    ...['quoNoMessagesAfter0600Z', 'outlookNoReviewEmail', 'gmailNoReviewEmail'].flatMap(key => [
+      [`${key} false`, { deliveryVerification: { ...DELIVERY_VERIFICATION, [key]: false } }],
+      [`${key} absent`, { deliveryVerification: { ...DELIVERY_VERIFICATION, [key]: undefined } }],
+    ]),
+    ['wrong request', { resumeRequestId: '11111111-1111-4111-8111-111111111111' }],
+    ['mixed continuation approval', { preparationContinuation: true }],
+  ];
+  for (const [name, overrides] of approvals) await t.test(name, async () => {
+    const f = fixture();
+    try {
+      f.prepareUncertainFailure();
+      f.authorize({ verifiedUnsentCompletion: true, resumeRequestId: UNSENT_REQUEST_ID, deliveryVerification: DELIVERY_VERIFICATION, ...overrides });
+      await assert.rejects(f.run());
+      assert.equal(f.calls.length, 0); assert.equal(f.previews.length, 0); assert.equal(f.verifications.length, 0);
+      assert.equal(JSON.parse(f.sqlite.prepare('SELECT payload FROM review_requests').get().payload).verifiedUnsentCompletion, undefined);
+    } finally { f.sqlite.close(); }
+  });
+});
+
+test('verified-unsent completion refuses any changed ledger or an existing completion marker', async t => {
+  const cases = [
+    ['SMS provider ID present', f => f.sqlite.prepare("UPDATE review_request_deliveries SET provider_message_id='already-attempted' WHERE channel='sms'").run()],
+    ['email provider ID empty', f => f.sqlite.prepare("UPDATE review_request_deliveries SET provider_message_id='' WHERE channel='email'").run()],
+    ['SMS sent timestamp present', f => f.sqlite.prepare("UPDATE review_request_deliveries SET sent_at=CURRENT_TIMESTAMP WHERE channel='sms'").run()],
+    ['email sent timestamp present', f => f.sqlite.prepare("UPDATE review_request_deliveries SET sent_at=CURRENT_TIMESTAMP WHERE channel='email'").run()],
+    ['SMS recipient changed', f => f.sqlite.prepare("UPDATE review_request_deliveries SET recipient='+12025550100' WHERE channel='sms'").run()],
+    ['email recipient changed', f => f.sqlite.prepare("UPDATE review_request_deliveries SET recipient='other@example.test' WHERE channel='email'").run()],
+    ['reason changed', f => f.sqlite.prepare('UPDATE review_request_deliveries SET reason=? WHERE channel=\'sms\'').run(SOURCE_FAILURE_REASON)],
+    ['sending status', f => f.sqlite.prepare("UPDATE review_request_deliveries SET status='sending' WHERE channel='email'").run()],
+    ['missing channel', f => f.sqlite.prepare("DELETE FROM review_request_deliveries WHERE channel='email'").run()],
+    ['nonmanual request', f => f.sqlite.prepare("UPDATE review_requests SET job_type='initial'").run()],
+    ['missing preparation marker', f => f.sqlite.prepare("UPDATE review_requests SET payload=json_remove(payload,'$.preparationContinuation')").run()],
+    ['completion marker false', f => f.sqlite.prepare("UPDATE review_requests SET payload=json_set(payload,'$.verifiedUnsentCompletion',json('false'))").run()],
+    ['completion marker null', f => f.sqlite.prepare("UPDATE review_requests SET payload=json_set(payload,'$.verifiedUnsentCompletionAt',NULL)").run()],
+    ['completion claim present', f => f.sqlite.prepare("UPDATE review_requests SET payload=json_set(payload,'$.verifiedUnsentCompletionClaim','previous')").run()],
+  ];
+  for (const [name, mutate] of cases) await t.test(name, async () => {
+    const f = fixture();
+    try {
+      f.prepareUncertainFailure(); mutate(f);
+      await assert.rejects(f.run());
+      assert.equal(f.calls.length, 0); assert.equal(f.previews.length, 0); assert.equal(f.verifications.length, 0);
+    } finally { f.sqlite.close(); }
+  });
+});
+
+test('concurrent verified-unsent completions claim the original rows once', async () => {
+  const f = fixture();
+  try {
+    f.prepareUncertainFailure();
+    const attempts = await Promise.allSettled([f.run(), f.run()]);
+    assert.equal(attempts.filter(attempt => attempt.status === 'fulfilled').length, 1);
+    assert.equal(f.calls.length, 2); assert.equal(f.previews.length, 0); assert.equal(f.verifications.length, 1);
+    assert.equal(f.deliveries().length, 2);
+  } finally { f.sqlite.close(); }
+});
+
+test('verified-unsent completion rechecks provider evidence atomically before claiming', async () => {
+  const f = fixture();
+  try {
+    f.prepareUncertainFailure();
+    f.beforeNextBatch(() => f.sqlite.prepare("UPDATE review_request_deliveries SET provider_message_id='concurrent-provider-id' WHERE channel='sms'").run());
+    await assert.rejects(f.run());
+    assert.equal(f.calls.length, 0); assert.equal(f.previews.length, 0); assert.equal(f.verifications.length, 0);
+    assert.equal(JSON.parse(f.sqlite.prepare('SELECT payload FROM review_requests').get().payload).verifiedUnsentCompletion, undefined);
+  } finally { f.sqlite.close(); }
+});
+
+test('verified-unsent completion cannot repeat after existing preview verification fails', async () => {
+  const f = fixture();
+  try {
+    f.prepareUncertainFailure(); f.failPreview();
+    const result = await f.run();
+    assert.equal(result.sms.status, 'not_attempted'); assert.equal(result.email.status, 'not_attempted');
+    assert.equal(f.calls.length, 0); assert.equal(f.previews.length, 0); assert.equal(f.verifications.length, 1);
+    f.authorize({ verifiedUnsentCompletion: true, resumeRequestId: UNSENT_REQUEST_ID, deliveryVerification: DELIVERY_VERIFICATION });
+    await assert.rejects(f.run());
+    assert.equal(f.calls.length, 0); assert.equal(f.verifications.length, 1);
+  } finally { f.sqlite.close(); }
+});
+
 test('provider rejection is terminal, keeps the backup send, and exposes only safe status', async t => {
   for (const channel of ['sms', 'email']) await t.test(channel, async () => {
     const f = fixture();
@@ -390,11 +570,75 @@ test('an uncertain network response is terminal and does not prevent the other a
       assert.equal(f.calls.length, 2);
       assert.equal(result[channel].accepted, false); assert.equal(result[channel].status, 'acceptance_uncertain');
       assert.equal(result[channel].httpStatus, null); assert.equal(result[channel].id, null);
+      assert.equal(result[channel].error, 'provider_network_verify_before_retry');
       assert.equal(result[channel === 'sms' ? 'email' : 'sms'].accepted, true);
       assert.equal(f.deliveries().find(row => row.channel === channel).status, 'failed');
       assert.doesNotMatch(JSON.stringify(result), /provider-private/);
       f.authorize();
       await assert.rejects(f.run(), error => error.status === 409);
+      assert.equal(f.calls.length, 2);
+    } finally { f.sqlite.close(); }
+  });
+});
+
+test('transport timeouts retain a safe distinct category and never retry either provider', async t => {
+  for (const channel of ['sms', 'email']) await t.test(channel, async () => {
+    const f = fixture();
+    try {
+      f.failNetwork(channel, 'AbortError');
+      const result = await f.run();
+      assert.equal(f.calls.filter(call => call.channel === channel).length, 1);
+      assert.equal(f.calls.length, 2);
+      assert.equal(result[channel].error, 'provider_timeout_verify_before_retry');
+      assert.equal(result[channel].status, 'acceptance_uncertain');
+      assert.equal(result[channel].httpStatus, null);
+      assert.equal(result[channel].id, null);
+      assert.doesNotMatch(JSON.stringify(result), /provider-private/);
+      f.authorize();
+      await assert.rejects(f.run());
+      assert.equal(f.calls.length, 2);
+    } finally { f.sqlite.close(); }
+  });
+});
+
+test('an HTTP success without a provider ID retains its real status and stays terminal', async t => {
+  for (const channel of ['sms', 'email']) await t.test(channel, async () => {
+    const f = fixture();
+    try {
+      f.omitProviderId(channel);
+      const result = await f.run();
+      assert.equal(result[channel].accepted, false);
+      assert.equal(result[channel].httpStatus, 202);
+      assert.equal(result[channel].id, null);
+      assert.equal(result[channel].error, 'provider_missing_provider_id_verify_before_retry');
+      assert.equal(result[channel].status, 'acceptance_uncertain');
+      assert.equal(f.calls.length, 2);
+      assert.match(f.deliveries().find(row => row.channel === channel).reason, /^manual_owner_test_http_202_/);
+      f.authorize();
+      await assert.rejects(f.run());
+      assert.equal(f.calls.length, 2);
+    } finally { f.sqlite.close(); }
+  });
+});
+
+test('a malformed provider ID on HTTP success remains uncertain with the real HTTP status', async t => {
+  for (const channel of ['sms', 'email']) await t.test(channel, async () => {
+    const f = fixture();
+    try {
+      f.malformedProviderId(channel);
+      const result = await f.run();
+      assert.equal(result[channel].accepted, false);
+      assert.equal(result[channel].httpStatus, 202);
+      assert.equal(result[channel].id, null);
+      assert.equal(result[channel].status, 'acceptance_uncertain');
+      assert.equal(result[channel].error, 'provider_missing_provider_id_verify_before_retry');
+      assert.doesNotMatch(JSON.stringify(result), /provider-private/);
+      const delivery = f.deliveries().find(row => row.channel === channel);
+      assert.equal(delivery.status, 'failed'); assert.equal(delivery.provider_message_id, null); assert.equal(delivery.sent_at, null);
+      assert.match(delivery.reason, /^manual_owner_test_http_202_/);
+      assert.equal(f.calls.length, 2);
+      f.authorize();
+      await assert.rejects(f.run());
       assert.equal(f.calls.length, 2);
     } finally { f.sqlite.close(); }
   });
