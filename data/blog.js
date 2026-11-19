@@ -1,6 +1,9 @@
 // Ohio Pet Waste Pros — blog content.
 // Converted from the legacy blog-data.js IIFE into a clean ES module.
-// All 16 posts preserved verbatim. Image paths normalized to /assets/...
+// Pricing examples use the same chart as the quote form.
+import { PRICING, CLEANUP_RANGE_EXPLANATION, formatCleanupRange } from "../app/free-quote/pricing.js";
+
+const weeklyMonthly = PRICING.monthly.once_a_week;
 
 export const posts = [
   {
@@ -87,12 +90,13 @@ export const posts = [
     image: "/assets/photos/scooping-bell.jpg",
     alt: "Ohio Pet Waste Pros technician scooping a yard in Toledo",
     excerpt:
-      "Dog poop removal in the Toledo Metro typically runs $18–$30 per visit — here’s what affects the price and how monthly plans work.",
+      `Ohio Pet Waste Pros charges $${weeklyMonthly[1]} per month for weekly visits to a one-dog yard up to 1/8 acre in the Toledo area.`,
     paragraphs: [
-      "Dog poop removal services in the Toledo Metro area typically cost between $18 and $30 per visit for a standard-sized yard with one to two dogs. Prices may vary depending on factors like frequency (weekly vs. one-time), yard size, and number of dogs. Companies often offer monthly plans with discounted rates for recurring visits.",
+      `For two dogs in the same size yard, weekly service is $${weeklyMonthly[2]} per month. Prices may vary depending on factors like frequency (weekly vs. one-time), yard size, and number of dogs. Companies often offer monthly plans with discounted rates for recurring visits.`,
       "Some services also include spring cleanups, deodorizing treatments, or installation of pet waste stations, which can influence total cost. Always confirm whether pricing is based on per-visit charges or bundled into monthly packages. Many companies offer online quote tools for convenience.",
     ],
     tip: "For the most accurate pricing, it’s best to request a quote directly from a local service like Ohio Pet Waste Pros. Their transparent pricing and family-owned values make them a top choice for pet parents across Toledo.",
+    source: { label: "Ohio Pet Waste Pros instant quote", href: "/free-quote/" },
   },
   {
     slug: "how-professionals-pick-up-dog-poop",
@@ -228,15 +232,12 @@ export const posts = [
     image: "/assets/photos/dixie-red-scoop.jpg",
     alt: "A clean Toledo-area yard maintained by professional dog waste removal",
     excerpt:
-      "In the Toledo area, one-time cleanups run about $55–$175, while recurring weekly visits are far more affordable — generally $18–$30 per visit.",
+      `In the Toledo area, Ohio Pet Waste Pros offers one-time cleanups and recurring service. Weekly visits start at $${weeklyMonthly[1]} per month for one dog in a yard up to 1/8 acre.`,
     paragraphs: [
-      "In the Toledo Metro area, professional poop scooping services cost approximately $55 to $175 for a one-time cleanup, while recurring weekly visits are often more affordable—generally $18 to $30 per visit. Larger yards or excessive waste buildup may cost more due to additional labor.",
-      "Customers can often choose between flexible service plans—weekly, biweekly, or monthly—and get discounts for bundling with additional services like sanitizing. Local companies prioritize convenience and offer contactless billing and scheduling.",
+      `For one dog in a yard up to 1/8 acre that was last thoroughly cleaned about a month ago, a one-time cleanup is ${formatCleanupRange(PRICING.oneTimeCleanup.one_month[1])}. ${CLEANUP_RANGE_EXPLANATION}`,
+      "Customers can often choose between flexible service plans (weekly, biweekly, or monthly) and get discounts for bundling with additional services like sanitizing. Local companies prioritize convenience and offer contactless billing and scheduling.",
     ],
-    source: {
-      label: "Angi’s pet waste removal price comparison",
-      href: "https://www.angi.com/articles/how-much-does-pet-waste-removal-cost.htm",
-    },
+    source: { label: "Ohio Pet Waste Pros instant quote", href: "/free-quote/" },
   },
   {
     slug: "dog-poop-pickup-options-sylvania",

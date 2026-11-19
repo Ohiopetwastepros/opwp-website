@@ -1,7 +1,9 @@
 import { normalizeFrequency, normalizeLastCleaned, sngRequest } from "@/lib/sweepandgo";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { PRICING } from "@/app/free-quote/pricing";
 
 export const dynamic = "force-dynamic";
+const frequencies = new Set([...PRICING.frequencies.map(({ id }) => id), "bi_weekly", "monthly"]);
 
 export async function GET(request) {
   const rate = await checkRateLimit(request, { scope: "public_quote", limit: 60, windowSeconds: 300, failClosed: true });
@@ -13,7 +15,7 @@ export async function GET(request) {
   const lastCleaned = searchParams.get("last_cleaned") || "one_month";
 
   const dogCount = Number(dogs);
-  if (!/^\d{5}$/.test(zip ?? "") || !Number.isInteger(dogCount) || dogCount < 1 || dogCount > 7 || !["twice_a_week", "once_a_week", "every_other_week", "bi_weekly", "once_a_month", "monthly", "one_time"].includes(String(frequency))) {
+  if (!/^\d{5}$/.test(zip ?? "") || !Number.isInteger(dogCount) || dogCount < 1 || dogCount > 7 || !frequencies.has(frequency)) {
     return Response.json({ configured: false, error: "Need valid zip, dogs, and frequency" }, { status: 400 });
   }
 

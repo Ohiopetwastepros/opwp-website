@@ -219,7 +219,7 @@ test("identity, assistant, handoff, correction and pricing replies send at night
     ["yes", META_RESPONSES.yard],
     ["I have lots of poop buildup", META_RESPONSES.buildup],
     ["actually 3 dogs", "Thanks for clarifying."],
-    ["what is the price?", "$100.00 per month"],
+    ["what is the price?", "$110.00 per month"],
   ]) {
     const db = database(); approve(db); const env = { ...environment(db), META_CADENCE_APPROVAL_ID: "" };
     db.sqlite.exec("UPDATE lead_automation_settings SET quiet_hours_enabled=1,quiet_hours_start='20:00',quiet_hours_end='08:00'");
@@ -442,7 +442,7 @@ test("an accepted Meta quote and address atomically queue a deduplicated owner a
     const rendered = buildMetaOwnerNotification({ submissionId: saved.id, lead: { name: "ExampleLead Example", phone: "+14195550100" }, state: finalState });
     assert.equal(email.subject, "Facebook lead ready for signup and route audit");
     assert.equal(email.text_body, rendered.content.text);
-    assert.equal(email.text_body, `Craig,\n\nThis Facebook lead accepted the quote and provided a service address. Create the account and audit the route/service day before confirming a start date.\n\nName: ExampleLead Example\nPhone: +14195550100\nAddress: 123 Maple Street, Toledo\nZIP: 43615\nDogs: 2\nFrequency: Weekly\nQuoted price: $100.00 per month\nInitial cleanup estimate: $55.00-$65.00 (exact price after yard inspection)\nSubmission ID: ${saved.id}\n\nGrowth Desk: https://www.ohiopetwastepros.com/admin/quote-funnel/`);
+    assert.equal(email.text_body, `Craig,\n\nThis Facebook lead accepted the quote and provided a service address. Create the account and audit the route/service day before confirming a start date.\n\nName: ExampleLead Example\nPhone: +14195550100\nAddress: 123 Maple Street, Toledo\nZIP: 43615\nDogs: 2\nFrequency: Weekly\nQuoted price: $110.00 per month\nInitial cleanup estimate: $58 to $70\nSubmission ID: ${saved.id}\n\nGrowth Desk: https://www.ohiopetwastepros.com/admin/quote-funnel/`);
     assert.equal(externalRequests, 0);
   } finally { globalThis.fetch = oldFetch; }
 });
@@ -461,7 +461,7 @@ test("reply branches and exact website pricing progress to audited signup withou
   let step = nextMetaResponse({ lead, text: "yes", confirmationSent: true });
   assert.equal(step.state.expected, "yard");
   step = nextMetaResponse({ lead, state: step.state, text: "A", confirmationSent: true }); assert.equal(step.state.expected, "cleaned");
-  step = nextMetaResponse({ lead, state: step.state, text: "D", confirmationSent: true }); assert.equal(step.state.expected, "quote_acceptance"); assert.equal(step.state.quote.monthly, 100);
+  step = nextMetaResponse({ lead, state: step.state, text: "D", confirmationSent: true }); assert.equal(step.state.expected, "quote_acceptance"); assert.equal(step.state.quote.monthly, 110);
   step = nextMetaResponse({ lead, state: step.state, text: "yes", confirmationSent: true }); assert.equal(step.state.expected, "address");
   step = nextMetaResponse({ lead, state: step.state, text: "123 Maple Street, Toledo", confirmationSent: true }); assert.equal(step.state.ready_for_route_audit, true); assert.match(step.response, /No day is booked/);
   assert.equal(metaWebsiteQuote({ ...lead, yard_size_tier: "tiny", last_cleaned: "one_month", number_of_dogs: 20 }), null);
@@ -530,14 +530,14 @@ test("signed Meta → YardOps → Airtable → Quo → reply integration, retrie
     assert.equal(select(db, "meta_sms_jobs").filter((job) => job.purpose === "follow_up" && job.status === "queued").length, 0);
     const snapshotAt = new Date().toISOString();
     db.sqlite.prepare(`INSERT INTO airtable_cockpit_snapshots(snapshot_key,payload,status,captured_at) VALUES ('business_cockpit',?,'success',?)`).run(JSON.stringify({ opwp: { customers: [{ fields: { Status: "Active", ZIP: "43615", "Service Day": "Tuesday" } }] } }), snapshotAt);
-    for (const [text, id, pattern] of [["A", "yard", /last thoroughly cleared/], ["about 1 month", "cleaned", /\$100.00 per month/], ["yes", "accept", /street address/], ["123 Maple Street, Toledo", "address", /audit the current route/]]) {
+    for (const [text, id, pattern] of [["A", "yard", /last thoroughly cleared/], ["about 1 month", "cleaned", /\$110\.00 per month/], ["yes", "accept", /street address/], ["123 Maple Street, Toledo", "address", /audit the current route/]]) {
       assert.equal((await api.quoPost(signedQuo(text, id))).status, 200);
       await processMetaConfirmations(env, { now: noon });
       assert.match(sends.at(-1).content, pattern);
     }
     await api.processAirtableQueue(env, 10);
     assert.match(mirrors.at(-1).records[0].fields["Customer Question"], /Customer's cleanup answer: about 1 month/);
-    assert.match(mirrors.at(-1).records[0].fields["Customer Question"], /\$55.00–\$65.00/);
+    assert.match(mirrors.at(-1).records[0].fields["Customer Question"], /\$58 to \$70/);
     const id = select(db, "submissions")[0].id;
     const token = await fixtureAdminSession("craig@ohiopetwastepros.com");
     const auditRequest = new Request(`https://opwp.test/api/admin/growth-desk/${id}`, { method: "PATCH", headers: { origin: "https://opwp.test", "content-type": "application/json", cookie: `__Host-opwp_admin_mfa=${token}` }, body: JSON.stringify({ action: "audit_meta_route", days: ["Tuesday"], snapshotAt }) });
@@ -625,7 +625,7 @@ test("a cleanup correction cancels the signup invitation, invalidates its audit 
   assert.equal(mirrored["Monthly Quote"], null);
   assert.match(mirrored["Customer Question"], /actually 6 months ago/);
   assert.match(mirrored["Customer Question"], /Custom quote/);
-  assert.doesNotMatch(mirrored["Customer Question"], /\$55/);
+  assert.doesNotMatch(mirrored["Customer Question"], /\$/);
   // A newly confirmed scope can receive a fresh audit without reviving the cancelled job.
   db.sqlite.prepare("UPDATE meta_lead_intakes SET response_state=? WHERE submission_id=?").run(JSON.stringify(state), saved.id);
   await auditMetaRoute(db, lead, { days: ["Tuesday"], snapshotAt }, "test-owner");

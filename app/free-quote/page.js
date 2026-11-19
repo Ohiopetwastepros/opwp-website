@@ -135,7 +135,7 @@ export default function FreeQuotePage() {
                     <p style={{ margin: "0 0 10px", fontSize: "14px", lineHeight: 1.5, color: "#36424b" }}>
                       &quot;{r.text}&quot;
                     </p>
-                    <div style={{ fontWeight: 700, fontSize: "13.5px" }}>— {r.name}</div>
+                    <div style={{ fontWeight: 700, fontSize: "13.5px" }}>{r.name}</div>
                   </div>
                 ))}
               </div>
@@ -168,8 +168,7 @@ export default function FreeQuotePage() {
             Prefer to talk first? Call or text{" "}
             <a href="tel:419-262-2371" style={{ color: "#fff", fontWeight: 700, textDecoration: "none" }}>
               419-262-2371
-            </a>{" "}
-            — we&apos;re a local, family-owned team and happy to help.
+            </a>. We&apos;re a local, family-owned team and happy to help.
           </p>
         </div>
       </section>

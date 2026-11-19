@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
 import vm from "node:vm";
+import { PRICING } from "../app/free-quote/pricing.js";
 import { accountSubmitState, questionSubmitState } from "../lib/quote-form-state.mjs";
 import { buildCustomerQuoteFollowUpEmail, buildCustomerQuoteFollowUpSms, buildSubmissionNotification, escapeEmailHtml, normalizeFunnelId, normalizeFunnelStage, PARTIAL_QUOTE_FOLLOW_UP_DELAY_MINUTES } from "../lib/quote-funnel.mjs";
 import {
@@ -19,6 +20,26 @@ test("funnel IDs and stages fail closed", () => {
   assert.equal(normalizeFunnelId("1234567890abcdef"), "1234567890abcdef");
   assert.equal(normalizeFunnelStage("details_started"), "details_started");
   assert.equal(normalizeFunnelStage("invented"), "quote_viewed");
+});
+
+test("configured live quote preserves Sweep & Go's price, tax and cross-sells for chart plans and legacy aliases", async () => {
+  const source = fs.readFileSync(new URL("../app/api/quote/route.js", import.meta.url), "utf8").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "");
+  const calls = [];
+  const upstream = { price: { value: "113.25" }, tax_percent: 7.25, cross_sells: [{ id: 1 }] };
+  const { GET } = vm.runInNewContext(source + "\n({GET})", {
+    PRICING, Response, URL, checkRateLimit: async () => ({ allowed: true }),
+    normalizeFrequency: (value) => value, normalizeLastCleaned: (value) => value,
+    sngRequest: async (_path, { searchParams }) => { calls.push(searchParams); return { configured: true, ok: true, data: upstream }; },
+  });
+  const request = (frequency) => new Request(`https://example.test/api/quote?zip=43604&dogs=2&frequency=${frequency}`);
+  for (const frequency of ["once_a_week", "bi_weekly", "monthly"]) {
+    const result = await GET(request(frequency));
+    assert.equal(result.status, 200);
+    assert.deepEqual(await result.json(), { configured: true, ok: true, monthly: 113.25, tax: 7.25, crossSells: upstream.cross_sells });
+    assert.equal(calls.at(-1).clean_up_frequency, frequency);
+  }
+  assert.equal((await GET(request("unknown"))).status, 400);
+  assert.equal(calls.length, 3);
 });
 
 test("website attribution values map to documented Sweep & Go enums", () => {
@@ -93,10 +114,10 @@ test("partial quote owner email contains the saved quote context", () => {
   const content = buildSubmissionNotification({
     type: "partial_quote",
     submissionId: "quote-id",
-    body: { email: "person@example.com", phone: "4195550100", zip: "43604", quote_context: { dogs: 2, frequency: "once_a_week", yard_size: "medium", quote_monthly: 90 } },
+    body: { email: "person@example.com", phone: "4195550100", zip: "43604", quote_context: { dogs: 2, frequency: "once_a_week", yard_size: "medium", quote_monthly: 130 } },
   });
   assert.equal(content.subject, "New website quote lead");
-  assert.match(content.text, /Quoted monthly: 90/);
+  assert.match(content.text, /Quoted monthly: 130/);
   assert.match(content.text, /Submission ID: quote-id/);
 });
 
@@ -178,13 +199,13 @@ test("one-time lead context preserves the estimate and coupon without a zero mon
   for (const price of [null, undefined, ""]) {
     assert.equal(validateLeadInput({ ...base, quote_monthly: price }).value.quote_context.quote_monthly, null);
   }
-  const result = validateLeadInput({ ...base, frequency: "one_time", quote_monthly: 0, quote_one_time_range: [75, 100], coupon: "TEST", dogs: 2, selected_addons: ["haul_away"] });
+  const result = validateLeadInput({ ...base, frequency: "one_time", quote_monthly: 0, quote_one_time_range: [80, 110], coupon: "TEST", dogs: 2, selected_addons: ["haul_away"] });
   assert.equal(result.value.quote_context.quote_monthly, null);
-  assert.deepEqual(result.value.quote_context.quote_one_time_range, [75, 100]);
+  assert.deepEqual(result.value.quote_context.quote_one_time_range, [80, 110]);
   assert.equal(result.value.quote_context.coupon, "TEST");
   assert.deepEqual(result.value.quote_context.selected_addons, ["haul_away"]);
-  assert.equal(validateLeadInput({ ...base, frequency: "one_time", quote_one_time_range: [100, 75] }).value.quote_context.quote_one_time_range, null);
-  assert.equal(validateLeadInput({ ...base, frequency: "once_a_week", quote_monthly: 100 }).value.quote_context.quote_monthly, 100);
+  assert.equal(validateLeadInput({ ...base, frequency: "one_time", quote_one_time_range: [110, 80] }).value.quote_context.quote_one_time_range, null);
+  assert.equal(validateLeadInput({ ...base, dogs: 2, frequency: "once_a_week", quote_monthly: 110 }).value.quote_context.quote_monthly, 110);
 });
 
 const questionContact = { name: "Test Customer", phone: "4195550100", email: "", token: "verified" };
@@ -225,7 +246,7 @@ test("missing verification stays visibly unavailable and a tap can explain the e
 test("question endpoint verifies quote_question, stores kind=question and never starts onboarding", async () => {
   const source = fs.readFileSync(new URL("../app/api/lead/route.js", import.meta.url), "utf8").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "");
   const calls = [];
-  const body = { source: "question", funnel_id: "1234567890abcdef", name: "Test Customer", phone: "4195550100", question: "Do you remove the waste?", frequency: "one_time", quote_monthly: null, quote_one_time_range: [75, 100], turnstileToken: "verified" };
+  const body = { source: "question", funnel_id: "1234567890abcdef", name: "Test Customer", phone: "4195550100", question: "Do you remove the waste?", dogs: 2, frequency: "one_time", quote_monthly: null, quote_one_time_range: [80, 110], turnstileToken: "verified" };
   const api = vm.runInNewContext(source + "\n({POST})", {
     Response, validateLeadInput,
     protectJsonRequest: async () => ({ body }),

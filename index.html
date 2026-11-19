@@ -165,6 +165,13 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script>
+    if (location.protocol === "file:") {
+      document.getElementById("root").textContent = "Open this tool through a local web server to load the current quote pricing.";
+    }
+  </script>
+  <script type="module">
+    import { PRICING, YARD_TIERS, calcLocalQuote, formatCleanupRange, CLEANUP_RANGE_EXPLANATION } from "./app/free-quote/pricing.js";
+
     const { useMemo, useState } = React;
 
     const zipToCity = {
@@ -179,30 +186,6 @@
       "43616": "Oregon", "43617": "Toledo", "43619": "Northwood", "43620": "Toledo",
       "43623": "Toledo", "44883": "Tiffin", "48144": "Lambertville", "48182": "Temperance",
       "49267": "Ottawa Lake"
-    };
-
-    const recurringPricing = {
-      weekly: { 1: 90, 2: 100, 3: 115, 4: 130, 5: 140, 6: 150, 7: 160 },
-      biweekly: { 1: 68, 2: 75, 3: 87 },
-      twice_weekly: { 1: 162, 2: 180, 3: 207, 4: 234, 5: 252, 6: 270, 7: 288 }
-    };
-
-    const initialCleanupPricing = {
-      one_week: { 1: "$18.48–$25", 2: "$21.93–$28", 3: "$23.09–$30", 4: "$24.25–$31", 5: "$25.40–$32" },
-      two_weeks: { 1: "$25.40–$32", 2: "$30.02–$37", 3: "$32.33–$39", 4: "$34.64–$41", 5: "$36.95–$43" },
-      three_weeks: { 1: "$35.20–$42", 2: "$42.51–$49", 3: "$46.17–$53", 4: "$49.82–$56", 5: "$53.48–$60" },
-      one_month: { 1: "$45–$55", 2: "$55–$65", 3: "$60–$70", 4: "$65–$75", 5: "$80–$90" },
-      two_months: { 1: "$60–$70", 2: "$70–$80", 3: "$80–$90", 4: "$90–$110", 5: "$120–$140" },
-      three_four_months: { 1: "$79–$89", 2: "$85–$95", 3: "$89–$99", 4: "$99–$119", 5: "$140–$160" }
-    };
-
-    const oneTimePricing = {
-      one_week: { 1: "$27.72–$37.50", 2: "$32.90–$42", 3: "$34.64–$45", 4: "$36.39–$46.50", 5: "$38.10–$48" },
-      two_weeks: { 1: "$38.10–$48", 2: "$45.03–$55.50", 3: "$48.50–$58.50", 4: "$51.96–$61.50", 5: "$55.43–$64.50" },
-      three_weeks: { 1: "$52.80–$63", 2: "$63.77–$73.50", 3: "$69.26–$79.50", 4: "$74.73–$84", 5: "$80.22–$90" },
-      one_month: { 1: "$60–$75", 2: "$75–$100", 3: "$85–$110", 4: "$105–$130", 5: "$125–$150" },
-      two_months: { 1: "$75–$100", 2: "$95–$120", 3: "$105–$130", 4: "$125–$150", 5: "$145–$170" },
-      three_four_months: { 1: "$95–$120", 2: "$115–$140", 3: "$125–$150", 4: "$145–$170", 5: "$165–$190" }
     };
 
     const guidance = {
@@ -240,9 +223,10 @@
     function normalizeFrequency(value) {
       if (!value) return "";
       if (value === "not_sure") return "weekly or biweekly";
-      if (value === "weekly") return "weekly";
-      if (value === "biweekly") return "biweekly";
-      if (value === "twice_weekly") return "twice weekly";
+      if (value === "once_a_week") return "weekly";
+      if (value === "every_other_week") return "biweekly";
+      if (value === "twice_a_week") return "twice weekly";
+      if (value === "once_a_month") return "monthly";
       if (value === "one_time") return "one-time cleanup";
       return value;
     }
@@ -267,38 +251,14 @@
       if (score >= 50) return "Warm lead";
       return "Needs info";
     }
-    function getRecurringPrice(dogs, frequency) {
-      const d = parseInt(dogs, 10);
-      if (!d) return "";
-      if (frequency === "biweekly" && d > 3) return "Biweekly service is not available for over 3 dogs.";
-      const amount = recurringPricing[frequency] && recurringPricing[frequency][d];
-      return amount ? `$${amount}/month` : "";
-    }
-    function getInitialEstimate(dogs, timeframe) {
-      const d = parseInt(dogs, 10);
-      if (!d || timeframe === "not_entered") return "";
-      if (timeframe === "no_initial") return "No initial needed";
-      if (d >= 6) return "Custom quote";
-      return initialCleanupPricing[timeframe] && initialCleanupPricing[timeframe][d] || "";
-    }
-    function getOneTimePrice(dogs, timeframe) {
-      const d = parseInt(dogs, 10);
-      if (!d || timeframe === "not_entered") return "";
-      if (d >= 6) return "Custom quote";
-      return oneTimePricing[timeframe] && oneTimePricing[timeframe][d] || "";
-    }
-    function getYardAdjustment(yardTier) {
-      switch (yardTier) {
-        case "small": return "";
-        case "medium": return "+$10 yard size adjustment";
-        case "large": return "+$20 yard size adjustment";
-        case "xl": return "+$30 yard size adjustment";
-        case "over_3_4": return "Custom quote required for yard size";
-        default: return "";
-      }
+    function getCleanupEstimate(quote, timeframe) {
+      if (!quote || timeframe === "not_entered") return "";
+      if (timeframe === "no_initial") return quote.type === "recurring" ? "No initial needed" : "";
+      const range = quote.type === "one_time" ? quote.oneTimeRange : quote.initialRange;
+      return range ? formatCleanupRange(range) : "Custom quote";
     }
     function getServiceDayText(frequency, serviceDay, secondServiceDay) {
-      if (frequency === "twice_weekly") {
+      if (frequency === "twice_a_week") {
         if (serviceDay && secondServiceDay) return `${serviceDay}s and ${secondServiceDay}s`;
         if (serviceDay) return `${serviceDay}s`;
         return "your scheduled service days";
@@ -321,39 +281,39 @@
       switch (data.template) {
         case "initial_full":
           return data.timeOfDay === "morning"
-            ? `Good morning ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Thanks for requesting a quote last night. Just confirming — you're in ${city} with ${dogs}, and you're looking for ${questionFrequency} service?`
-            : `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 I can get you pricing — just confirming you're in ${city} with ${dogs}, and looking for ${questionFrequency} service?`;
+            ? `Good morning ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Thanks for requesting a quote last night. Just confirming, you're in ${city} with ${dogs}, and you're looking for ${questionFrequency} service?`
+            : `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 I can get you pricing. Just confirming you're in ${city} with ${dogs}, and looking for ${questionFrequency} service?`;
         case "initial_missing_info":
-          if (!data.city && !dogs) return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 I can get you pricing — can you confirm your city and how many dogs you have?`;
-          if (data.city && !dogs) return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 I see you're in ${city} — how many dogs do you have so I can get accurate pricing?`;
-          if (!data.city && dogs) return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 I see you have ${dogs} — what city are you in, and are you thinking weekly or biweekly service?`;
+          if (!data.city && !dogs) return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 I can get you pricing. Can you confirm your city and how many dogs you have?`;
+          if (data.city && !dogs) return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 I see you're in ${city}. How many dogs do you have so I can get accurate pricing?`;
+          if (!data.city && dogs) return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 I see you have ${dogs}. What city are you in, and are you thinking weekly or biweekly service?`;
           return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just confirming you're in ${city} with ${dogs}?`;
         case "one_time":
-          return `Got it 👍 For one-time cleanups, pricing depends on yard size and how much waste has built up.\n\nIs the area your dog uses about 1/8 acre or larger?\nAnd when was it last fully cleaned?`;
+          return `Got it 👍\n\nIs the area your dog uses about 1/8 acre or larger?\nAnd when was it last fully cleaned?`;
         case "website_followup":
           return `Hi! This is ${sender} with Ohio Pet Waste Pros 👋 We received your information from the quote form you filled out on our website.\n\nBased on what you submitted, I can share pricing again. Are you interested in recurring service or a one-time cleanup?`;
         case "quote_sent_followup":
-          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just wanted to check — did you have any questions on the pricing, or want me to get you on the schedule?`;
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just wanted to check, did you have any questions on the pricing, or want me to get you on the schedule?`;
         case "quote_sent_close":
-          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 I sent your pricing over — want me to lock in your first cleanup?`;
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 I sent your pricing over. Want me to lock in your first cleanup?`;
         case "no_response_followup":
-          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just checking back in — still interested in getting pricing or starting service? Happy to help!`;
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just checking back in. Still interested in getting pricing or starting service? Happy to help!`;
         case "schedule_close":
           return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Want me to get your first cleanup scheduled? We can get you on the route quickly.`;
         case "april_followup":
-          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 April is right around the corner — want to get service started so you're all set for spring?`;
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 April is right around the corner. Want to get service started so you're all set for spring?`;
         case "followup_day1":
-          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just wanted to follow up — did you still want pricing or help getting started?`;
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just wanted to follow up, did you still want pricing or help getting started?`;
         case "followup_day3":
           return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just checking back in 🙂 We’re filling up in your area, so I wanted to see if you wanted to get on the schedule.`;
         case "followup_day5":
-          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Last follow-up from me — I don’t want to bug you 😊 If you still want help with dog waste cleanup, just let me know and I’ll get everything set up for you.`;
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Last follow-up from me. I don’t want to bug you 😊 If you still want help with dog waste cleanup, just let me know and I’ll get everything set up for you.`;
         case "quote_followup_24h":
           return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just wanted to see if you had any questions on the pricing or if you’d like to get scheduled?`;
         case "quote_followup_3d":
-          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just checking in 🙂 ${data.startDate ? `We could get you started as soon as ${formatDateForText(data.startDate)} — ` : ""}want me to lock that in for you?`;
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Just checking in 🙂 ${data.startDate ? `We could get you started as soon as ${formatDateForText(data.startDate)}. ` : ""}Want me to lock that in for you?`;
         case "quote_followup_final":
-          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Wanted to follow up one last time — should I get your first cleanup scheduled or hold off for now?`;
+          return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 👋 Wanted to follow up one last time. Should I get your first cleanup scheduled or hold off for now?`;
         case "hot_lead_close":
           return `Awesome 👍 This is ${sender} with Ohio Pet Waste Pros. Want me to get your first cleanup scheduled?`;
         default:
@@ -368,7 +328,7 @@
       const addOns = data.notes && data.notes.trim() ? ` + ${data.notes.trim()}` : "";
       const serviceDay = getServiceDayText(data.frequency, data.serviceDay, data.secondServiceDay);
       const startText = formatDateForText(data.startDate);
-      return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 🐾\n\nWelcome aboard — we’re excited to have you!\n\nYou’re set up for ${dogs} on ${serviceText}${addOns}.\n\nWe service your yard on ${serviceDay} each visit.\n\nAfter your first cleanup, we’ll charge your initial cleanup + the remainder of the month. After that, billing runs automatically on the 1st each month.\n\nYou’ll receive a text when we’re on the way and another when your cleanup is complete.\n\n${startText ? `Your first cleanup is scheduled for ${startText}.` : `We’ll confirm your first cleanup date with you shortly.`}`;
+      return `Hey ${name}! This is ${sender} with Ohio Pet Waste Pros 🐾\n\nWelcome aboard! We’re excited to have you!\n\nYou’re set up for ${dogs} on ${serviceText}${addOns}.\n\nWe service your yard on ${serviceDay} each visit.\n\nAfter your first cleanup, we’ll charge your initial cleanup + the remainder of the month. After that, billing runs automatically on the 1st each month.\n\nYou’ll receive a text when we’re on the way and another when your cleanup is complete.\n\n${startText ? `Your first cleanup is scheduled for ${startText}.` : `We’ll confirm your first cleanup date with you shortly.`}`;
     }
 
     function App() {
@@ -399,34 +359,43 @@
       const currentData = { ...form, city: derivedCity };
       const score = leadScore({ ...currentData, city: derivedCity });
       const checks = qualityCheck(form.email, form.phone);
-      const recurringPrice = getRecurringPrice(form.dogs, form.frequency);
-      const initialEstimate = getInitialEstimate(form.dogs, form.initialTimeframe);
-      const oneTimeEstimate = getOneTimePrice(form.dogs, form.initialTimeframe);
-      const yardAdjustment = getYardAdjustment(form.yardTier);
+      const oneTime = form.template === "one_time" || form.frequency === "one_time";
+      const frequency = oneTime ? "one_time" : form.frequency;
+      const frequencyOption = PRICING.frequencies.find(option => option.id === frequency);
+      const quote = form.dogs && frequencyOption ? calcLocalQuote({ dogs: Number(form.dogs), frequency, lastCleaned: form.initialTimeframe }) : null;
+      const unavailable = quote && !oneTime && frequencyOption && quote.monthly === null
+        ? `${frequencyOption.name} service is not available for over ${frequencyOption.maxDogs} dogs.`
+        : "";
+      const tier = YARD_TIERS.find(tier => tier.id === form.yardTier);
+      const customYard = tier?.upcharge === null;
+      const recurringPrice = quote?.monthly != null && !customYard ? `$${quote.monthly + (tier?.upcharge || 0)}/month` : "";
+      const yardAdjustment = recurringPrice && tier?.upcharge ? `This includes a $${tier.upcharge} yard size adjustment.` : "";
+      const estimate = unavailable || customYard ? "" : getCleanupEstimate(quote, form.initialTimeframe);
 
       const message = useMemo(() => {
         if (tab === "welcome") return buildWelcomeMessage(currentData);
         let base = buildLeadMessage(currentData);
         const pricingTemplates = new Set(["initial_full", "initial_missing_info", "quote_sent_followup", "quote_sent_close", "quote_followup_24h", "quote_followup_3d", "quote_followup_final", "schedule_close", "hot_lead_close"]);
-        if (pricingTemplates.has(form.template) && form.frequency !== "one_time" && recurringPrice) base += `\n\nYour recurring service would be ${recurringPrice}.`;
-        if (pricingTemplates.has(form.template) && form.frequency !== "one_time" && yardAdjustment) base += yardAdjustment === "Custom quote required for yard size" ? `\nYard size would require a custom quote.` : `\n${yardAdjustment}.`;
-        if (pricingTemplates.has(form.template) && form.frequency !== "one_time" && initialEstimate) {
-          if (initialEstimate === "No initial needed") {
-            base += `
-There will be no initial cleanup charge. The remainder of the current month will be billed after your first cleanup.`;
-          } else if (initialEstimate === "Custom quote") {
-            base += `
-Initial cleanup will be a custom quote based on the property, buildup, and how long it will take the technician to complete the cleanup.`;
-          } else {
-            base += `
-Initial cleanup will fall in the ${initialEstimate} range depending on buildup and how long it takes the technician to complete the cleanup.`;
+        if (oneTime || pricingTemplates.has(form.template)) {
+          if (unavailable) base += `\n\n${unavailable}`;
+          else if (customYard) base += "\n\nYard size would require a custom quote.";
+          else {
+            if (recurringPrice) base += `\n\nYour recurring service would be ${recurringPrice}.`;
+            if (yardAdjustment) base += `\n${yardAdjustment}`;
+            if (estimate === "No initial needed") {
+              base += "\nThere will be no initial cleanup charge. The remainder of the current month will be billed after your first cleanup.";
+            } else if (estimate === "Custom quote") {
+              base += oneTime ? "\n\nBased on the property and buildup, this would be a custom quote." : "\nInitial cleanup will be a custom quote based on the property and buildup.";
+            } else if (estimate) {
+              base += oneTime ? `\n\nA one-time cleanup will fall in the ${estimate} range.` : `\nInitial cleanup will fall in the ${estimate} range.`;
+              base += ` ${CLEANUP_RANGE_EXPLANATION}`;
+            }
           }
         }
-        if ((form.template === "one_time" || form.frequency === "one_time") && oneTimeEstimate) base += oneTimeEstimate === "Custom quote" ? `\n\nBased on the property and buildup, this would be a custom quote.` : `\n\nBased on buildup, a one-time cleanup will fall in the ${oneTimeEstimate} range.`;
         if (form.urgency && form.template !== "followup_day3") base += `\n\nWe’re currently filling up your area, so we can get you on the route quickly.`;
         if (form.startDate && form.template !== "quote_followup_3d") base += `\nWe could start as soon as ${formatDateForText(form.startDate)}.`;
         return base;
-      }, [tab, currentData, form.template, form.frequency, form.urgency, form.startDate, recurringPrice, initialEstimate, oneTimeEstimate, yardAdjustment]);
+      }, [tab, currentData, form.template, form.urgency, form.startDate, oneTime, unavailable, customYard, recurringPrice, estimate, yardAdjustment]);
 
       function updateField(key, value) {
         setForm(prev => ({ ...prev, [key]: value }));
@@ -446,12 +415,12 @@ Initial cleanup will fall in the ${initialEstimate} range depending on buildup a
             zip: "43560",
             city: "",
             dogs: "3",
-            frequency: "biweekly",
+            frequency: "every_other_week",
             source: "search_engine",
             template: "initial_full",
             timeOfDay: "standard",
             initialTimeframe: "one_month",
-            yardTier: "medium",
+            yardTier: "small",
             serviceDay: "Monday",
             startDate: "2026-04-07",
             urgency: false,
@@ -460,18 +429,18 @@ Initial cleanup will fall in the ${initialEstimate} range depending on buildup a
         } else {
           setForm({
             senderName: "Amanda",
-            fullName: "Stan Nally",
-            phone: "(330) 592-3621",
-            email: "stan.nally@gmail.com",
+            fullName: "Sample Customer",
+            phone: "(419) 555-0100",
+            email: "sample@example.com",
             zip: "43560",
             city: "",
             dogs: "2",
-            frequency: "weekly",
+            frequency: "once_a_week",
             source: "search_engine",
             template: "initial_full",
             timeOfDay: "standard",
             initialTimeframe: "one_month",
-            yardTier: "medium",
+            yardTier: "small",
             serviceDay: "",
             startDate: "2026-04-03",
             urgency: true,
@@ -509,16 +478,16 @@ Initial cleanup will fall in the ${initialEstimate} range depending on buildup a
                 field("ZIP code", input(form.zip, v => updateField("zip", v))),
                 field("City override", input(form.city, v => updateField("city", v), "Leave blank to auto-fill from ZIP")),
                 field("Yard size", select(form.yardTier, v => updateField("yardTier", v), [
-                  ["", "Select yard size"], ["small", "Standard Yard (≤1/8 acre)"], ["medium", "Medium yard (1/8–1/4)"], ["large", "Large yard (1/4–1/2)"], ["xl", "XL yard (1/2–3/4)"], ["over_3_4", "Over 3/4 acre"]
+                  ["", "Select yard size"], ["tiny", "Standard Yard (≤1/8 acre)"], ["small", "Medium yard (1/8 to 1/4)"], ["medium", "Large yard (1/4 to 1/2)"], ["large", "XL yard (1/2 to 3/4)"], ["xlarge", "Over 3/4 acre"]
                 ])),
                 field("Dogs", select(form.dogs, v => updateField("dogs", v), [["", "Select number of dogs"], ["1", "1 dog"], ["2", "2 dogs"], ["3", "3 dogs"], ["4", "4 dogs"], ["5", "5 dogs"], ["6", "6 dogs"], ["7", "7 dogs"]])),
-                field("Frequency", select(form.frequency, v => updateField("frequency", v), [["not_sure", "Not sure yet"], ["weekly", "Weekly"], ["biweekly", "Biweekly"], ["twice_weekly", "Twice weekly"], ["one_time", "One-time cleanup"]])),
+                field("Frequency", select(form.frequency, v => updateField("frequency", v), [["not_sure", "Not sure yet"], ["once_a_week", "Weekly"], ["every_other_week", "Biweekly"], ["twice_a_week", "Twice weekly"], ["once_a_month", "Monthly"], ["one_time", "One-time cleanup"]])),
                 field("Referral source", select(form.source, v => updateField("source", v), [["", "Select referral source"], ["search_engine", "Search engine"], ["previous_client", "Previous client"], ["family_friend", "Referred by family or friend"], ["social_media", "Social media"], ["vehicle_signage", "Vehicle signage"], ["yard_sign", "Yard sign"], ["other", "Other"]])),
                 tab === "lead" ? field("Response template", select(form.template, v => updateField("template", v), [["initial_full", "Initial lead text"], ["initial_missing_info", "Missing info text"], ["one_time", "One-time cleanup text"], ["website_followup", "Website follow-up"], ["quote_sent_followup", "Quote sent follow-up"], ["quote_sent_close", "Quote sent close"], ["no_response_followup", "No response follow-up"], ["schedule_close", "Ready to schedule text"], ["april_followup", "Month-start follow-up"], ["followup_day1", "Follow-up Day 1"], ["followup_day3", "Follow-up Day 3"], ["followup_day5", "Follow-up Day 5"], ["quote_followup_24h", "Quote follow-up 24h"], ["quote_followup_3d", "Quote follow-up 3 days"], ["quote_followup_final", "Quote final follow-up"], ["hot_lead_close", "Hot lead fast close"]])) : null,
                 tab === "lead" ? field("Time context", select(form.timeOfDay, v => updateField("timeOfDay", v), [["standard", "Standard"], ["morning", "Morning follow-up"]])) : null,
-                field("Last thorough cleanup", select(form.initialTimeframe, v => updateField("initialTimeframe", v), [["not_entered", "Not entered"], ["no_initial", "No initial needed (yard is clean)"], ["one_week", "One week"], ["two_weeks", "Two weeks"], ["three_weeks", "Three weeks"], ["one_month", "One month"], ["two_months", "Two months"], ["three_four_months", "3–4 months"]])),
+                field("Last thorough cleanup", select(form.initialTimeframe, v => updateField("initialTimeframe", v), [["not_entered", "Not entered"], ["no_initial", "No initial needed (yard is clean)"], ...PRICING.lastCleanedOptions.map(({ id, label }) => [id, label])])),
                 tab === "welcome" ? field("Service day", select(form.serviceDay, v => updateField("serviceDay", v), [["", "Select service day"], ["Monday", "Monday"], ["Tuesday", "Tuesday"], ["Wednesday", "Wednesday"], ["Thursday", "Thursday"], ["Friday", "Friday"]])) : null,
-                tab === "welcome" && form.frequency === "twice_weekly" ? field("Second service day", select(form.secondServiceDay || "", v => updateField("secondServiceDay", v), [["", "Select second service day"], ["Monday", "Monday"], ["Tuesday", "Tuesday"], ["Wednesday", "Wednesday"], ["Thursday", "Thursday"], ["Friday", "Friday"]])) : null,
+                tab === "welcome" && form.frequency === "twice_a_week" ? field("Second service day", select(form.secondServiceDay || "", v => updateField("secondServiceDay", v), [["", "Select second service day"], ["Monday", "Monday"], ["Tuesday", "Tuesday"], ["Wednesday", "Wednesday"], ["Thursday", "Thursday"], ["Friday", "Friday"]])) : null,
                 field(tab === "welcome" ? "Start date" : "Start date (optional)", dateInput(form.startDate, v => updateField("startDate", v))),
                 tab === "lead" ? React.createElement("div", { className: "checkbox-row", key: "urgency" },
                   React.createElement("input", { type: "checkbox", checked: form.urgency, onChange: e => updateField("urgency", e.target.checked) }),
@@ -537,11 +506,12 @@ Initial cleanup will fall in the ${initialEstimate} range depending on buildup a
                 statusRow("Lead score", score + "%"),
                 statusRow("Status", scoreLabel(score)),
                 tab === "lead" ? infoSection("Checks", checks.length ? checks.join("\n") : "Contact info looks usable") : null,
-                tab === "lead" ? infoSection("Pricing preview", [
-                  form.frequency !== "one_time" ? (recurringPrice || "Enter dogs and frequency to see recurring price.") : (oneTimeEstimate || "Enter dogs and last thorough cleanup timeframe to see one-time estimate."),
-                  yardAdjustment || "",
-                  form.frequency !== "one_time" ? (initialEstimate === "No initial needed" ? "No initial cleanup needed." : (initialEstimate || "Enter last thorough cleanup timeframe to see initial cleanup estimate.")) : ""
-                ].filter(Boolean).join("\n")) : null,
+                tab === "lead" ? infoSection("Pricing preview", unavailable || (customYard ? "Custom quote required for yard size" : [
+                  !oneTime && (recurringPrice || "Enter dogs and frequency to see recurring price."),
+                  yardAdjustment,
+                  estimate || (oneTime ? "Enter dogs and last thorough cleanup timeframe to see one-time estimate." : frequencyOption && form.dogs && "Enter last thorough cleanup timeframe to see initial cleanup estimate."),
+                  estimate.startsWith("$") && !message.includes(CLEANUP_RANGE_EXPLANATION) && CLEANUP_RANGE_EXPLANATION
+                ].filter(Boolean).join("\n"))) : null,
                 infoSection("Quick office use", tab === "welcome" ? "Use this tab after a client signs up to send a clean onboarding text." : (guidance[form.template] || "Pick a template, review the message, and copy/send."))
               )
             ),

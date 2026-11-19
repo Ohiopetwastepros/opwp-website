@@ -1,5 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { runInNewContext } from 'node:vm';
+import { build } from 'esbuild';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { CLEANUP_RANGE_EXPLANATION } from '../app/free-quote/pricing.js';
 import { callGuideProration } from '../lib/call-guide-proration.mjs';
 
 const weekly = { frequency: 'once_a_week', startDate: '2026-10-07', serviceDay: 'Wednesday', monthlyTotal: 121 };
@@ -40,4 +46,34 @@ test('biweekly, twice-weekly, monthly and one-time service preserve their cadenc
   assert.equal(callGuideProration({ ...weekly, frequency: 'twice_a_week' }).pending, true);
   assert.equal(callGuideProration({ ...weekly, frequency: 'once_a_month' }).amount, 0);
   assert.equal(callGuideProration({ frequency: 'one_time' }).amount, 0);
+});
+
+test('office customer scripts explain whole-dollar cleanup ranges and preserve prorated invoice cents', async () => {
+  const result = await build({
+    entryPoints: ['app/office/NewClientCallGuide.js'], outdir: 'tmp', write: false,
+    bundle: true, platform: 'node', format: 'cjs', jsx: 'automatic', loader: {'.js':'jsx'},
+    alias: {'@':process.cwd()}, external: ['react', 'react/jsx-runtime'],
+  });
+  const source = result.outputFiles.find((file) => file.path.endsWith('.js')).text;
+  const Guide = runInNewContext(source + '\nmodule.exports.default', {require:createRequire(import.meta.url), module:{exports:{}}});
+  const render = (frequency, lastCleaned) => renderToStaticMarkup(createElement(Guide, {initialDraft:{
+    dogs:'2', frequency, lastCleaned, yardSize:'small', phone:'4195550100', startDate:'2026-11-04', serviceDay:'Wednesday',
+  }}));
+  const welcome = (html) => decodeURIComponent(html.match(/href="sms:[^?"]+\?body=([^"]+)"/)[1]);
+  const oneTime = render('one_time', 'one_month');
+  const recurring = render('once_a_week', 'one_month');
+  for (const html of [oneTime, recurring]) assert.ok(html.includes('The initial cleanup portion stays within the displayed range unless the actual yard condition requires approval for a different amount.'));
+  for (const [message, range] of [
+    [welcome(recurring), '$58 to $70'],
+    [welcome(oneTime), '$80 to $110'],
+    [oneTime.match(/Let me read everything back[^<]+/)[0], '$80 to $110'],
+  ]) {
+    assert.ok(message.includes(range));
+    assert.equal(message.split(CLEANUP_RANGE_EXPLANATION).length - 1, 1);
+    assert.doesNotMatch(message, /[\u2013\u2014]/);
+  }
+  assert.match(recurring, /Subtotal<\/span><b>\$141\.14 to \$153\.14</);
+  const custom = welcome(render('one_time', '5_6_months'));
+  assert.match(custom, /Custom review/);
+  assert.equal(custom.includes(CLEANUP_RANGE_EXPLANATION), false);
 });

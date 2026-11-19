@@ -5,8 +5,8 @@ import TurnstileWidget from "@/components/TurnstileWidget";
 import MonthlyPriceBreakdown from "./MonthlyPriceBreakdown";
 import { accountSubmitState, questionSubmitState } from "@/lib/quote-form-state.mjs";
 import {
-  PRICING, YARD_TIERS, CHARGE_LABEL,
-  isInArea, haulAwayPrice, calcLocalQuote,
+  PRICING, YARD_TIERS, CHARGE_LABEL, CLEANUP_RANGE_EXPLANATION,
+  isInArea, isFrequencyOffered, haulAwayPrice, calcLocalQuote, formatCleanupRange,
 } from "./pricing";
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -50,7 +50,6 @@ const secHead = (first = false) => ({
 });
 
 const money  = (n) => "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-const rngStr = ([lo, hi]) => `${money(lo)}–${money(hi)}`;
 
 function Btn({ children, active, onClick, style = {} }) {
   return (
@@ -221,29 +220,26 @@ export default function QuoteForm() {
   );
 
   // Live SNG pricing proxy
+  const priceQuery = inArea && base.monthly != null ? new URLSearchParams({
+    zip: zipClean, dogs: String(dogs), frequency, last_cleaned: lastCleaned,
+  }).toString() : "";
   useEffect(() => {
     let cancelled = false;
     setLivePrice(null);
-    if (!inArea || frequency === "one_time") return;
+    if (!priceQuery) return;
     const t = setTimeout(async () => {
       try {
-        const params = new URLSearchParams({
-          zip: zipClean,
-          dogs: String(dogs),
-          frequency,
-          last_cleaned: lastCleaned,
-        });
-        const r = await fetch(`/api/quote?${params}`);
+        const r = await fetch(`/api/quote?${priceQuery}`);
         const j = await r.json();
         if (!cancelled && j.configured && j.ok && typeof j.monthly === "number") {
-          setLivePrice(j.monthly);
+          setLivePrice({ query: priceQuery, monthly: j.monthly });
         }
       } catch { /* fallback to local */ }
     }, 350);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [inArea, zipClean, dogs, frequency, lastCleaned]);
+  }, [priceQuery]);
 
-  const baseMonthly   = livePrice ?? base.monthly;
+  const baseMonthly   = livePrice?.query === priceQuery ? livePrice.monthly : base.monthly;
   const monthly       = baseMonthly != null ? baseMonthly + yardUpcharge : null;
 
   const monthlyAddons = useMemo(() =>
@@ -265,10 +261,7 @@ export default function QuoteForm() {
     p.includes(a) ? p.filter((x) => x !== a) : [...p, a]
   );
 
-  const freqMax   = PRICING.frequencies.find((f) => f.id === frequency)?.maxDogs ?? 7;
-  const overMax   = frequency !== "one_time" && dogs > freqMax;
-  // Over the frequency's dog cap always blocks (e.g. Monthly = 1 dog only), even if a
-  // stray price exists in the table; a null price only blocks when it's not an XL/custom yard.
+  const overMax   = !isFrequencyOffered(frequency, dogs);
   const notOffered= frequency !== "one_time" && (overMax || (monthly == null && !yardIsXL));
 
   // Step 1 gate: must have in-area ZIP, phone, email, consent, yard size (recurring)
@@ -315,11 +308,10 @@ export default function QuoteForm() {
     return () => { cancelled = true; };
   }, [funnelId, inArea, phoneReady, emailReady, followupConsent, zipClean, phone, email, dogs, frequency, lastCleaned, yardSize, monthlyTotal, base.oneTimeRange, selected, coupon, step, partialRetry]);
 
-  // If the dog count pushes the current frequency past its cap (e.g. Monthly + 2 dogs),
+  // If the dog count pushes the current frequency past its cap,
   // fall back to Weekly so the form never sits on a disabled option.
   useEffect(() => {
-    const fm = PRICING.frequencies.find((f) => f.id === frequency);
-    if (frequency !== "one_time" && fm && dogs > (fm.maxDogs ?? 7)) {
+    if (!isFrequencyOffered(frequency, dogs) && frequency !== "once_a_week") {
       setFrequency("once_a_week");
     }
   }, [dogs, frequency]);
@@ -336,7 +328,7 @@ export default function QuoteForm() {
     const parts = [];
     if (yardTier && yardTier.id !== "tiny") {
       parts.push(yardIsXL
-        ? `Yard size: Over 3/4 acre — custom upcharge to be confirmed.`
+        ? `Yard size: Over 3/4 acre, custom upcharge to be confirmed.`
         : `Yard size: ${yardTier.label} → +$${yardUpcharge}/mo. Subscription rate includes yard upcharge.`
       );
     }
@@ -367,7 +359,7 @@ export default function QuoteForm() {
     number_of_dogs:   dogs,
     clean_up_frequency: frequency,
     last_time_yard_was_thoroughly_cleaned: lastCleaned,
-    initial_cleanup_required: ["one_week","two_weeks","three_weeks","one_month","two_months","3_4_months"].includes(lastCleaned) ? 1 : 0,
+    initial_cleanup_required: Object.hasOwn(PRICING.initialCleanup, lastCleaned) ? 1 : 0,
     coupon:           coupon || undefined,
     // Quote-follow-up consent is not blanket promotional-marketing consent.
     marketing_allowed: 0,
@@ -646,7 +638,7 @@ export default function QuoteForm() {
       {zipReady && !inArea && (
         <>
           <div style={{ background: "#fff5f4", border: "1.5px solid #f1c9c5", borderRadius: "12px", padding: "16px 18px", marginBottom: "18px", fontSize: "14px", color: "#8a3b36", lineHeight: 1.5 }}>
-            We&apos;re not in <strong>{zipClean}</strong> yet — but we&apos;re expanding fast. Leave your info and we&apos;ll reach out the moment we cover your area.
+            We&apos;re not in <strong>{zipClean}</strong> yet, but we&apos;re expanding fast. Leave your info and we&apos;ll reach out the moment we cover your area.
           </div>
           <div style={{ display: "grid", gap: "14px", marginBottom: "14px" }}>
             <div>
@@ -689,16 +681,17 @@ export default function QuoteForm() {
         <>
           {/* Dogs */}
           <div style={{ marginBottom: "26px" }}>
-            <label style={{ ...lbl, marginBottom: "14px" }}>
+            <label htmlFor="quote-dog-count" style={{ ...lbl, marginBottom: "14px" }}>
               Number of dogs:{" "}
               <span style={{ color: "#4F9E3A", fontFamily: "'Bricolage Grotesque'", fontSize: "16px" }}>
-                {dogs}{dogs === 7 ? "+" : ""}
+                {dogs}
               </span>
             </label>
-            <input type="range" min="1" max="7" value={dogs} onChange={(e) => setDogs(Number(e.target.value))} className="opwp-range" />
+            <input id="quote-dog-count" type="range" min="1" max="7" value={dogs} onChange={(e) => setDogs(Number(e.target.value))} className="opwp-range" />
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: 600, color: "#8a96a0", marginTop: "8px", padding: "0 2px" }}>
-              {[1,2,3,4,5,6,7].map((n) => <span key={n}>{n === 7 ? "7+" : n}</span>)}
+              {[1,2,3,4,5,6,7].map((n) => <span key={n}>{n}</span>)}
             </div>
+            <p style={{ fontSize: "13px", color: "#64717a" }}>For 8 or more dogs, call or text <a href={`tel:${ORG_PHONE.replace(/\D/g, "")}`}>{ORG_PHONE}</a> for a custom quote.</p>
           </div>
 
           {/* Frequency */}
@@ -707,13 +700,13 @@ export default function QuoteForm() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px" }}>
               {PRICING.frequencies.map((f) => {
                 const active   = f.id === frequency;
-                const disabled = f.id !== "one_time" && dogs > (f.maxDogs ?? 7);
+                const disabled = !isFrequencyOffered(f.id, dogs);
                 return (
                   <button
                     key={f.id}
                     type="button"
                     disabled={disabled}
-                    title={disabled ? `Not available for ${dogs}${dogs === 7 ? "+" : ""} dogs` : undefined}
+                    title={disabled ? `Not available for ${dogs} dogs` : undefined}
                     onClick={() => { if (!disabled) setFrequency(f.id); }}
                     style={{
                       border: `1.5px solid ${active ? "#4F9E3A" : disabled ? "#eaece6" : "#dfe2da"}`,
@@ -877,11 +870,11 @@ export default function QuoteForm() {
                 <>
                   <div style={{ fontSize: "13px", fontWeight: 700, color: "#7c8891", marginBottom: "4px" }}>One-time cleanup estimate</div>
                   <div style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: "34px", color: "#1A3C5A", lineHeight: 1.05 }}>
-                    {base.oneTimeRange ? rngStr(base.oneTimeRange) : "Custom quote"}
+                    {base.oneTimeRange ? formatCleanupRange(base.oneTimeRange) : "Custom quote"}
                   </div>
                   <div style={{ fontSize: "12.5px", color: "#8a96a0", marginTop: "6px" }}>
                     {base.oneTimeRange
-                      ? "Estimate based on dogs + time since last cleaned. Exact price confirmed on-site."
+                      ? CLEANUP_RANGE_EXPLANATION
                       : "We'll reach out with an exact price."}
                   </div>
                 </>
@@ -889,7 +882,7 @@ export default function QuoteForm() {
                 <>
                   <div style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: "24px", color: "#1A3C5A" }}>Not offered for this combo</div>
                   <div style={{ fontSize: "13px", color: "#8a96a0", marginTop: "6px", lineHeight: 1.5 }}>
-                    {overMax ? `${PRICING.frequencies.find((f) => f.id === frequency)?.name} isn't offered for ${dogs}${dogs===7?"+ ":""}dogs.` : ""} Try Weekly or 2×/week.
+                    {overMax ? `${PRICING.frequencies.find((f) => f.id === frequency)?.name} isn't offered for ${dogs} dogs.` : ""} Try Weekly or 2×/week.
                   </div>
                 </>
               ) : (
@@ -900,11 +893,11 @@ export default function QuoteForm() {
                       Base service: {money(baseMonthly / base.visits)}/visit ({base.visits} visits/mo), before yard upcharge and extras.
                     </div>
                   )}
-                  {base.initialRange && (
-                    <div style={{ marginTop: "10px", fontSize: "12.5px", color: "#6f7686" }}>
-                      Plus a one-time initial cleanup, est. <strong>{rngStr(base.initialRange)}</strong> (first visit only).
-                    </div>
-                  )}
+                  <div style={{ marginTop: "10px", fontSize: "12.5px", color: "#6f7686" }}>
+                    {base.initialRange
+                      ? <>Plus a one-time initial cleanup, est. <strong>{formatCleanupRange(base.initialRange)}</strong> (first visit only). {CLEANUP_RANGE_EXPLANATION}</>
+                      : "Initial cleanup requires a custom quote."}
+                  </div>
                   {otherAddons.length > 0 && (
                     <div style={{ marginTop: "8px", fontSize: "12.5px", color: "#6f7686" }}>
                       Added at checkout: {otherAddons.map((a) => `${a.name} (${money(a.price)}${CHARGE_LABEL[a.charge]})`).join(", ")}.
@@ -1062,7 +1055,7 @@ export default function QuoteForm() {
         <div style={{ background: "#f3f9f0", border: "1.5px solid #c8e0be", borderRadius: "12px", padding: "14px 16px", marginBottom: "22px", fontSize: "13.5px", color: "#36424b" }}>
           <strong style={{ color: "#1A3C5A" }}>Your one-time cleanup: </strong>
           {dogs} dog{dogs > 1 ? "s" : ""}
-          <div style={{ marginTop: "10px" }}>{base.oneTimeRange ? `Estimated cleanup: ${rngStr(base.oneTimeRange)}.` : "We’ll confirm your cleanup estimate with you."}</div>
+          <div style={{ marginTop: "10px" }}>{base.oneTimeRange ? `Estimated cleanup: ${formatCleanupRange(base.oneTimeRange)}. ${CLEANUP_RANGE_EXPLANATION}` : "We’ll confirm your cleanup estimate with you."}</div>
         </div>
       )}
       {monthlyTotal != null && frequency !== "one_time" && (
@@ -1072,7 +1065,9 @@ export default function QuoteForm() {
           <div style={{ marginTop: "14px" }}>
             <MonthlyPriceBreakdown {...{ baseMonthly, yardTier, yardUpcharge, monthlyAddons, monthlyTotal, money }} compact />
           </div>
-          {base.initialRange && <div style={{ marginTop: "10px" }}>Plus a one-time initial cleanup, est. {rngStr(base.initialRange)}.</div>}
+          <div style={{ marginTop: "10px" }}>{base.initialRange
+            ? `Plus a one-time initial cleanup, est. ${formatCleanupRange(base.initialRange)}. ${CLEANUP_RANGE_EXPLANATION}`
+            : "Initial cleanup requires a custom quote."}</div>
         </div>
       )}
 
@@ -1153,8 +1148,8 @@ export default function QuoteForm() {
         <label style={lbl}>Is it safe for our team to be in the yard with your dog? {req}</label>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "8px" }}>
           {[
-            ["yes",      "Yes — completely safe"],
-            ["no",       "No — keep indoors during service"],
+            ["yes",      "Yes, completely safe"],
+            ["no",       "No, keep indoors during service"],
           ].map(([val, label]) => (
             <Btn key={val} active={safeDog === val} onClick={() => setSafeDog(val)}>{label}</Btn>
           ))}

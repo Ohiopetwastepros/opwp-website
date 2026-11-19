@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CLEANUP_RANGE_EXPLANATION } from "@/app/free-quote/pricing";
 
 export const metadata = {
   title:
@@ -57,7 +58,7 @@ const faqJsonLd = {
       name: "How is one-time pricing determined?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Pricing depends on how many dogs you have and how often you'd like service — get your exact price with our instant quote.",
+        text: CLEANUP_RANGE_EXPLANATION,
       },
     },
     {
@@ -78,7 +79,7 @@ const faqData = [
   },
   {
     q: "How is one-time pricing determined?",
-    a: "Pricing depends on how many dogs you have and how often you’d like service — get your exact price with our instant quote.",
+    a: CLEANUP_RANGE_EXPLANATION,
   },
   {
     q: "Can I start recurring service after a one-time cleanup?",
@@ -151,7 +152,7 @@ export default function OneTimePage() {
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#658461", marginBottom: 12 }}>How it works</div>
             <h2 style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 700, fontSize: 34, lineHeight: 1.05, letterSpacing: "-0.02em", margin: "0 0 22px" }}>From request to clean yard</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-              <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}><div style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: 22, color: "#4F9E3A", flex: "none", width: 30 }}>1</div><div><div style={{ fontWeight: 700, fontSize: 16 }}>Request a free quote</div><p style={{ margin: "4px 0 0", fontSize: 14.5, lineHeight: 1.5, color: "#5b6770" }}>Tell us your yard size and number of dogs — we&apos;ll confirm your one-time price.</p></div></div>
+              <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}><div style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: 22, color: "#4F9E3A", flex: "none", width: 30 }}>1</div><div><div style={{ fontWeight: 700, fontSize: 16 }}>Request a free quote</div><p style={{ margin: "4px 0 0", fontSize: 14.5, lineHeight: 1.5, color: "#5b6770" }}>Tell us your yard size and number of dogs to get a one-time cleanup estimate.</p></div></div>
               <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}><div style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: 22, color: "#4F9E3A", flex: "none", width: 30 }}>2</div><div><div style={{ fontWeight: 700, fontSize: 16 }}>We schedule your visit</div><p style={{ margin: "4px 0 0", fontSize: 14.5, lineHeight: 1.5, color: "#5b6770" }}>Pick a date that works — no contract, no recurring charge.</p></div></div>
               <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}><div style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: 22, color: "#4F9E3A", flex: "none", width: 30 }}>3</div><div><div style={{ fontWeight: 700, fontSize: 16 }}>We reset the yard</div><p style={{ margin: "4px 0 0", fontSize: 14.5, lineHeight: 1.5, color: "#5b6770" }}>A complete cleanup, double-bagged disposal, and a gate photo when we finish.</p></div></div>
             </div>
