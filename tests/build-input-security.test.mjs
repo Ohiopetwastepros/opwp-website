@@ -13,7 +13,7 @@ function fixture(t){
   fs.mkdirSync(path.join(root,'data'),{recursive:true});
   fs.mkdirSync(path.join(root,'schema-proposals'),{recursive:true});
   fs.copyFileSync(new URL('../data/production-schema-changes.json',import.meta.url),path.join(root,'data/production-schema-changes.json'));
-  for(const file of ['0067_review_requests.sql','0068_lead_inbox_trash.sql'])fs.copyFileSync(new URL('../schema-proposals/'+file,import.meta.url),path.join(root,'schema-proposals',file));
+  for(const file of ['0067_review_requests.sql','0068_lead_inbox_trash.sql','0069_lead_playbook.sql'])fs.copyFileSync(new URL('../schema-proposals/'+file,import.meta.url),path.join(root,'schema-proposals',file));
   fs.copyFileSync(new URL('../scripts/prepare-build-inputs.mjs',import.meta.url),path.join(root,'scripts/prepare-build-inputs.mjs'));
   fs.copyFileSync(new URL('../scripts/render-test-migrations.mjs',import.meta.url),path.join(root,'scripts/render-test-migrations.mjs'));
   fs.cpSync(new URL('./fixtures/migration-templates/',import.meta.url),path.join(root,'tests/fixtures/migration-templates'),{recursive:true});
@@ -48,4 +48,11 @@ test('test preparation verifies additive inbox schema bytes before rendering its
   assert.equal(fs.readFileSync(path.join(f.root,'tmp/test-migrations/0068_lead_inbox_trash.sql'),'utf8'),fs.readFileSync(path.join(f.root,'schema-proposals/0068_lead_inbox_trash.sql'),'utf8'));
   fs.appendFileSync(path.join(f.root,'schema-proposals/0068_lead_inbox_trash.sql'),'\n-- unreviewed change\n');
   const result=f.run();assert.notEqual(result.status,0);assert.match(result.stderr,/Reviewed inbox test schema bytes changed/);
+});
+
+test('test preparation verifies the playbook proposal before rendering it locally',t=>{
+  const f=fixture(t);assert.equal(f.run(['--synthetic']).status,0);
+  assert.equal(fs.readFileSync(path.join(f.root,'tmp/test-migrations/0069_lead_playbook.sql'),'utf8'),fs.readFileSync(path.join(f.root,'schema-proposals/0069_lead_playbook.sql'),'utf8'));
+  fs.appendFileSync(path.join(f.root,'schema-proposals/0069_lead_playbook.sql'),'\n-- unreviewed change\n');
+  assert.notEqual(f.run().status,0);
 });

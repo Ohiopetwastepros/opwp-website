@@ -42,7 +42,7 @@ async function executeWorker(source, cron, rejectedProcessor = "") {
       contexts.push(request.url);
       return run();
     },
-    ...Object.fromEntries([...processors, ...existingTasks].map(name => [name, async actualEnv => {
+    ...Object.fromEntries([...processors, ...existingTasks, "runScheduledPlaybook"].map(name => [name, async actualEnv => {
       assert.equal(actualEnv, env);
       calls.push(name);
       if (name === rejectedProcessor) throw new Error("Fixture processor failed");
@@ -69,7 +69,8 @@ test("all five processors run once on */10 alongside other */10 blocks, even wit
     assert.deepEqual(Array.from(result.outcomes[0].value), processors, "completion logging preserves processor results");
     for (const cron of ["0 * * * *", "5 * * * *", "15 * * * *", "35 * * * *"]) {
       const skipped = await executeWorker(patched, cron);
-      assert.deepEqual(skipped.calls, []);
+      assert.deepEqual(skipped.calls, cron === "0 * * * *" ? ["runScheduledPlaybook"] : []);
+      if (cron === "0 * * * *") assert.deepEqual(skipped.contexts, ["https://opwp.internal/lead-playbook"]);
       assert.deepEqual(skipped.logs, []);
     }
   }
