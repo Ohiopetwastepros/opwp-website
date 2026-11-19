@@ -17,7 +17,7 @@ test("preview tokens and URLs contain independent random request identity withou
   for (const token of tokens) {
     assert.ok(validReviewPreviewToken(token));
     assert.equal(reviewRequestPageUrl(token), `${REVIEW_SITE_ORIGIN}/review/r/${token}/`);
-    assert.equal(reviewRequestImageUrl(token), `${reviewRequestPageUrl(token)}og.png`);
+    assert.equal(reviewRequestImageUrl(token), `${reviewRequestPageUrl(token)}og.jpg`);
     assert.equal(reviewPreviewObjectKey(token), `review-og/${token}.png`);
     assert.doesNotMatch(reviewRequestPageUrl(token), /Jennifer|@|job-/i);
   }
@@ -38,8 +38,8 @@ function fixture() {
       objects.set(key, { body: bytes, ...options, httpEtag: '"fixture"' });
     },
   } };
-  const render = async (_env, options) => { renders.push(options); return { bytes: new Uint8Array([137, 80, 78, 71]), contentType: "image/png" }; };
-  return { env, writes, renders, render };
+  const render = async (_env, options) => { renders.push(options); return { bytes: new Uint8Array([255, 216, 255, 224, 255, 217]), contentType: "image/jpeg" }; };
+  return { env, objects, writes, renders, render };
 }
 
 test("prepared preview is persisted once, immutable across channels, and readable on a cache miss", async () => {
@@ -50,14 +50,53 @@ test("prepared preview is persisted once, immutable across channels, and readabl
   assert.deepEqual(await prepareReviewPreview(f.env, { token, firstName: "Changed", tech: "craig" }, f), preview);
   assert.equal(f.writes.length, 1);
   assert.deepEqual(f.writes[0].options.onlyIf, { etagDoesNotMatch: "*" });
-  assert.deepEqual(f.writes[0].options.customMetadata, { reviewPreviewVersion: "1", tech: "tony" });
+  assert.deepEqual(f.writes[0].options.customMetadata, { reviewPreviewVersion: "2", tech: "tony" });
+  assert.equal(f.writes[0].options.httpMetadata.contentType, "image/jpeg");
   assert.deepEqual(await getReviewPreview(f.env, token), preview);
   const image = await getReviewPreviewImage(f.env, token);
   assert.equal(image.status, 200);
-  assert.equal(image.headers.get("content-type"), "image/png");
+  assert.equal(image.headers.get("content-type"), "image/jpeg");
+  assert.equal(image.headers.get("location"), null);
+  assert.equal(image.headers.get("x-robots-tag"), null);
   assert.equal(image.headers.get("referrer-policy"), "no-referrer");
   assert.match(image.headers.get("cache-control"), /immutable/);
-  assert.equal((await image.arrayBuffer()).byteLength, 4);
+  assert.equal((await image.arrayBuffer()).byteLength, 6);
+});
+
+test("legacy tokens still resolve and a JPEG replacement preserves the same page and image aliases", async () => {
+  const f = fixture(), token = "11111111-2222-4333-8444-555555555555", key = reviewPreviewObjectKey(token);
+  f.objects.set(key, {
+    body: new Uint8Array([137, 80, 78, 71]),
+    customMetadata: { reviewPreviewVersion: "1", tech: "tony" },
+    httpMetadata: { contentType: "image/png" },
+  });
+  const before = await getReviewPreview(f.env, token);
+  assert.equal(before.token, token);
+  assert.equal(before.imageUrl, `${reviewRequestPageUrl(token)}og.jpg`);
+  assert.equal((await getReviewPreviewImage(f.env, token)).headers.get("content-type"), "image/png");
+  const jpeg = (await f.render(f.env, { firstName: "Jennifer", tech: "tony" })).bytes;
+  f.objects.set(key, { body: jpeg, customMetadata: { reviewPreviewVersion: "2", tech: "tony" }, httpMetadata: { contentType: "image/jpeg" } });
+  assert.deepEqual(await getReviewPreview(f.env, token), before);
+  const response = await getReviewPreviewImage(f.env, token);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "image/jpeg");
+  assert.equal(response.headers.get("location"), null);
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), jpeg);
+});
+
+test("invalid and oversized rendered images cannot be published as JPEG previews", async () => {
+  const cases = [
+    { bytes: new Uint8Array([137, 80, 78, 71]), contentType: "image/png" },
+    { bytes: new Uint8Array([137, 80, 78, 71]), contentType: "image/jpeg" },
+    { bytes: new Uint8Array(), contentType: "image/jpeg" },
+    { bytes: new Uint8Array(1_000_001).fill(255), contentType: "image/jpeg" },
+  ];
+  cases.at(-1).bytes[1] = 216;
+  for (const image of cases) {
+    const f = fixture();
+    await assert.rejects(() => prepareReviewPreview(f.env, { token: createReviewPreviewToken(), firstName: "Jennifer", tech: "tony" }, { render: async () => image }), /Invalid review preview image/);
+    assert.equal(f.writes.length, 0);
+  }
 });
 
 test("invalid and unpublished tokens cannot enumerate or render arbitrary bucket objects", async () => {
@@ -85,11 +124,15 @@ test("page metadata, page image, email image and SMS use the same personalized a
   const token = createReviewPreviewToken(), image = reviewRequestImageUrl(token), page = reviewRequestPageUrl(token);
   const metadata = personalizedReviewMetadata({ token, tech: "tony" });
   assert.equal(metadata.openGraph.images[0].url, image);
+  assert.match(image, /^https:\/\/www\.ohiopetwastepros\.com\/review\/r\/[a-f0-9-]+\/og\.jpg$/);
+  assert.equal(metadata.openGraph.images[0].secureUrl, image);
+  assert.equal(metadata.openGraph.images[0].type, "image/jpeg");
   assert.equal(metadata.openGraph.images[0].width, 1200);
   assert.equal(metadata.openGraph.images[0].height, 630);
   assert.equal(metadata.twitter.images[0], image);
   assert.equal(metadata.twitter.card, "summary_large_image");
   assert.equal(metadata.openGraph.url, page);
+  assert.equal(metadata.openGraph.title, "Tony took care of your yard today");
   assert.equal(metadata.robots.index, false);
   assert.equal(metadata.referrer, "no-referrer");
   assert.ok(buildReviewRequestSms({ firstName: "Jennifer", tech: "tony", previewToken: token }).includes(page));
@@ -97,10 +140,14 @@ test("page metadata, page image, email image and SMS use the same personalized a
   assert.ok(email.text.includes(page));
   assert.ok(email.html.includes(`src="${image}"`));
   const pageSource = fs.readFileSync(new URL("../app/review/r/[token]/page.js", import.meta.url), "utf8");
-  const imageSource = fs.readFileSync(new URL("../app/review/r/[token]/og.png/route.js", import.meta.url), "utf8");
-  for (const source of [pageSource, imageSource]) {
+  const imageSources = ["og.jpg", "og.png"].map(name => fs.readFileSync(new URL(`../app/review/r/[token]/${name}/route.js`, import.meta.url), "utf8"));
+  for (const source of [pageSource, ...imageSources]) {
     assert.match(source, /dynamic = "force-dynamic"/);
     assert.doesNotMatch(source, /dynamicParams\s*=\s*false|generateStaticParams|REVIEW_REQUESTS_ENABLED/);
+  }
+  for (const source of imageSources) {
+    assert.match(source, /return getReviewPreviewImage\(getRuntimeEnv\(\), token\)/);
+    assert.doesNotMatch(source, /redirect|Location|30[1278]/);
   }
   assert.match(pageSource, /src=\{preview.imageUrl\}/);
   assert.match(pageSource, /href=\{REVIEW_URL\}/);

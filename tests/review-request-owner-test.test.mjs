@@ -232,7 +232,7 @@ test('the locked manual test bypasses quiet hours with flag false and records on
     const sms = f.calls.find(call => call.channel === 'sms').body;
     assert.deepEqual(sms.to, [OWNER_REVIEW_TEST.phone]);
     assert.equal(sms.from, OWNER_REVIEW_TEST.from);
-    assert.equal(sms.content, `Hi Craig, this is Craig with Ohio Pet Waste Pros. Thanks for letting Tony take care of your yard! If you were happy with the cleanup, would you take a minute to leave us a Google review? It really helps our small family business grow. 😃 ${result.previewPageUrl}\n\nReply STOP to opt out`);
+    assert.equal(sms.content, `Hi Craig, this is Craig with Ohio Pet Waste Pros. Thanks for letting Tony take care of your yard! If you were happy with the cleanup, would you take a minute to leave us a Google review? It really helps our small family business grow. 😃\n\nReply STOP to opt out\n\n${result.previewPageUrl}`);
     const email = f.calls.find(call => call.channel === 'email').body;
     assert.deepEqual(email.to, [OWNER_REVIEW_TEST.email]);
     assert.match(email.html, new RegExp(result.ogImageUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
@@ -417,7 +417,7 @@ test('verified-unsent completion claims the same locked request once and reuses 
     assert.equal(f.calls.find(call => call.channel === 'sms').body.from, OWNER_REVIEW_TEST.from);
     assert.deepEqual(f.calls.find(call => call.channel === 'sms').body.to, [OWNER_REVIEW_TEST.phone]);
     assert.deepEqual(f.calls.find(call => call.channel === 'email').body.to, [OWNER_REVIEW_TEST.email]);
-    assert.match(f.calls.find(call => call.channel === 'sms').body.content, /Reply STOP to opt out$/);
+    assert.match(f.calls.find(call => call.channel === 'sms').body.content, /Reply STOP to opt out\n\nhttps:\/\/www\.ohiopetwastepros\.com\/review\/r\/[a-f0-9-]+\/$/);
     assert.match(f.calls.find(call => call.channel === 'email').body.text, /Email: craig@ohiopetwastepros\.com/);
     const request = f.sqlite.prepare('SELECT * FROM review_requests').get();
     const payload = JSON.parse(request.payload);

@@ -280,7 +280,9 @@ test('eligible initial completion sends both channels once and reserves the cust
     assert.equal((await f.queue(first)).status, 'duplicate');
     assert.equal((await f.run()).sent, 2);
     assert.deepEqual(f.sends.map(send => send.channel).sort(), ['email', 'sms']);
-    assert.match(f.sends.find(send => send.channel === 'sms').options.content, /Hey Jordan,.*\/review\/r\/[a-f0-9-]+\//);
+    const sms = f.sends.find(send => send.channel === 'sms').options.content;
+    assert.match(sms, /^Hey Jordan,/);
+    assert.match(sms, /\n\nReply STOP to opt out\n\nhttps:\/\/www\.ohiopetwastepros\.com\/review\/r\/[a-f0-9-]+\/$/);
     const email = f.sends.find(send => send.channel === 'email').options;
     assert.match(email.headers['List-Unsubscribe'], /https:\/\/www\.ohiopetwastepros\.com\/api\/review-requests\/unsubscribe\/\?token=/);
     assert.equal(email.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
