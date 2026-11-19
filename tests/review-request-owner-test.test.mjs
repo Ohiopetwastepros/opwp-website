@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { createHash } from 'node:crypto';
 import vm from 'node:vm';
-import { OWNER_REVIEW_TEST, OWNER_REVIEW_RETEST, assertOwnerReviewTestRecipients, runOwnerReviewTest, runOwnerReviewRetest } from '../lib/review-request-owner-test.mjs';
-import { reviewRequestPageUrl, reviewRequestImageUrl } from '../lib/review-request-content.mjs';
+import { OWNER_REVIEW_TEST, OWNER_REVIEW_RETEST, OWNER_REVIEW_GOOGLE_LINK, assertOwnerReviewTestRecipients, runOwnerReviewTest, runOwnerReviewRetest, runOwnerReviewGoogleLinkTest } from '../lib/review-request-owner-test.mjs';
+import { REVIEW_URL, reviewRequestPageUrl, reviewRequestImageUrl } from '../lib/review-request-content.mjs';
 import { readBoundedBytes, readBoundedProviderJson } from '../lib/bounded-body.mjs';
 import { outboundFetch } from '../lib/outbound-request.js';
 
@@ -28,6 +28,7 @@ const CAPABILITY = 'ab'.repeat(32);
 const SOURCE_FAILURE_REASON = 'manual_owner_test_http_none_source_line_verification_failed';
 const UNSENT_REQUEST_ID = '61f7de2b-f6b6-4c2c-ace5-726424736168';
 const UNCERTAIN_REASON = 'manual_owner_test_http_none_provider_acceptance_uncertain_verify_before_retry';
+const GOOGLE_LINK_REQUEST_ID = 'b7b0fbfb-1111-4111-8111-111111111111';
 const DELIVERY_VERIFICATION = Object.freeze({ checkedAt: new Date(NOW.getTime() - 60_000).toISOString(),
   quoNoMessagesAfter0600Z: true, outlookNoReviewEmail: true, gmailNoReviewEmail: true });
 
@@ -82,7 +83,8 @@ function fixture(identity = OWNER_REVIEW_TEST) {
   function authorize(overrides = {}, selectedIdentity = identity) {
     const payload = JSON.stringify({
       tokenHash: createHash('sha256').update(CAPABILITY).digest('hex'),
-      expiresAt: new Date(NOW.getTime() + 15 * 60_000).toISOString(), workerVersion: VERSION, ...overrides,
+      expiresAt: new Date(NOW.getTime() + 15 * 60_000).toISOString(), workerVersion: VERSION,
+      ...(selectedIdentity === OWNER_REVIEW_GOOGLE_LINK ? { requestId: GOOGLE_LINK_REQUEST_ID } : {}), ...overrides,
     });
     sqlite.prepare('INSERT OR REPLACE INTO airtable_cockpit_snapshots(snapshot_key,payload,status) VALUES(?,?,?)')
       .run(selectedIdentity.approvalKey, payload, 'success');
@@ -118,7 +120,7 @@ function fixture(identity = OWNER_REVIEW_TEST) {
     throw new Error('Unexpected provider destination');
   };
   authorize();
-  const run = (options = {}, selectedIdentity = identity) => (selectedIdentity === OWNER_REVIEW_RETEST ? runOwnerReviewRetest : runOwnerReviewTest)(env, {
+  const run = (options = {}, selectedIdentity = identity) => (selectedIdentity === OWNER_REVIEW_GOOGLE_LINK ? runOwnerReviewGoogleLinkTest : selectedIdentity === OWNER_REVIEW_RETEST ? runOwnerReviewRetest : runOwnerReviewTest)(env, {
     phone: OWNER_REVIEW_TEST.phone, email: OWNER_REVIEW_TEST.email,
     authorization: `Bearer ${CAPABILITY}`, now: NOW, ...options,
   }, { preparePreview, verifyPreview, fetchProvider, sendSms, sendEmail });
@@ -232,7 +234,7 @@ test('the locked manual test bypasses quiet hours with flag false and records on
     const sms = f.calls.find(call => call.channel === 'sms').body;
     assert.deepEqual(sms.to, [OWNER_REVIEW_TEST.phone]);
     assert.equal(sms.from, OWNER_REVIEW_TEST.from);
-    assert.equal(sms.content, `Hi Craig, this is Craig with Ohio Pet Waste Pros. Thanks for letting Tony take care of your yard! If you were happy with the cleanup, would you take a minute to leave us a Google review? It really helps our small family business grow. 😃\n\nReply STOP to opt out\n\n${result.previewPageUrl}`);
+    assert.equal(sms.content, `Hi Craig, this is Craig with Ohio Pet Waste Pros. Thanks for letting Tony take care of your yard! If you were happy with the cleanup, would you take a minute to leave us a Google review? It really helps our small family business grow. 😃\n\nReply STOP to opt out\n\n${REVIEW_URL}`);
     const email = f.calls.find(call => call.channel === 'email').body;
     assert.deepEqual(email.to, [OWNER_REVIEW_TEST.email]);
     assert.match(email.html, new RegExp(result.ogImageUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
@@ -319,11 +321,11 @@ test('the separate locked retest sends once with an old sent job present and pre
     assert.notEqual(emailCalls[0].options.headers['Idempotency-Key'], emailCalls[1].options.headers['Idempotency-Key']);
     const sms = f.calls.filter(call => call.channel === 'sms')[1].body;
     assert.deepEqual(sms.to, [OWNER_REVIEW_TEST.phone]); assert.equal(sms.from, OWNER_REVIEW_TEST.from);
-    assert.equal(sms.content.split('\n').filter(line => line.trim()).at(-1), result.previewPageUrl);
-    assert.ok(sms.content.endsWith(`\n\nReply STOP to opt out\n\n${result.previewPageUrl}`));
+    assert.equal(sms.content.split('\n').filter(line => line.trim()).at(-1), REVIEW_URL);
+    assert.ok(sms.content.endsWith(`\n\nReply STOP to opt out\n\n${REVIEW_URL}`));
     assert.doesNotMatch(sms.content, /[\u2013\u2014]|five[- ]star/i);
     assert.equal(f.sqlite.prepare('SELECT template_version FROM review_requests WHERE job_id=?').get(OWNER_REVIEW_RETEST.jobId).template_version,
-      'review-request-initial-cleanup-v2');
+      'review-request-initial-cleanup-v3');
     assert.deepEqual(f.sqlite.prepare('SELECT * FROM review_requests WHERE id=?').get(original.requestId), originalRequest);
     assert.deepEqual(f.sqlite.prepare('SELECT * FROM review_request_deliveries WHERE request_id=? ORDER BY channel').all(original.requestId), originalDeliveries);
     f.authorize();
@@ -337,13 +339,106 @@ test('the separate locked retest sends once with an old sent job present and pre
   } finally { f.sqlite.close(); }
 });
 
-test('the retest cannot acquire the original preparation or verified-unsent continuation capability', async t => {
+test('the Google-link identity is isolated from both completed jobs and uses a new preview and idempotency key once', async () => {
+  const f = fixture(OWNER_REVIEW_GOOGLE_LINK);
+  try {
+    assert.equal(OWNER_REVIEW_GOOGLE_LINK.jobId, 'manual-owner-review-test-2026-11-19-google-link');
+    assert.equal(OWNER_REVIEW_GOOGLE_LINK.approvalKey, 'manual_owner_review_test:2026-11-19-google-link');
+    assert.ok(Object.isFrozen(OWNER_REVIEW_GOOGLE_LINK));
+    for (const key of ['phone', 'email', 'from', 'phoneId']) assert.equal(OWNER_REVIEW_GOOGLE_LINK[key], OWNER_REVIEW_TEST[key]);
+
+    const prior = [];
+    for (const identity of [OWNER_REVIEW_TEST, OWNER_REVIEW_RETEST]) {
+      f.authorize({}, identity);
+      prior.push(await f.run({}, identity));
+    }
+    const oldRequests = f.sqlite.prepare('SELECT * FROM review_requests ORDER BY job_id').all();
+    const oldDeliveries = f.sqlite.prepare('SELECT * FROM review_request_deliveries ORDER BY id').all();
+    // Both historical jobs exist when this separate job receives its approval.
+    f.authorize();
+    const result = await f.run();
+    assert.equal(result.sms.accepted, true); assert.equal(result.email.accepted, true);
+    assert.equal(f.env.REVIEW_REQUESTS_ENABLED, 'false');
+    assert.equal(f.calls.length, 6); assert.equal(f.previews.length, 3);
+    assert.equal(result.requestId, GOOGLE_LINK_REQUEST_ID, 'the private approved token is reserved for this future send');
+    assert.ok(prior.every(value => value.requestId !== result.requestId));
+    assert.notEqual(result.requestId, UNSENT_REQUEST_ID);
+    assert.notEqual(result.requestId, '57c65e44-d4d1-4f2f-97c2-104227fa3727');
+    assert.deepEqual(f.previews[2], { token: result.requestId, firstName: 'Craig', tech: 'Tony' });
+    const emailCalls = f.calls.filter(call => call.channel === 'email');
+    assert.equal(emailCalls[2].options.headers['Idempotency-Key'], `manual-owner-review-test/${OWNER_REVIEW_GOOGLE_LINK.jobId}`);
+    assert.equal(new Set(emailCalls.map(call => call.options.headers['Idempotency-Key'])).size, 3);
+    assert.ok(emailCalls[2].body.html.includes(reviewRequestImageUrl(result.requestId)));
+    assert.ok(emailCalls[2].body.html.includes(`href="${REVIEW_URL}"`));
+    assert.doesNotMatch(emailCalls[2].body.text, /ohiopetwastepros\.com\/review\/(?:r\/|tony\/|craig\/)/);
+    const sms = f.calls.filter(call => call.channel === 'sms')[2].body;
+    assert.deepEqual(Object.keys(sms).sort(), ['content', 'from', 'to'], 'Quo remains text-only');
+    assert.deepEqual(sms.to, [OWNER_REVIEW_GOOGLE_LINK.phone]); assert.equal(sms.from, OWNER_REVIEW_GOOGLE_LINK.from);
+    assert.equal(sms.content.split('\n').filter(line => line.trim()).at(-1), REVIEW_URL);
+    assert.deepEqual(sms.content.match(/https?:\/\/\S+/g), [REVIEW_URL]);
+    assert.ok(sms.content.endsWith(`\n\nReply STOP to opt out\n\n${REVIEW_URL}`));
+    assert.doesNotMatch(sms.content, /[\u2013\u2014]|five[- ]star|ohiopetwastepros\.com\/review\//i);
+    assert.equal(f.sqlite.prepare('SELECT template_version FROM review_requests WHERE job_id=?').get(OWNER_REVIEW_GOOGLE_LINK.jobId).template_version,
+      'review-request-initial-cleanup-v3');
+    assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM airtable_cockpit_snapshots WHERE snapshot_key=?').get(OWNER_REVIEW_GOOGLE_LINK.approvalKey).n, 0);
+    for (const row of oldRequests) assert.deepEqual(f.sqlite.prepare('SELECT * FROM review_requests WHERE id=?').get(row.id), row);
+    for (const row of oldDeliveries) assert.deepEqual(f.sqlite.prepare('SELECT * FROM review_request_deliveries WHERE id=?').get(row.id), row);
+    for (const identity of [OWNER_REVIEW_TEST, OWNER_REVIEW_RETEST, OWNER_REVIEW_GOOGLE_LINK]) {
+      f.authorize({}, identity);
+      await assert.rejects(f.run({}, identity), error => error.status === 409);
+    }
+    assert.equal(f.calls.length, 6); assert.equal(f.previews.length, 3);
+    assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM review_requests').get().n, 3);
+    assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM review_request_customers').get().n, 0);
+    assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM review_request_settings').get().n, 0);
+  } finally { f.sqlite.close(); }
+});
+
+test('concurrent Google-link attempts consume the third capability only once', async () => {
+  const f = fixture(OWNER_REVIEW_GOOGLE_LINK);
+  try {
+    const attempts = await Promise.allSettled([f.run(), f.run()]);
+    assert.equal(attempts.filter(value => value.status === 'fulfilled').length, 1);
+    assert.equal(f.calls.length, 2); assert.equal(f.previews.length, 1); assert.equal(f.deliveries().length, 2);
+  } finally { f.sqlite.close(); }
+});
+
+test('the Google-link capability requires its own valid opaque request id and excludes completed previews', async t => {
+  for (const requestId of [undefined, '', 'not-a-token', UNSENT_REQUEST_ID, '57c65e44-d4d1-4f2f-97c2-104227fa3727']) await t.test(String(requestId), async () => {
+    const f = fixture(OWNER_REVIEW_GOOGLE_LINK);
+    try {
+      f.authorize({ requestId });
+      await assert.rejects(f.run(), error => error.status === 400);
+      assert.equal(f.calls.length, 0); assert.equal(f.previews.length, 0); assert.equal(f.deliveries().length, 0);
+      assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM airtable_cockpit_snapshots WHERE snapshot_key=?').get(OWNER_REVIEW_GOOGLE_LINK.approvalKey).n, 1);
+    } finally { f.sqlite.close(); }
+  });
+});
+
+test('the Google-link identity requires a current fifteen-minute capability pinned to the running Worker', async t => {
+  for (const [name, overrides] of [
+    ['expired', { expiresAt: NOW.toISOString() }],
+    ['too long', { expiresAt: new Date(NOW.getTime() + 15 * 60_000 + 1).toISOString() }],
+    ['wrong version', { workerVersion: '11111111-1111-4111-8111-111111111111' }],
+  ]) await t.test(name, async () => {
+    const f = fixture(OWNER_REVIEW_GOOGLE_LINK);
+    try {
+      f.authorize(overrides);
+      await assert.rejects(f.run(), error => error.status === 403);
+      assert.equal(f.calls.length, 0); assert.equal(f.previews.length, 0); assert.equal(f.deliveries().length, 0);
+      assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM airtable_cockpit_snapshots WHERE snapshot_key=?').get(OWNER_REVIEW_GOOGLE_LINK.approvalKey).n, 1);
+    } finally { f.sqlite.close(); }
+  });
+});
+
+test('the separate owner tests cannot acquire the original preparation or verified-unsent continuation capability', async t => {
+  for (const identity of [OWNER_REVIEW_RETEST, OWNER_REVIEW_GOOGLE_LINK]) {
   for (const approval of [
     { preparationContinuation: true, resumeRequestId: UNSENT_REQUEST_ID },
     { verifiedUnsentCompletion: true, resumeRequestId: UNSENT_REQUEST_ID, deliveryVerification: DELIVERY_VERIFICATION },
     { preparationContinuation: false }, { verifiedUnsentCompletion: false }, { resumeRequestId: UNSENT_REQUEST_ID },
-  ]) await t.test(Object.keys(approval)[0], async () => {
-    const f = fixture(OWNER_REVIEW_RETEST);
+  ]) await t.test(`${identity.jobId}: ${Object.keys(approval)[0]}`, async () => {
+    const f = fixture(identity);
     try {
       f.authorize(approval);
       await assert.rejects(f.run(), error => error.status === 409);
@@ -352,16 +447,18 @@ test('the retest cannot acquire the original preparation or verified-unsent cont
       assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM review_requests').get().n, 0);
     } finally { f.sqlite.close(); }
   });
+  }
 });
 
-test('the retest enforces the same fixed recipients and disabled automation flag before preparation', async t => {
+test('the separate owner tests enforce the same fixed recipients and disabled automation flag before preparation', async t => {
+  for (const identity of [OWNER_REVIEW_RETEST, OWNER_REVIEW_GOOGLE_LINK]) {
   for (const [name, options, flag] of [
     ['another phone', { phone: '+12025550100' }, 'false'],
     ['another email', { email: 'someone@example.test' }, 'false'],
     ['multiple recipients', { phone: [OWNER_REVIEW_TEST.phone, '+12025550100'] }, 'false'],
     ['flag true', {}, 'true'], ['flag missing', {}, undefined],
-  ]) await t.test(name, async () => {
-    const f = fixture(OWNER_REVIEW_RETEST);
+  ]) await t.test(`${identity.jobId}: ${name}`, async () => {
+    const f = fixture(identity);
     try {
       f.env.REVIEW_REQUESTS_ENABLED = flag;
       await assert.rejects(f.run(options), error => error.status === (flag === 'false' ? 400 : 403));
@@ -370,6 +467,7 @@ test('the retest enforces the same fixed recipients and disabled automation flag
       assert.equal(f.writes.length, 0);
     } finally { f.sqlite.close(); }
   });
+  }
 });
 
 test('the one-time preparation continuation reuses the original unsent request and delivery rows', async () => {
@@ -500,7 +598,7 @@ test('verified-unsent completion claims the same locked request once and reuses 
     assert.equal(f.calls.find(call => call.channel === 'sms').body.from, OWNER_REVIEW_TEST.from);
     assert.deepEqual(f.calls.find(call => call.channel === 'sms').body.to, [OWNER_REVIEW_TEST.phone]);
     assert.deepEqual(f.calls.find(call => call.channel === 'email').body.to, [OWNER_REVIEW_TEST.email]);
-    assert.match(f.calls.find(call => call.channel === 'sms').body.content, /Reply STOP to opt out\n\nhttps:\/\/www\.ohiopetwastepros\.com\/review\/r\/[a-f0-9-]+\/$/);
+    assert.match(f.calls.find(call => call.channel === 'sms').body.content, /Reply STOP to opt out\n\nhttps:\/\/g\.page\/r\/CXzwhf5RzsotEAE\/review$/);
     assert.match(f.calls.find(call => call.channel === 'email').body.text, /Email: craig@ohiopetwastepros\.com/);
     const request = f.sqlite.prepare('SELECT * FROM review_requests').get();
     const payload = JSON.parse(request.payload);
@@ -727,7 +825,7 @@ test('a malformed provider ID on HTTP success remains uncertain with the real HT
   });
 });
 
-test('both owner endpoints require same-origin bounded requests and never accept extra send controls', async t => {
+test('all owner endpoints require same-origin bounded requests and never accept extra send controls', async t => {
   const inputs = [
     [{}, {}, 403],
     [{ origin: 'https://other.example.test' }, {}, 403],
@@ -738,7 +836,7 @@ test('both owner endpoints require same-origin bounded requests and never accept
     [{ origin: 'https://www.ohiopetwastepros.com' }, { phone: OWNER_REVIEW_TEST.phone, email: OWNER_REVIEW_TEST.email, preparationContinuation: true }, 400],
     [{ origin: 'https://www.ohiopetwastepros.com', 'content-length': '1000' }, {}, 400],
   ];
-  for (const endpoint of ['owner-test', 'owner-retest']) await t.test(endpoint, async () => {
+  for (const endpoint of ['owner-test', 'owner-retest', 'owner-google-link']) await t.test(endpoint, async () => {
     const source = readFileSync(new URL(`../app/api/review-requests/${endpoint}/route.js`, import.meta.url), 'utf8')
       .replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, '');
     for (const [headers, body, status] of inputs) {
@@ -748,6 +846,7 @@ test('both owner endpoints require same-origin bounded requests and never accept
       getRuntimeEnv: () => ({}),
       runOwnerReviewTest: async () => { invoked++; throw new Error('Unexpected runner invocation'); },
       runOwnerReviewRetest: async () => { invoked++; throw new Error('Unexpected runner invocation'); },
+      runOwnerReviewGoogleLinkTest: async () => { invoked++; throw new Error('Unexpected runner invocation'); },
     });
     const response = await POST(new Request(`https://www.ohiopetwastepros.com/api/review-requests/${endpoint}/`, {
       method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body),
@@ -758,17 +857,20 @@ test('both owner endpoints require same-origin bounded requests and never accept
   });
 });
 
-test('the retest endpoint invokes only its fixed wrapper and forwards no caller send controls', async () => {
-  const source = readFileSync(new URL('../app/api/review-requests/owner-retest/route.js', import.meta.url), 'utf8')
+test('the separate owner endpoints invoke only their fixed wrappers and forward no caller send controls', async t => {
+  for (const [endpoint, runner] of [['owner-retest', 'runOwnerReviewRetest'], ['owner-google-link', 'runOwnerReviewGoogleLinkTest']]) await t.test(endpoint, async () => {
+  const source = readFileSync(new URL(`../app/api/review-requests/${endpoint}/route.js`, import.meta.url), 'utf8')
     .replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, '');
   const calls = [], env = { fixed: true };
   const POST = vm.runInNewContext(`${source}\nPOST`, {
     Response, URL, Number, TextDecoder, Object, JSON, readBoundedBytes,
     getRuntimeEnv: () => env,
     runOwnerReviewTest: async () => { throw new Error('The original capability must not be selected'); },
-    runOwnerReviewRetest: async (...args) => { calls.push(args); return { kind: 'manual_owner_test' }; },
+    runOwnerReviewRetest: async () => { throw new Error('The iOS capability must not be selected'); },
+    runOwnerReviewGoogleLinkTest: async () => { throw new Error('The Google-link capability must not be selected'); },
+    [runner]: async (...args) => { calls.push(args); return { kind: 'manual_owner_test' }; },
   });
-  const response = await POST(new Request('https://www.ohiopetwastepros.com/api/review-requests/owner-retest/', {
+  const response = await POST(new Request(`https://www.ohiopetwastepros.com/api/review-requests/${endpoint}/`, {
     method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://www.ohiopetwastepros.com', authorization: `Bearer ${CAPABILITY}` },
     body: JSON.stringify({ phone: OWNER_REVIEW_TEST.phone, email: OWNER_REVIEW_TEST.email }),
   }));
@@ -778,4 +880,5 @@ test('the retest endpoint invokes only its fixed wrapper and forwards no caller 
   });
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
   assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+  });
 });

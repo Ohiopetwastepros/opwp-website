@@ -7,7 +7,7 @@ import { leadFollowUpDrafts } from "../lib/lead-assistant.mjs";
 import { buildMetaConfirmation, formatMetaSms } from "../lib/meta-lead-policy.mjs";
 import { META_RESPONSES, metaFollowUpDrafts } from "../lib/meta-conversation.mjs";
 import { buildCustomerQuoteFollowUpSms } from "../lib/quote-funnel.mjs";
-import { buildReviewRequestSms } from "../lib/review-request-content.mjs";
+import { buildReviewRequestSms, REVIEW_URL } from "../lib/review-request-content.mjs";
 import { leadTestDatabase } from "./helpers/lead-inbox-fixture.mjs";
 
 const closing = "\n\nReply STOP to opt out";
@@ -38,13 +38,14 @@ test("the shared formatter repairs existing same-line closings and does not dupl
   assert.ok(formatCustomerSms("x".repeat(1100)).length <= 1000);
 });
 
-test("review requests retain STOP before the personalized final-link line", () => {
+test("review requests retain STOP before the direct Google final-link line", () => {
   const previewToken = "00000000-0000-4000-a000-000000000001";
-  const reviewUrl = `https://www.ohiopetwastepros.com/review/r/${previewToken}/`;
   for (const template of ["standard", "initial-cleanup"]) {
     const body = buildReviewRequestSms({ firstName: "Alex", tech: "Tony", previewToken, template });
     assert.match(body, /\n\nReply STOP to opt out\n\nhttps:\/\/\S+$/);
-    assert.equal(body.trim().split("\n").at(-1), reviewUrl);
+    assert.equal(body.trim().split("\n").at(-1), REVIEW_URL);
+    assert.deepEqual(body.match(/https?:\/\/\S+/g), [REVIEW_URL]);
+    assert.doesNotMatch(body, /ohiopetwastepros\.com\/review\//);
     assert.equal(body.match(/Reply STOP to opt out/g).length, 1);
     assert.doesNotMatch(body, /[\u2013\u2014]/);
   }

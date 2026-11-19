@@ -146,7 +146,7 @@ test('real Dispatch type, cell_phone, numeric marketing flag and assignment enri
   } finally { f.sqlite.close(); }
 });
 
-test('review ledger keeps Tony or Craig and both provider messages share the request preview', async t => {
+test('review ledger keeps Tony or Craig while messages use Google and email keeps the request preview', async t => {
   for (const [tech, slug] of [['Tony B', 'tony'], ['Craig Bridgman', 'craig'], ['Chad', 'craig'], ['Unknown Tech', 'craig'], ['', 'craig']]) await t.test(tech || 'missing technician', async () => {
     const f = fixture();
     try {
@@ -158,8 +158,9 @@ test('review ledger keeps Tony or Craig and both provider messages share the req
       const email = f.sends.find(send => send.channel === 'email').options;
       const token = f.rows()[0].request_id;
       const pageUrl = content.reviewRequestPageUrl(token);
-      assert.ok(sms.includes(pageUrl));
-      assert.ok(email.text.includes(pageUrl));
+      assert.equal(sms.split('\n').at(-1), content.REVIEW_URL);
+      assert.ok(email.text.includes(content.REVIEW_URL));
+      assert.ok(!sms.includes(pageUrl) && !email.text.includes(pageUrl));
       assert.ok(email.html.includes(content.reviewRequestImageUrl(token)));
       assert.ok(f.previews.every(preview => preview.token === token && content.reviewTechSlug(preview.tech) === slug));
       assert.doesNotMatch(pageUrl, /Jordan|Example|client-1|job-1|2025550100|example\.test/);
@@ -176,14 +177,13 @@ test('a refreshed unsupported technician prepares a Craig preview under the same
     job.assigned_to_name = 'Chad';
     assert.equal((await f.run()).sent, 2);
     assert.ok(f.rows().every(row => row.page_slug === 'craig'));
-    const pageUrl = content.reviewRequestPageUrl(f.rows()[0].request_id);
-    assert.ok(f.sends.find(send => send.channel === 'sms').options.content.includes(pageUrl));
+    assert.equal(f.sends.find(send => send.channel === 'sms').options.content.split('\n').at(-1), content.REVIEW_URL);
     assert.ok(f.sends.find(send => send.channel === 'email').options.html.includes(content.reviewRequestImageUrl(f.rows()[0].request_id)));
     assert.ok(f.previews.every(preview => content.reviewTechSlug(preview.tech) === 'craig'));
   } finally { f.sqlite.close(); }
 });
 
-test('different review requests receive different opaque links even when first names match', async () => {
+test('different review requests keep unique opaque email images while sharing the direct Google review link', async () => {
   const f = fixture();
   try {
     await f.queue(f.job());
@@ -196,11 +196,13 @@ test('different review requests receive different opaque links even when first n
     for (const [index, link] of links.entries()) {
       assert.match(link, /^https:\/\/www\.ohiopetwastepros\.com\/review\/r\/[a-f0-9-]{36}\/$/);
       assert.doesNotMatch(link, /Jordan|Example|client-[12]|job-[12]|202555010[01]|example\.test/);
-      assert.equal(f.sends.filter(send => send.channel === 'sms' && send.options.content.includes(link)).length, 1);
-      const email = f.sends.filter(send => send.channel === 'email' && send.options.text.includes(link));
+      assert.equal(f.sends.filter(send => send.channel === 'sms' && send.options.content.includes(link)).length, 0);
+      const email = f.sends.filter(send => send.channel === 'email' && send.options.html.includes(content.reviewRequestImageUrl(tokens[index])));
       assert.equal(email.length, 1);
-      assert.ok(email[0].options.html.includes(content.reviewRequestImageUrl(tokens[index])));
+      assert.ok(email[0].options.text.includes(content.REVIEW_URL));
+      assert.ok(!email[0].options.text.includes(link));
     }
+    assert.ok(f.sends.filter(send => send.channel === 'sms').every(send => send.options.content.split('\n').at(-1) === content.REVIEW_URL));
   } finally { f.sqlite.close(); }
 });
 
@@ -294,15 +296,15 @@ test('preview preparation failure leaves deliveries queued and calls neither pro
   } finally { f.sqlite.close(); }
 });
 
-test('an empty sanitized preview name uses the existing generic tech link and image', async () => {
+test('an empty sanitized preview name uses the direct Google link and existing generic tech image', async () => {
   const f = fixture();
   try {
     await f.queue();
     f.beforePreview(() => null);
     assert.equal((await f.run()).sent, 2);
-    assert.ok(f.sends.find(send => send.channel === 'sms').options.content.includes(content.reviewPageUrl('tony')));
+    assert.equal(f.sends.find(send => send.channel === 'sms').options.content.split('\n').at(-1), content.REVIEW_URL);
     const email = f.sends.find(send => send.channel === 'email').options;
-    assert.ok(email.text.includes(content.reviewPageUrl('tony')));
+    assert.ok(email.text.includes(content.REVIEW_URL));
     assert.ok(email.html.includes(`${content.REVIEW_SITE_ORIGIN}${content.REVIEW_TECHS.tony.ogImage}`));
   } finally { f.sqlite.close(); }
 });
@@ -357,7 +359,7 @@ test('eligible initial completion sends both channels once and reserves the cust
     assert.deepEqual(f.sends.map(send => send.channel).sort(), ['email', 'sms']);
     const sms = f.sends.find(send => send.channel === 'sms').options.content;
     assert.match(sms, /^Hey Jordan,/);
-    assert.match(sms, /\n\nReply STOP to opt out\n\nhttps:\/\/www\.ohiopetwastepros\.com\/review\/r\/[a-f0-9-]+\/$/);
+    assert.ok(sms.endsWith(`\n\nReply STOP to opt out\n\n${content.REVIEW_URL}`));
     const email = f.sends.find(send => send.channel === 'email').options;
     assert.match(email.headers['List-Unsubscribe'], /https:\/\/www\.ohiopetwastepros\.com\/api\/review-requests\/unsubscribe\/\?token=/);
     assert.equal(email.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');

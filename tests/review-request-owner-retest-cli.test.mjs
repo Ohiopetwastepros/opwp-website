@@ -7,7 +7,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { OWNER_REVIEW_TEST, OWNER_REVIEW_RETEST, assertOwnerReviewTestRecipients } from '../lib/review-request-owner-test.mjs';
-import { buildReviewRequestSms } from '../lib/review-request-content.mjs';
+import { buildReviewRequestSms, REVIEW_URL } from '../lib/review-request-content.mjs';
 
 const path = nodePath.win32;
 const scriptUrl = new URL('../scripts/send-owner-review-retest.mjs', import.meta.url);
@@ -123,8 +123,9 @@ test('retest CLI approves the new job with the original job present and sends ex
   assert.equal(f.result().previewVerification.jpeg1200x630, true);
   assert.equal(f.result().previewVerification.personalizedOgTagPresent, true);
   assert.equal(f.result().previewVerification.noImageRobotsTag, true);
-  assert.equal(f.result().smsBody.split('\n').at(-1), `${origin}/review/r/${requestId}/`);
-  assert.ok(f.result().smsBody.indexOf('Reply STOP to opt out') < f.result().smsBody.indexOf(`${origin}/review/r/`));
+  assert.equal(f.result().smsBody.split('\n').at(-1), REVIEW_URL);
+  assert.ok(f.result().smsBody.indexOf('Reply STOP to opt out') < f.result().smsBody.indexOf(REVIEW_URL));
+  assert.doesNotMatch(f.result().smsBody, /ohiopetwastepros\.com\/review\//);
   assert.equal(f.commands.filter(args => args[1] === 'd1').length, 3, 'absence checked before approval and immediately before POST');
   assert.equal(f.process.exitCode, 0);
   assert.doesNotMatch(f.read('result.json') + f.read('receipt.md') + f.output.join(''), /fixture SECRET/);

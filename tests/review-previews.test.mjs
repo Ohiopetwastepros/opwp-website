@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { sanitizeReviewFirstName, createReviewPreviewToken, validReviewPreviewToken, reviewPreviewObjectKey } from "../lib/review-preview-token.mjs";
 import { prepareReviewPreview, getReviewPreview, getReviewPreviewImage } from "../lib/review-previews.mjs";
-import { personalizedReviewMetadata, reviewRequestPageUrl, reviewRequestImageUrl, buildReviewRequestEmail, buildReviewRequestSms, REVIEW_SITE_ORIGIN } from "../lib/review-request-content.mjs";
+import { personalizedReviewMetadata, reviewRequestPageUrl, reviewRequestImageUrl, buildReviewRequestEmail, buildReviewRequestSms, REVIEW_SITE_ORIGIN, REVIEW_URL } from "../lib/review-request-content.mjs";
 
 test("preview first names allow only letters, hyphens and apostrophes with a bounded first name", () => {
   for (const [input, expected] of [["Jennifer Example", "Jennifer"], [" Jo\u2019Anne Doe ", "Jo'Anne"], ["Anne-Marie Example", "Anne-Marie"], ["Jos\u00e9 Smith", "Jose"], ["<b>Jennifer!</b> Example", "Jennifer"], ["123<>@", ""], ["---''", ""], [null, ""]]) assert.equal(sanitizeReviewFirstName(input), expected);
@@ -120,7 +120,7 @@ test("empty sanitized name falls back and storage failure prevents sending a bro
   assert.equal(preview.tech, "craig");
 });
 
-test("page metadata, page image, email image and SMS use the same personalized asset and opaque URL", () => {
+test("page metadata and email keep the personalized asset while messages use the direct Google review URL", () => {
   const token = createReviewPreviewToken(), image = reviewRequestImageUrl(token), page = reviewRequestPageUrl(token);
   const metadata = personalizedReviewMetadata({ token, tech: "tony" });
   assert.equal(metadata.openGraph.images[0].url, image);
@@ -135,9 +135,13 @@ test("page metadata, page image, email image and SMS use the same personalized a
   assert.equal(metadata.openGraph.title, "Tony took care of your yard today");
   assert.equal(metadata.robots.index, false);
   assert.equal(metadata.referrer, "no-referrer");
-  assert.ok(buildReviewRequestSms({ firstName: "Jennifer", tech: "tony", previewToken: token }).includes(page));
+  const sms = buildReviewRequestSms({ firstName: "Jennifer", tech: "tony", previewToken: token });
+  assert.equal(sms.split("\n").at(-1), REVIEW_URL);
+  assert.ok(!sms.includes(page));
   const email = buildReviewRequestEmail({ firstName: "Jennifer", tech: "tony", previewToken: token, unsubscribeUrl: `${REVIEW_SITE_ORIGIN}/review/unsubscribe/?token=fixture` });
-  assert.ok(email.text.includes(page));
+  assert.ok(email.text.includes(REVIEW_URL));
+  assert.ok(!email.text.includes(page));
+  assert.ok(email.html.includes(`href="${REVIEW_URL}"`));
   assert.ok(email.html.includes(`src="${image}"`));
   const pageSource = fs.readFileSync(new URL("../app/review/r/[token]/page.js", import.meta.url), "utf8");
   const imageSources = ["og.jpg", "og.png"].map(name => fs.readFileSync(new URL(`../app/review/r/[token]/${name}/route.js`, import.meta.url), "utf8"));

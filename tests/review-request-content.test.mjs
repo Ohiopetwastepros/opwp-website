@@ -6,19 +6,20 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import {
   REVIEW_REQUEST_TEMPLATE_VERSION, REVIEW_SITE_ORIGIN, REVIEW_TECHS, REVIEW_URL,
-  buildReviewRequestEmail, buildReviewRequestSms, reviewPageMetadata, reviewPageUrl, reviewRequestPageUrl, reviewRequestImageUrl, reviewTechSlug,
+  buildReviewRequestEmail, buildReviewRequestSms, reviewPageMetadata, reviewPageUrl, reviewRequestImageUrl, reviewTechSlug,
 } from "../lib/review-request-content.mjs";
 import { createReviewPreviewToken } from "../lib/review-preview-token.mjs";
 import { REVIEW_REQUEST_TEMPLATES, renderReviewRequestTemplate, reviewRequestTemplateVersion } from "../lib/review-request-templates.mjs";
 
 test("review SMS preserves the approved wording and uses only the customer's first name", () => {
   assert.equal(buildReviewRequestSms({ firstName: "Alex Example", tech: "Tony B" }),
-    "Hey Alex, thanks for choosing Ohio Pet Waste Pros for your cleanup! Here's who took care of your yard today. If you have a minute, an honest Google review would mean a lot.\n\nThank you!\n\nReply STOP to opt out\n\nhttps://www.ohiopetwastepros.com/review/tony/");
-  assert.match(REVIEW_REQUEST_TEMPLATE_VERSION, /v2$/);
+    "Hey Alex, thanks for choosing Ohio Pet Waste Pros for your cleanup! Here's who took care of your yard today. If you have a minute, an honest Google review would mean a lot.\n\nThank you!\n\nReply STOP to opt out\n\nhttps://g.page/r/CXzwhf5RzsotEAE/review");
+  assert.equal(REVIEW_REQUEST_TEMPLATE_VERSION, "review-request-v3");
+  assert.equal(reviewRequestTemplateVersion("initial-cleanup"), "review-request-initial-cleanup-v3");
   const sms = buildReviewRequestSms({ firstName: "Jo\u2019Anne Example", tech: "Craig Bridgman" });
   assert.match(sms, /^Hey Jo'Anne,/);
   assert.equal(/[^\x20-\x7e\n]/.test(sms), false);
-  assert.equal(sms.includes(REVIEW_URL), false);
+  assert.equal(sms.includes(REVIEW_URL), true);
   assert.match(buildReviewRequestSms(), /^Hey there,/);
 });
 
@@ -26,7 +27,7 @@ test("Sweep & Go technician variations map to public page slugs without guessed 
   for (const [input, slug] of [["Tony B", "tony"], ["Tony", "tony"], ["TONY B.", "tony"], ["Chad", "craig"], ["Chad B", "craig"], ["Craig Bridgman", "craig"], ["craig", "craig"], ["", "craig"], ["Unknown Tech", "craig"], ["Chadwick", "craig"], ["team", "craig"]]) {
     assert.equal(reviewTechSlug(input), slug, input);
     assert.equal(reviewPageUrl(input), `${REVIEW_SITE_ORIGIN}/review/${slug}/`);
-    assert.match(buildReviewRequestSms({ firstName: "Alex", tech: input }), new RegExp(`/review/${slug}/`));
+    assert.equal(buildReviewRequestSms({ firstName: "Alex", tech: input }).split("\n").at(-1), REVIEW_URL);
   }
 });
 
@@ -81,7 +82,8 @@ test("backup email has the tech image, honest-review wording, Google button, own
   const email = buildReviewRequestEmail({ firstName: "Alex Example", tech: "Chad", unsubscribeUrl });
   assert.match(email.text, /^Hey Alex,/);
   assert.match(email.text, /an honest Google review would mean a lot/);
-  assert.match(email.text, /\/review\/craig\//);
+  assert.equal(email.text.includes(REVIEW_URL), true);
+  assert.doesNotMatch(email.text, /ohiopetwastepros\.com\/review\/(?:r\/|tony\/|craig\/)/);
   assert.match(email.html, /review-craig-og\.jpg/);
   assert.doesNotMatch(email.html, /Chad|placeholder|review-team/);
   assert.match(email.html, new RegExp(`href="${REVIEW_URL}"`));
@@ -90,30 +92,30 @@ test("backup email has the tech image, honest-review wording, Google button, own
   assert.equal(email.html.includes(`${REVIEW_SITE_ORIGIN}/assets/opwp-logo.webp`), true);
   assert.equal(email.html.includes(unsubscribeUrl), true);
   const tonyEmail = buildReviewRequestEmail({ firstName: "Alex", tech: "Tony B", unsubscribeUrl });
-  assert.match(tonyEmail.text, /\/review\/tony\//);
+  assert.equal(tonyEmail.text.includes(REVIEW_URL), true);
   assert.match(tonyEmail.html, /review-tony-og\.jpg/);
   assert.throws(() => buildReviewRequestEmail({ unsubscribeUrl: "https://attacker.example/unsubscribe" }), /secure OPWP/);
 });
 
-test("initial-cleanup SMS uses the exact approved message with the unique URL last and a STOP line", () => {
-  const previewToken = createReviewPreviewToken(), reviewLink = reviewRequestPageUrl(previewToken);
+test("initial-cleanup SMS uses the exact approved message with the direct Google URL last and a STOP line", () => {
+  const previewToken = createReviewPreviewToken();
   const sms = buildReviewRequestSms({ template: "initial-cleanup", firstName: "Craig Bridgman", tech: "Tony B", previewToken });
-  assert.equal(sms, `Hi Craig, this is Craig with Ohio Pet Waste Pros. Thanks for letting Tony take care of your yard! If you were happy with the cleanup, would you take a minute to leave us a Google review? It really helps our small family business grow. 😃\n\nReply STOP to opt out\n\n${reviewLink}`);
-  assert.equal(sms.split("\n").filter(Boolean).at(-1), reviewLink);
+  assert.equal(sms, "Hi Craig, this is Craig with Ohio Pet Waste Pros. Thanks for letting Tony take care of your yard! If you were happy with the cleanup, would you take a minute to leave us a Google review? It really helps our small family business grow. 😃\n\nReply STOP to opt out\n\nhttps://g.page/r/CXzwhf5RzsotEAE/review");
+  assert.equal(sms.split("\n").filter(Boolean).at(-1), REVIEW_URL);
   assert.doesNotMatch(sms, /\{\{|\}\}|[\u2013\u2014\u2018\u2019\u201c\u201d]|five.star|5.star/i);
   assert.equal(sms.replace("😃", "").match(/[^\x20-\x7e\n]/), null);
 });
 
-test("both SMS templates put their sole URL after STOP on the final non-empty line", () => {
-  const previewToken = createReviewPreviewToken(), reviewLink = reviewRequestPageUrl(previewToken);
-  for (const template of ["standard", "initial-cleanup"]) {
+test("both SMS templates put their sole direct Google URL after STOP with or without a preview", () => {
+  for (const template of ["standard", "initial-cleanup"]) for (const previewToken of [undefined, createReviewPreviewToken()]) {
     const sms = buildReviewRequestSms({ template, firstName: "Alex", tech: "Tony", previewToken });
     const lines = sms.split("\n").filter(line => line.trim());
-    assert.equal(lines.at(-1), reviewLink, template);
+    assert.equal(lines.at(-1), REVIEW_URL, template);
     assert.equal(lines.at(-2), "Reply STOP to opt out", template);
-    assert.ok(sms.endsWith(`\n\n${reviewLink}`), template);
+    assert.ok(sms.endsWith(`\n\n${REVIEW_URL}`), template);
     assert.equal(sms.slice(0, sms.indexOf("Reply STOP to opt out")).includes("http"), false, template);
-    assert.deepEqual(sms.match(/https?:\/\/\S+/g), [reviewLink], template);
+    assert.deepEqual(sms.match(/https?:\/\/\S+/g), [REVIEW_URL], template);
+    assert.doesNotMatch(sms, /ohiopetwastepros\.com\/review\/|[\u2013\u2014]|five.star|5.star/i);
   }
 });
 
@@ -140,8 +142,8 @@ test("initial-cleanup email shares the SMS message, personalized image, Google b
   const unsubscribeUrl = `${REVIEW_SITE_ORIGIN}/review/unsubscribe/?token=fixture`;
   const options = { template: "initial-cleanup", firstName: "Craig", tech: "Tony", previewToken, unsubscribeUrl };
   const email = buildReviewRequestEmail(options), message = buildReviewRequestSms(options).split("\n\n")[0];
-  assert.equal(email.text.split("\n\n")[0], `${message} ${reviewRequestPageUrl(previewToken)}`);
-  assert.equal(email.html.includes(`${message} ${reviewRequestPageUrl(previewToken)}`), true);
+  assert.equal(email.text.split("\n\n")[0], `${message} ${REVIEW_URL}`);
+  assert.equal(email.html.includes(`${message} ${REVIEW_URL}`), true);
   assert.equal(email.html.includes(`src="${reviewRequestImageUrl(previewToken)}"`), true);
   assert.equal(email.html.includes(`href="${REVIEW_URL}"`), true);
   assert.match(email.html, /font-size:18px;font-weight:bold;text-decoration:none">Leave a review<\/a>/);
@@ -150,4 +152,23 @@ test("initial-cleanup email shares the SMS message, personalized image, Google b
   assert.equal(email.html.includes(unsubscribeUrl), true);
   assert.match(email.text, /Unsubscribe from review requests:/);
   assert.doesNotMatch(email.text, /five.star|5.star/i);
+});
+
+test("both email templates use Google for every review link and preserve personalized JPEGs", () => {
+  const unsubscribeUrl = `${REVIEW_SITE_ORIGIN}/review/unsubscribe/?token=fixture`;
+  for (const template of ["standard", "initial-cleanup"]) for (const previewToken of [undefined, createReviewPreviewToken()]) {
+    const email = buildReviewRequestEmail({ template, firstName: "Craig", tech: "Tony", previewToken, unsubscribeUrl });
+    const body = email.text.split("\n\nLeave a review:")[0];
+    assert.deepEqual(body.match(/https?:\/\/\S+/g), [REVIEW_URL]);
+    assert.equal(email.html.includes(`href="${REVIEW_URL}"`), true);
+    assert.equal(email.text.includes(`Leave a review: ${REVIEW_URL}`), true);
+    assert.doesNotMatch(email.text, /ohiopetwastepros\.com\/review\/(?:r\/|tony\/|craig\/)/);
+    assert.doesNotMatch(email.html, /href="https:\/\/www\.ohiopetwastepros\.com\/review\/(?:r\/|tony\/|craig\/)/);
+    if (previewToken) {
+      assert.equal(email.html.includes(`src="${reviewRequestImageUrl(previewToken)}" width="600" height="315"`), true);
+      assert.equal(email.text.includes(previewToken), false);
+    }
+    assert.equal(email.text.includes("Craig Bridgman- Owner\nCell (419)-262-2371\nEmail: craig@ohiopetwastepros.com\nWebsite Ohiopetwastepros.com"), true);
+    assert.doesNotMatch(email.text, /[\u2013\u2014]|five.star|5.star/i);
+  }
 });
