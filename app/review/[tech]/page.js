@@ -2,8 +2,8 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { REVIEW_TECHS, REVIEW_URL, reviewPageMetadata } from "@/lib/review-request-content.mjs";
 import styles from "../review.module.css";
 
-export const dynamicParams = false;
-
+// Allow known pages to render on an OpenNext cache miss; the config check below
+// still returns 404 for every unsupported technician.
 export function generateStaticParams() {
   return [...Object.keys(REVIEW_TECHS), "team"].map(tech => ({ tech }));
 }

@@ -64,7 +64,6 @@ test("public routes expose only configured technicians and a legacy team redirec
   assert.deepEqual(Array.from(functions.generateStaticParams(), row => row.tech), ["tony", "craig", "team"]);
   assert.deepEqual(await functions.generateMetadata({ params: Promise.resolve({ tech: "team" }) }), reviewPageMetadata("craig"));
   assert.deepEqual(Object.keys(await functions.generateMetadata({ params: Promise.resolve({ tech: "chad" }) })), []);
-  assert.match(page, /dynamicParams = false/);
   assert.match(page, /if \(slug === "team"\) permanentRedirect\("\/review\/craig\/"\)/);
   assert.match(page, /if \(!Object.hasOwn\(REVIEW_TECHS, slug\)\) notFound\(\)/);
   assert.match(page, /<source srcSet=\{tech.image\} type="image\/webp"/);
