@@ -1,11 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import path from 'node:path';
+import nodePath from 'node:path';
 import vm from 'node:vm';
 import { createHash, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { OWNER_REVIEW_TEST, assertOwnerReviewTestRecipients } from '../lib/review-request-owner-test.mjs';
+
+// The operational CLI is intentionally Windows-only. Model its filesystem paths
+// consistently when this VM harness runs under Linux CI as well as Windows.
+const path = nodePath.win32;
 
 const scriptUrl = new URL('../scripts/send-owner-review-test.mjs', import.meta.url);
 const scriptPath = fileURLToPath(scriptUrl);
