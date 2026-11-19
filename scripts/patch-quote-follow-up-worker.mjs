@@ -14,6 +14,7 @@ export function patchQuoteFollowUpWorker(source) {
     ["runScheduledYardOps", "lead-assistant.js"],
     ["runFailedPaymentRecovery", "failed-payment-reconciliation.js"],
     ["processFieldMessages", "field-messages.js"],
+    ["runScheduledReviewRequests", "review-requests.js"],
   ]) {
     if (!source.includes(`from "../lib/${file}"`)) {
       source = source.replace(importMarker, `import { ${name} } from "../lib/${file}";\n${importMarker}`);
@@ -38,8 +39,18 @@ export function patchQuoteFollowUpWorker(source) {
                         report("runScheduledYardOps", runScheduledYardOps(env)),
                         report("runFailedPaymentRecovery", runFailedPaymentRecovery(env)),
                         report("processFieldMessages", processFieldMessages(env)),
+                        report("runScheduledReviewRequests", runScheduledReviewRequests(env)),
                     ]);
                 })
+        );`);
+  }
+  // Repair workers already patched with other */10 calls. Import presence or an
+  // existing quote group must never suppress the review processor's invocation.
+  if (!/\brunScheduledReviewRequests\s*\(\s*env\b/.test(source)) {
+    source = source.replace(scheduledMarker, `${scheduledMarker}
+        if (controller.cron === "*/10 * * * *") ctx.waitUntil(
+            runWithCloudflareRequestContext(new Request("https://opwp.internal/review-requests"), env, ctx,
+                () => runScheduledReviewRequests(env))
         );`);
   }
   checkQuoteFollowUpWorker(source);

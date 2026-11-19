@@ -8,12 +8,13 @@ import vm from "node:vm";
 import { patchQuoteFollowUpWorker } from "../scripts/patch-quote-follow-up-worker.mjs";
 import { checkQuoteFollowUpWorker } from "../scripts/check-quote-follow-up-worker.mjs";
 
-const processors = ["runScheduledQuoteFollowUps", "runScheduledYardOps", "runFailedPaymentRecovery", "processFieldMessages"];
+const processors = ["runScheduledQuoteFollowUps", "runScheduledYardOps", "runFailedPaymentRecovery", "processFieldMessages", "runScheduledReviewRequests"];
 const existingTasks = ["runScheduledDensityRefresh", "runScheduledDispatchPreparation", "runScheduledFoodOperations"];
 const imports = `import { runScheduledQuoteFollowUps } from "../lib/quote-follow-up-delivery.js";
 import { runScheduledYardOps } from "../lib/lead-assistant.js";
 import { runFailedPaymentRecovery } from "../lib/failed-payment-reconciliation.js";
 import { processFieldMessages } from "../lib/field-messages.js";
+import { runScheduledReviewRequests } from "../lib/review-requests.js";
 `;
 const fixture = `export default {
     async scheduled(controller, env, ctx) {
@@ -55,7 +56,7 @@ async function executeWorker(source, cron, rejectedProcessor = "") {
   return { calls, contexts, waits, logs, outcomes };
 }
 
-test("all four processors run once on */10 alongside other */10 blocks, even with preexisting imports", async () => {
+test("all five processors run once on */10 alongside other */10 blocks, even with preexisting imports", async () => {
   for (const source of [fixture, imports + fixture]) {
     const patched = patchQuoteFollowUpWorker(source);
     assert.equal(patchQuoteFollowUpWorker(patched), patched, "patch is byte-idempotent");
@@ -82,6 +83,17 @@ test("processor failures are observable without logging error details or swallow
   assert.equal(result.outcomes[0].status, "rejected");
   assert.match(result.outcomes[0].reason.message, /Fixture processor failed/);
   assert.equal(JSON.stringify(result.logs).includes("Fixture processor failed"), false);
+});
+
+test('review processing is added when the quote processor was already called', async () => {
+  const previous = patchQuoteFollowUpWorker(fixture)
+    .replace('report("runScheduledReviewRequests", runScheduledReviewRequests(env)),', '')
+    .replace('import { runScheduledReviewRequests } from "../lib/review-requests.js";', '');
+  const patched = patchQuoteFollowUpWorker(previous);
+  assert.equal(patchQuoteFollowUpWorker(patched), patched);
+  const result = await executeWorker(patched, '*/10 * * * *');
+  assert.equal(result.calls.filter(name=>name==='runScheduledReviewRequests').length, 1);
+  assert.deepEqual(result.calls.sort(), [...processors, ...existingTasks].sort());
 });
 
 test("missing worker markers fail before writing an incomplete patch", () => {

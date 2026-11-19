@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export function checkQuoteFollowUpWorker(source) {
-  for (const name of ["runScheduledQuoteFollowUps", "runScheduledYardOps", "runFailedPaymentRecovery", "processFieldMessages"]) {
+  for (const name of ["runScheduledQuoteFollowUps", "runScheduledYardOps", "runFailedPaymentRecovery", "processFieldMessages", "runScheduledReviewRequests"]) {
     const imported = new RegExp(`import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from\\s*["']`, "s").test(source);
     if (imported && !new RegExp(`\\b${name}\\s*\\(\\s*env\\b`).test(source)) {
       throw new Error(`OpenNext worker imports ${name} but never calls it; scheduled follow-up processing is missing.`);
