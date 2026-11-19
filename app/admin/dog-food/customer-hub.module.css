@@ -24,6 +24,7 @@
 .customerTable tr:hover td { background:#fbfcfa; }
 .hub .customerName { display:flex; align-items:center; gap:12px; padding:0; border:0; border-radius:0; background:transparent; text-align:left; color:#183545; }
 .customerName strong { font-size:14px; }
+.customerName+.inactive { margin-top:8px; }
 .miniAvatar,.avatar { display:grid; place-items:center; flex-shrink:0; background:#e6efdf; color:#3d6948; border-radius:50%; font-weight:700; }
 .miniAvatar { width:36px; height:36px; font-size:11px; }
 .avatar { width:52px; height:52px; font-size:18px; }

@@ -3,6 +3,7 @@ import {foodSalesService} from '@/lib/food-sales-service';
 import {foodSalesPolicy,foodSalesOrder,salesUuid} from '@/lib/food-sales-ledger.mjs';
 import {FoodError,text,foodDate} from '@/lib/dog-food-operations.mjs';
 import {readBoundedBytes} from '@/lib/bounded-body.mjs';
+import {foodEstablishedAccountSql,foodCustomerAccountState} from '@/lib/food-customer-account.mjs';
 export const dynamic='force-dynamic';
 const staffStockOptions=env=>({allowPreviousCounts:env.FOOD_SALES_USE_PREVIOUS_COUNTS==='true'});
 export async function GET(request) {
@@ -15,10 +16,11 @@ export async function GET(request) {
       return Response.json({ok:true,saved:Boolean(saved),result:saved?JSON.parse(saved.result):null},{headers:salesHeaders});
     }
     const policy=await foodSalesPolicy(db),q=text(url.searchParams.get('q'),100);
-    const customers=q.length>=1?(await db.prepare(`SELECT id,first_name,last_name,email,phone FROM dog_food_customers WHERE deleted_at IS NULL AND status='active'
-      AND (instr(lower(first_name||' '||last_name),lower(?))>0 OR instr(lower(email),lower(?))>0 OR instr(phone,?)>0) ORDER BY last_name LIMIT 20`).bind(q,q,q).all()).results||[]:[];
+    const establishedAccount=await foodEstablishedAccountSql(db);
+    const customers=q.length>=1?((await db.prepare(`SELECT c.id,c.first_name,c.last_name,c.email,c.phone,${establishedAccount} established_account FROM dog_food_customers c WHERE c.deleted_at IS NULL AND c.status='active'
+      AND (instr(lower(c.first_name||' '||c.last_name),lower(?))>0 OR instr(lower(c.email),lower(?))>0 OR instr(c.phone,?)>0) ORDER BY c.last_name LIMIT 20`).bind(q,q,q).all()).results||[]).map(customer=>({...customer,...foodCustomerAccountState(customer)})):[];
     const ids=(await db.prepare('SELECT order_id FROM dog_food_sales_order_metadata WHERE recorded_by=? ORDER BY created_at DESC LIMIT 20').bind(c.auth.member.id).all()).results||[];
-    const recent=[];for(const row of ids){try{const o=await foodSalesOrder(db,row.order_id);recent.push({id:o.id,orderNumber:o.order_number,customerName:`${o.first_name} ${o.last_name}`,totalCents:o.total_cents,receivedCents:o.received_cents,balanceCents:o.balance_cents,paymentStatus:o.payment_status,fulfillmentMethod:o.fulfillment_method,fulfillmentStatus:o.handoff_status==='delivered'?'completed':'pending'});}catch(error){if(error.status!==404)throw error;}}
+    const recent=[];for(const row of ids){try{const o=await foodSalesOrder(db,row.order_id);recent.push({id:o.id,orderNumber:o.order_number,customerName:`${o.first_name} ${o.last_name}`,totalCents:o.total_cents,receivedCents:o.received_cents,balanceCents:o.balance_cents,paymentStatus:o.payment_status,fulfillmentMethod:o.fulfillment_method,fulfillmentStatus:o.handoff_status==='delivered'?'completed':'pending',establishedAccount:o.establishedAccount,needsAccountCreated:o.needsAccountCreated});}catch(error){if(error.status!==404)throw error;}}
     const products=(await db.prepare('SELECT id,name,color,formula_code,bag_weight_lb,retail_price_cents FROM dog_food_products WHERE is_active=1 AND retail_price_cents>0 ORDER BY formula_code').all()).results||[];
     const addresses=customers.length?(await db.prepare(`SELECT id,customer_id,line1,city,state,postal_code FROM dog_food_addresses WHERE customer_id IN(${customers.map(()=>'?').join(',')}) AND postal_code<>'00000' ORDER BY is_primary DESC LIMIT 60`).bind(...customers.map(c=>c.id)).all()).results||[]:[];
     const inventory=await foodSalesService.inventory(db,staffStockOptions(c.env));

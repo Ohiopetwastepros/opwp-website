@@ -2,6 +2,7 @@
 @media(max-width:700px){.content{padding:25px 16px}.header{padding:17px 16px}.brand{font-size:9px;letter-spacing:.8px}.brand small{font-size:11px}.header button{font-size:11px;padding:9px}.intro{display:block}.intro h1{font-size:30px}.live{margin-top:17px;font-size:10px}.tabs{margin:20px 0}.saleForm{display:flex;flex-direction:column;gap:16px}.card,.summary{width:100%;box-sizing:border-box;padding:20px}.summary{position:static}.card legend{font-size:15px}.grid{gap:0 10px}.product small{font-size:10px}.shell .product{gap:10px;grid-template-columns:33px 1fr 57px}.login{padding:25px;margin-top:10px}.login h1{font-size:39px}.shell .product input{width:57px}}
 
 .customerDetails{padding:12px 16px;background:#f6f8f2;border:1px solid #dae5d4;border-radius:10px;margin-top:12px}.customerDetails p{font-size:12px;overflow-wrap:anywhere}.customerDetails button{margin-top:8px}
+.accountNotice{padding:12px;border:1px solid #d7c478;border-radius:8px;background:#fff8dc;font-size:12px}.accountNotice p{margin-bottom:0}
 
 .saleDetailsGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .shell .passwordVisibility{align-items:center;min-height:44px;margin-top:-9px;cursor:pointer}

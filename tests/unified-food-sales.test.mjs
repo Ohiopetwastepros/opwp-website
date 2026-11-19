@@ -10,6 +10,7 @@ import * as ledger from '../lib/food-sales-ledger.mjs';
 import * as auth from '../lib/food-sales-auth.mjs';
 import * as sng from '../lib/food-sales-sng.mjs';
 import * as account from '../lib/dog-food-account.mjs';
+import * as accountState from '../lib/food-customer-account.mjs';
 import * as cadence from '../lib/dog-food-cadence.mjs';
 import * as checkout from '../lib/dog-food-checkout.mjs';
 import {foodProfileComplete,FOOD_STATES} from '../lib/dog-food-profile.mjs';
@@ -144,7 +145,7 @@ test('revoking a grant, resetting credentials or deactivating an account invalid
 test('direct food-sales API checks grants, cross-site writes, allowed actions and row ownership',async()=>{
   const f=setup(),env={DB:f.db,FOOD_SALES_NATIVE_ENABLED:'true'};
   const api=vm.runInNewContext(source('lib/food-sales-api.js')+'\n({foodSalesContext,salesError,salesHeaders})',{getRuntimeEnv:()=>env,verifyFoodSalesRequest:auth.verifyFoodSalesRequest,checkRateLimit:async()=>({allowed:true}),rateLimitResponse:()=>Response.json({error:'limited'},{status:429}),FoodError:logic.FoodError,Response,URL});
-  const route=vm.runInNewContext(source('app/api/food-sales/route.js')+'\n({GET,POST})',{...api,foodSalesService:f.sales,...ledger,...logic,readBoundedBytes:async r=>new Uint8Array(await r.arrayBuffer()),Response,URL,TextDecoder,JSON});
+  const route=vm.runInNewContext(source('app/api/food-sales/route.js')+'\n({GET,POST})',{...api,foodSalesService:f.sales,...ledger,...logic,...accountState,readBoundedBytes:async r=>new Uint8Array(await r.arrayBuffer()),Response,URL,TextDecoder,JSON});
   const unauthorized=await route.GET(new Request('https://example.test/api/food-sales/'));assert.equal(unauthorized.status,401);
   const signed=await auth.authenticateFoodSales(f.db,'seller@example.test','123456',async()=>true),headers={cookie:auth.FOOD_SALES_COOKIE+'='+signed.token,'Content-Type':'application/json',origin:'https://example.test'};
   assert.equal((await route.POST(new Request('https://example.test/api/food-sales/',{method:'POST',headers:{...headers,origin:'https://evil.test'},body:'{}'}))).status,403);

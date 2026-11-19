@@ -20,7 +20,7 @@ const text=node=>(node?.props?.children||[]).flat(Infinity).map(child=>typeof ch
 const storage=()=>{const values=new Map();return {getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};};
 const customer={id:'synthetic-buyer',first_name:'Synthetic',last_name:'Buyer',phone:'4195550100',contactComplete:true,intakeComplete:true,addresses:[]};
 const model=id=>({member:{id,name:'Synthetic Staff'},office:false,recordingEnabled:true,inventoryConfigured:true,stockBasis:'confirmed_count',products:[{id:'synthetic-product',color:'Pink',formula_code:'22-12',name:'Synthetic formula',bag_weight_lb:40,retail_price_cents:5900,available:4}],customers:[customer],addresses:[],recent:[]});
-async function app({save=async()=>Response.json({error:'Your food-sales session has expired.'},{status:401}),lookup=()=>({saved:false}),selectedCustomer=customer,embedded=false,get}={}){
+async function app({save=async()=>Response.json({error:'Your food-sales session has expired.'},{status:401}),quote,lookup=()=>({saved:false}),selectedCustomer=customer,embedded=false,get}={}){
   const states=[],refs=[],effects=[],pendingEffects=[],timers=new Map(),requests=[];
   const sessionStorage=storage(),localStorage=storage(),module={exports:{}};
   let si=0,ri=0,ei=0,timerId=0,memberId='synthetic-staff';
@@ -35,7 +35,7 @@ async function app({save=async()=>Response.json({error:'Your food-sales session 
     fetch:async(url,options)=>{
       const body=options.body?JSON.parse(options.body):undefined;requests.push({url,method:options.method,body});
       if(url.includes('/session/')){assert.equal(body.action,undefined,'recovery only signs in; it never resets credentials');memberId=body.email==='different@example.test'?'different-staff':'synthetic-staff';return Response.json({ok:true});}
-      if(options.method==='POST')return body.action==='quote'?Response.json({result:{total:6000,subtotal:6000,tax:0,quoteHash:'synthetic-quote'}}):save(body);
+      if(options.method==='POST')return body.action==='quote'?(quote?quote(body):Response.json({result:{total:6000,subtotal:6000,tax:0,quoteHash:'synthetic-quote'}})):save(body);
       if(url.includes('submission='))return Response.json(lookup(new URL(url,'https://example.test').searchParams.get('submission')));
       if(url.includes('/customers/'))return Response.json({customer:selectedCustomer});
       if(get){const result=await get(url);if(result)return result;}
@@ -96,6 +96,7 @@ test('an unknown outcome stays locked after a negative lookup and later definiti
   await f.click('Retry same submission');
   assert.equal(f.findButton('Edit rejected draft'),undefined,'a later rejected retry cannot prove the first request did not commit');
   assert.ok(nodes(f.render()).filter(n=>n.type==='fieldset').every(n=>n.props.disabled));
+  assert.match(text(nodes(f.render()).find(n=>n.type==='section'&&n.props.className==='summary')),/Check or retry the pending submission/);
 });
 
 test('signing in as another account keeps the first account submission private and never retries it',async()=>{
@@ -106,20 +107,65 @@ test('signing in as another account keeps the first account submission private a
   assert.equal(f.requests.filter(r=>r.body?.action==='save').length,1);
 });
 
-test('a disabled save explains incomplete customer contact information beside the save button',async()=>{
-  const f=await app({selectedCustomer:{...customer,phone:'',contactComplete:false}});await f.prepare();
+for(const field of ['first_name','last_name'])test('a disabled save explains missing '+field+' beside the save button without demanding phone',async()=>{
+  const f=await app({selectedCustomer:{...customer,[field]:'',phone:'',contactComplete:false}});await f.prepare();
   const summary=nodes(f.render()).find(n=>n.type==='section'&&n.props.className==='summary');
-  assert.match(text(summary),/Ask the office to complete their contact information before saving/);
-  assert.ok(nodes(summary).some(n=>n.props?.role==='status'&&text(n).includes('first name, last name and phone number')));
+  assert.match(text(summary),/Ask the office to complete their name before saving/);
+  assert.ok(nodes(summary).some(n=>n.props?.role==='status'&&/first name and last name/.test(text(n))));
+  assert.doesNotMatch(text(summary),/phone/i);
   assert.equal(nodes(summary).find(n=>n.type==='button'&&text(n).startsWith('Save sale')).props.disabled,true);
   assert.equal(f.requests.filter(r=>r.body?.action==='save').length,0);
+});
+
+test('a name-only customer can save with account follow-up shown in Review and the confirmed receipt',async()=>{
+  const f=await app({selectedCustomer:{...customer,email:'',phone:'',contactComplete:true,intakeComplete:false,needsAccountCreated:true},save:async()=>Response.json({result:{orderNumber:'SYNTHETIC-NAME-ONLY',balanceCents:6000,needsAccountCreated:true}})});
+  await f.prepare();
+  let summary=nodes(f.render()).find(n=>n.type==='section'&&n.props.className==='summary');
+  assert.match(text(summary),/Needs account created/);
+  assert.equal(nodes(summary).find(n=>n.type==='button'&&text(n).startsWith('Save sale')).props.disabled,false);
+  assert.match(text(f.render()),/Phone and email not recorded/);
+  assert.doesNotMatch(text(summary),/phone number|name and phone/i);
+  await f.submit();
+  assert.ok(nodes(f.render()).some(n=>n.props?.role==='status'&&/SYNTHETIC-NAME-ONLY saved/.test(text(n))&&/Needs account created/.test(text(n))));
+  assert.equal(f.requests.filter(r=>r.body?.action==='save').length,1);
 });
 
 test('a complete contact with reviewed price can save without an office-contact blocker',async()=>{
   const f=await app();await f.prepare();
   const summary=nodes(f.render()).find(n=>n.type==='section'&&n.props.className==='summary');
   assert.doesNotMatch(text(summary),/Ask the office/);
+  assert.doesNotMatch(text(summary),/Needs account created/);
   assert.equal(nodes(summary).find(n=>n.type==='button'&&text(n).startsWith('Save sale')).props.disabled,false);
+});
+
+test('Review keeps inline reasons for no customer, no bags, price review and overpayment',async()=>{
+  const f=await app(),summary=()=>nodes(f.render()).find(n=>n.type==='section'&&n.props.className==='summary');
+  assert.match(text(summary()),/Choose an existing customer before saving/);
+  nodes(f.render()).find(n=>typeof n.props?.onSelect==='function').props.onSelect(customer);await f.settle();
+  assert.match(text(summary()),/Choose at least one bag before saving/);
+  await f.click('Add one Pink 22-12 bag');assert.match(text(summary()),/Select Review current price before saving/);
+  await f.click('Review current price');
+  nodes(f.render()).find(n=>n.type==='input'&&n.props.inputMode==='decimal').props.onChange({target:{value:'60.01'}});await f.settle();
+  assert.match(text(summary()),/Amount collected exceeds the sale total/);
+  assert.equal(nodes(summary()).find(n=>n.type==='button'&&text(n).startsWith('Save sale')).props.disabled,true);
+});
+
+test('Review keeps paused-recording and unverified-stock disabled reasons',async()=>{
+  for(const [field,hint] of [['recordingEnabled',/New sale recording is paused/],['inventoryConfigured',/No verified bags are available to sell/]]){
+    const f=await app({get:()=>Response.json({...model('synthetic-staff'),[field]:false})});
+    const summary=nodes(f.render()).find(n=>n.type==='section'&&n.props.className==='summary');
+    assert.match(text(summary),hint);assert.equal(nodes(summary).find(n=>n.type==='button'&&text(n).startsWith('Save sale')).props.disabled,true);
+  }
+});
+
+test('Review explains a pending price request beside the disabled Save button',async()=>{
+  let finish;const result=new Promise(resolve=>{finish=resolve;}),f=await app({quote:()=>result});
+  nodes(f.render()).find(n=>typeof n.props?.onSelect==='function').props.onSelect(customer);await f.settle();await f.click('Add one Pink 22-12 bag');
+  const request=f.findButton('Review current price').props.onClick();
+  const summary=nodes(f.render()).find(n=>n.type==='section'&&n.props.className==='summary');
+  assert.match(text(summary),/Wait for the current request to finish before saving/);assert.equal(nodes(summary).find(n=>n.type==='button'&&text(n).startsWith('Save sale')).props.disabled,true);
+  finish(Response.json({result:{total:6000,subtotal:6000,tax:0,quoteHash:'synthetic-quote'}}));await request;await f.settle();
+  assert.equal(nodes(f.render()).find(n=>n.type==='button'&&text(n).startsWith('Save sale')).props.disabled,false);
 });
 
 test('an expired embedded office session offers management sign-in and preserves its pending submission',async()=>{

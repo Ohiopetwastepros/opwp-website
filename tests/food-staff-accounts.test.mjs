@@ -8,6 +8,7 @@ import * as staff from '../lib/food-sales-staff.mjs';
 import * as ledger from '../lib/food-sales-ledger.mjs';
 import * as logic from '../lib/dog-food-operations.mjs';
 import * as hub from '../lib/food-customer-hub.mjs';
+import * as accountState from '../lib/food-customer-account.mjs';
 const origin='https://example.test',password='Approved-sale!2026';
 const body=(extra={})=>({action:'invite',commandId:crypto.randomUUID(),name:'Sample Salesperson',email:'salesperson@example.test',confirm:true,...extra});
 const source=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'');
@@ -71,7 +72,7 @@ test('master directory distinguishes setup, expiry, active and revoked; revocati
 test('staff HTTP boundary allows new sales and blocks customer mutations and changes to existing sales',async()=>{
   const f=setup();let office=false,commandCalls=0;
   const context=async()=>({env:{DB:f.db,FOOD_SALES_RECORDING_ENABLED:'true'},auth:{office,member:{id:'seller'}}});
-  const common={...ledger,...logic,...hub,foodSalesContext:context,salesHeaders:{},salesError:e=>Response.json({error:e.message,definitive:e.definitive===true},{status:e.status||500}),readBoundedBytes:async r=>new Uint8Array(await r.arrayBuffer()),Response,URL,TextDecoder};
+  const common={...ledger,...logic,...hub,...accountState,foodSalesContext:context,salesHeaders:{},salesError:e=>Response.json({error:e.message,definitive:e.definitive===true},{status:e.status||500}),readBoundedBytes:async r=>new Uint8Array(await r.arrayBuffer()),Response,URL,TextDecoder};
   const route=vm.runInNewContext(source('app/api/food-sales/route.js')+'\n({GET,POST})',{...common,foodSalesService:{...f.sales,command:async(...args)=>{commandCalls++;return f.sales.command(...args);}}});
   const customers=vm.runInNewContext(source('app/api/food-sales/customers/route.js')+'\n({GET,POST})',common);
   const req=(payload,path='/api/food-sales/')=>new Request(origin+path,{method:'POST',headers:{origin},body:JSON.stringify(payload)});

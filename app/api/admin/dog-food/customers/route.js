@@ -20,7 +20,7 @@ export async function GET(request) {
     const contextResult=await context(request);
     if(contextResult.response)return contextResult.response;
     const url=new URL(request.url),db=contextResult.env.DB;
-    const data=await readFoodCustomerHub(db,{q:url.searchParams.get('q'),id:url.searchParams.get('id'),offset:url.searchParams.get('offset'),status:url.searchParams.get('status')||'all'});
+    const data=await readFoodCustomerHub(db,{q:url.searchParams.get('q'),id:url.searchParams.get('id'),offset:url.searchParams.get('offset'),status:url.searchParams.get('status')||'all',accountStatus:url.searchParams.get('accountStatus')||'all'});
     if(url.searchParams.get('id')&&data.customers.length){
       const customer=data.customers[0],model=await readFoodOperations(db);
       const ids=new Set(customer.sourceLinks.filter(link=>link.source_table==='Sales').map(link=>link.source_record_id));
