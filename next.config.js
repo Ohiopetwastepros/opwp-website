@@ -54,6 +54,9 @@ const cityRedirects = [
 const toRule = ([source, destination]) => ({ source, destination, permanent: true });
 
 const nextConfig = {
+  // Wrangler bundles workers-og's precompiled WASM for workerd. Keeping it
+  // external here prevents Next's Node webpack pass from parsing WASM as JS.
+  serverExternalPackages: ["workers-og"],
   // Preserve the exact WordPress URL structure (trailing slashes) so rankings transfer.
   trailingSlash: true,
   poweredByHeader: false,

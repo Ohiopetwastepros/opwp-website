@@ -48,8 +48,9 @@ function fixture({ enabled = true, initialize = true } = {}) {
       } catch (error) { sqlite.exec('ROLLBACK'); throw error; }
     },
   };
-  const jobs = new Map(), sends = [], lookups = [];
+  const jobs = new Map(), sends = [], lookups = [], previews = [];
   let beforeRequest = null;
+  let beforePreview = null;
   let failureChannel = null;
   const request = async (path, options) => {
     lookups.push({ path, options });
@@ -62,6 +63,12 @@ function fixture({ enabled = true, initialize = true } = {}) {
     crypto: webcrypto, TextEncoder, Date, Intl, URL, Object, Set, String, Number, Boolean, JSON, console,
     sngRequest: request, sngRows: result => Array.isArray(result.data) ? result.data : [],
     transactionalEmailConfig: () => ({ configured: true, provider: 'resend' }),
+    prepareReviewPreview: async (_env, options) => {
+      previews.push(options);
+      if (beforePreview && await beforePreview() === null) return null;
+      const tech = content.reviewTechSlug(options.tech);
+      return { token: options.token, tech, pageUrl: content.reviewRequestPageUrl(options.token), imageUrl: content.reviewRequestImageUrl(options.token) };
+    },
     sendQuoText: async (_env, row, options) => { sends.push({ channel: 'sms', row, options }); if (failureChannel === 'sms') throw new Error('fixture uncertain response'); return 'fixture-sms'; },
     sendTransactionalEmail: async (_env, options) => { sends.push({ channel: 'email', options }); if (failureChannel === 'email') throw new Error('fixture uncertain response'); return 'fixture-email'; },
   });
@@ -72,7 +79,7 @@ function fixture({ enabled = true, initialize = true } = {}) {
   async function queue(value = job(), options = {}) { return methods.queueReviewRequest(env, { body: { data: { ...value, job_id: value.id } }, now: NOW, request, ...options }); }
   async function run(options = {}) { return methods.runScheduledReviewRequests(env, { now: NOW, request, ...options }); }
   const rows = () => sqlite.prepare('SELECT d.*,r.customer_key,r.job_type,r.page_slug FROM review_request_deliveries d JOIN review_requests r ON r.id=d.request_id ORDER BY d.channel').all();
-  return { sqlite, db, env, writes, jobs, sends, lookups, methods, job, queue, run, rows, beforeRequest: callback => { beforeRequest = callback; }, failProvider: channel => { failureChannel = channel; } };
+  return { sqlite, db, env, writes, jobs, sends, lookups, previews, methods, job, queue, run, rows, beforeRequest: callback => { beforeRequest = callback; }, beforePreview: callback => { beforePreview = callback; }, failProvider: channel => { failureChannel = channel; } };
 }
 
 test('only initial and one_time completion jobs qualify for review requests', async t => {
@@ -91,7 +98,7 @@ test('disabled review requests do not write, queue, look up or send even with em
   try {
     assert.equal((await f.queue()).status, 'disabled');
     assert.equal((await f.run()).attempted, 0);
-    assert.equal(f.writes.length, 0); assert.equal(f.lookups.length, 0); assert.equal(f.sends.length, 0);
+    assert.equal(f.writes.length, 0); assert.equal(f.lookups.length, 0); assert.equal(f.sends.length, 0); assert.equal(f.previews.length, 0);
     assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM review_request_settings').get().n, 0);
     assert.equal(f.rows().length, 0);
   } finally { f.sqlite.close(); }
@@ -104,7 +111,7 @@ test('turning the review feature off leaves existing queued rows untouched and c
     f.env.REVIEW_REQUESTS_ENABLED = 'false';
     assert.equal((await f.run()).attempted, 0);
     assert.equal(f.writes.length, writes); assert.equal(f.lookups.length, lookups);
-    assert.equal(f.sends.length, 0); assert.ok(f.rows().every(row => row.status === 'queued'));
+    assert.equal(f.sends.length, 0); assert.equal(f.previews.length, 0); assert.ok(f.rows().every(row => row.status === 'queued'));
   } finally { f.sqlite.close(); }
 });
 
@@ -119,7 +126,7 @@ test('real Dispatch type, cell_phone, numeric marketing flag and assignment enri
   } finally { f.sqlite.close(); }
 });
 
-test('review ledger and both provider messages use only Tony or Craig with Craig fallback', async t => {
+test('review ledger keeps Tony or Craig and both provider messages share the request preview', async t => {
   for (const [tech, slug] of [['Tony B', 'tony'], ['Craig Bridgman', 'craig'], ['Chad', 'craig'], ['Unknown Tech', 'craig'], ['', 'craig']]) await t.test(tech || 'missing technician', async () => {
     const f = fixture();
     try {
@@ -129,15 +136,19 @@ test('review ledger and both provider messages use only Tony or Craig with Craig
       assert.ok(f.rows().every(row => row.page_slug === slug));
       const sms = f.sends.find(send => send.channel === 'sms').options.content;
       const email = f.sends.find(send => send.channel === 'email').options;
-      assert.ok(sms.includes(`${content.REVIEW_SITE_ORIGIN}/review/${slug}/`));
-      assert.ok(email.text.includes(`${content.REVIEW_SITE_ORIGIN}/review/${slug}/`));
-      assert.ok(email.html.includes(`${content.REVIEW_SITE_ORIGIN}/assets/photos/review-${slug}-og.jpg`));
+      const token = f.rows()[0].request_id;
+      const pageUrl = content.reviewRequestPageUrl(token);
+      assert.ok(sms.includes(pageUrl));
+      assert.ok(email.text.includes(pageUrl));
+      assert.ok(email.html.includes(content.reviewRequestImageUrl(token)));
+      assert.ok(f.previews.every(preview => preview.token === token && content.reviewTechSlug(preview.tech) === slug));
+      assert.doesNotMatch(pageUrl, /Jordan|Example|client-1|job-1|2025550100|example\.test/);
       assert.doesNotMatch(sms + email.text + email.html, /review\/(chad|team)\/|review-(chad|team)|photo is coming soon/);
     } finally { f.sqlite.close(); }
   });
 });
 
-test('a refreshed unsupported technician changes the pending page link and photo to Craig', async () => {
+test('a refreshed unsupported technician prepares a Craig preview under the same opaque request URL', async () => {
   const f = fixture();
   try {
     const job = f.job(); await f.queue(job);
@@ -145,8 +156,66 @@ test('a refreshed unsupported technician changes the pending page link and photo
     job.assigned_to_name = 'Chad';
     assert.equal((await f.run()).sent, 2);
     assert.ok(f.rows().every(row => row.page_slug === 'craig'));
-    assert.match(f.sends.find(send => send.channel === 'sms').options.content, /\/review\/craig\//);
-    assert.match(f.sends.find(send => send.channel === 'email').options.html, /review-craig-og\.jpg/);
+    const pageUrl = content.reviewRequestPageUrl(f.rows()[0].request_id);
+    assert.ok(f.sends.find(send => send.channel === 'sms').options.content.includes(pageUrl));
+    assert.ok(f.sends.find(send => send.channel === 'email').options.html.includes(content.reviewRequestImageUrl(f.rows()[0].request_id)));
+    assert.ok(f.previews.every(preview => content.reviewTechSlug(preview.tech) === 'craig'));
+  } finally { f.sqlite.close(); }
+});
+
+test('different review requests receive different opaque links even when first names match', async () => {
+  const f = fixture();
+  try {
+    await f.queue(f.job());
+    await f.queue(f.job({ id: 'job-2', client_id: 'client-2', cell_phone_number: '2025550101', email: 'other@example.test' }));
+    assert.equal((await f.run()).sent, 4);
+    const tokens = [...new Set(f.rows().map(row => row.request_id))];
+    assert.equal(tokens.length, 2);
+    const links = tokens.map(token => content.reviewRequestPageUrl(token));
+    assert.notEqual(links[0], links[1]);
+    for (const [index, link] of links.entries()) {
+      assert.match(link, /^https:\/\/www\.ohiopetwastepros\.com\/review\/r\/[a-f0-9-]{36}\/$/);
+      assert.doesNotMatch(link, /Jordan|Example|client-[12]|job-[12]|202555010[01]|example\.test/);
+      assert.equal(f.sends.filter(send => send.channel === 'sms' && send.options.content.includes(link)).length, 1);
+      const email = f.sends.filter(send => send.channel === 'email' && send.options.text.includes(link));
+      assert.equal(email.length, 1);
+      assert.ok(email[0].options.html.includes(content.reviewRequestImageUrl(tokens[index])));
+    }
+  } finally { f.sqlite.close(); }
+});
+
+test('turning the feature off during preview preparation prevents both provider calls', async () => {
+  const f = fixture();
+  try {
+    await f.queue();
+    f.beforePreview(() => { f.env.REVIEW_REQUESTS_ENABLED = 'false'; });
+    assert.equal((await f.run()).sent, 0);
+    assert.equal(f.sends.length, 0);
+    assert.ok(f.previews.length > 0);
+  } finally { f.sqlite.close(); }
+});
+
+test('preview preparation failure leaves deliveries queued and calls neither provider', async () => {
+  const f = fixture();
+  try {
+    await f.queue();
+    f.beforePreview(() => { throw new Error('fixture preview storage unavailable'); });
+    assert.equal((await f.run()).sent, 0);
+    assert.equal(f.sends.length, 0);
+    assert.ok(f.rows().every(row => row.status === 'queued'));
+  } finally { f.sqlite.close(); }
+});
+
+test('an empty sanitized preview name uses the existing generic tech link and image', async () => {
+  const f = fixture();
+  try {
+    await f.queue();
+    f.beforePreview(() => null);
+    assert.equal((await f.run()).sent, 2);
+    assert.ok(f.sends.find(send => send.channel === 'sms').options.content.includes(content.reviewPageUrl('tony')));
+    const email = f.sends.find(send => send.channel === 'email').options;
+    assert.ok(email.text.includes(content.reviewPageUrl('tony')));
+    assert.ok(email.html.includes(`${content.REVIEW_SITE_ORIGIN}${content.REVIEW_TECHS.tony.ogImage}`));
   } finally { f.sqlite.close(); }
 });
 
@@ -182,6 +251,7 @@ test('quiet hours defer queued deliveries and the 9 AM to 8 PM Eastern window re
     for (const now of ['2026-11-18T13:59:59Z', '2026-11-19T01:00:00Z']) {
       assert.equal((await f.run({ now: new Date(now) })).deferred, true);
       assert.ok(f.rows().every(row => row.status === 'queued')); assert.equal(f.sends.length, 0);
+      assert.equal(f.previews.length, 0);
     }
     assert.equal(policy.reviewSendWindow('2026-07-18T12:59:59Z'), false);
     assert.equal(policy.reviewSendWindow('2026-07-18T13:00:00Z'), true);
@@ -197,7 +267,7 @@ test('eligible initial completion sends both channels once and reserves the cust
     assert.equal((await f.queue(first)).status, 'duplicate');
     assert.equal((await f.run()).sent, 2);
     assert.deepEqual(f.sends.map(send => send.channel).sort(), ['email', 'sms']);
-    assert.match(f.sends.find(send => send.channel === 'sms').options.content, /Hey Jordan,.*\/review\/tony\//);
+    assert.match(f.sends.find(send => send.channel === 'sms').options.content, /Hey Jordan,.*\/review\/r\/[a-f0-9-]+\//);
     const email = f.sends.find(send => send.channel === 'email').options;
     assert.match(email.headers['List-Unsubscribe'], /https:\/\/www\.ohiopetwastepros\.com\/api\/review-requests\/unsubscribe\/\?token=/);
     assert.equal(email.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');

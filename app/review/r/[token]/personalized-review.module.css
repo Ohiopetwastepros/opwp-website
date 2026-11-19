@@ -1,0 +1,10 @@
+.page { padding: 42px 24px 64px; background: #f5f4ee; min-height: 70vh; }
+.card { max-width: 1000px; margin: 0 auto; background: #fff; border-radius: 24px; overflow: hidden; box-shadow: 0 16px 52px rgba(22, 51, 72, .1); }
+.image { display: block; width: 100%; height: auto; aspect-ratio: 1200 / 630; }
+.content { max-width: 720px; padding: 32px 40px 36px; margin: 0 auto; }
+.content h1 { color: #183c5a; font-size: clamp(28px, 4.5vw, 40px); line-height: 1.12; margin-bottom: 20px; }
+.content p { font-size: 18px; line-height: 1.7; }
+.button { display: flex; align-items: center; justify-content: center; gap: 16px; min-height: 62px; margin: 28px 0 22px; padding: 16px 24px; color: #fff; background: #347c2c; border-radius: 10px; text-decoration: none; font-size: 21px; font-weight: 800; }
+.button:hover { background: #286222; }
+.content .signoff { font-size: 15px; color: #52616b; }
+@media (max-width: 600px) { .page { padding: 24px 16px 40px; } .card { border-radius: 18px; } .content { padding: 26px 24px 30px; } }
