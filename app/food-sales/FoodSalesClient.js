@@ -18,13 +18,19 @@ async function request(url,body,method='POST',office=false) {
   }finally{clearTimeout(timer);}
 }
 export default function FoodSalesClient({embedded=false}) {
-  const call=(url,body,method)=>request(url,body,method,embedded);
+  const call=async(url,body,method)=>{
+    // A response from before reauthentication cannot expire the new session.
+    const epoch=authEpoch.current;
+    try{return await request(url,body,method,embedded);}
+    catch(e){if(e.status===401&&epoch===authEpoch.current)setNeedsSignIn(true);throw e;}
+  };
   const [customerOpen,setCustomerOpen]=useState(false),[customerEdit,setCustomerEdit]=useState(null),[customerVersion,setCustomerVersion]=useState(0),[customerLoading,setCustomerLoading]=useState(false),[searchResult,setSearchResult]=useState({query:'',customers:[]}),[searchBusy,setSearchBusy]=useState(false);
   const [data,setData]=useState(null),[draft,setDraft]=useState(blank),[query,setQuery]=useState(''),[customer,setCustomer]=useState(null),[quote,setQuote]=useState(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState(''),[pending,setPending]=useState(null),[tab,setTab]=useState('sale'),[login,setLogin]=useState({email:'',password:''}),[loaded,setLoaded]=useState(false),[recentAction,setRecentAction]=useState(null);
   const [setupToken,setSetupToken]=useState(''),[passwordSetup,setPasswordSetup]=useState({password:'',passwordConfirm:''});
   const [showLoginPassword,setShowLoginPassword]=useState(false),[showSetupPasswords,setShowSetupPasswords]=useState(false);
+  const [needsSignIn,setNeedsSignIn]=useState(false);
   useEffect(()=>{const match=/^#setup=([a-f0-9]{64})$/.exec(window.location.hash);if(match){setSetupToken(match[1]);window.history.replaceState(null,'',window.location.pathname+window.location.search);}},[]);
-  const member=useRef(null),searchVersion=useRef(0),notice=useRef(null);
+  const member=useRef(null),searchVersion=useRef(0),notice=useRef(null),authEpoch=useRef(0);
   useEffect(()=>{if(message||error)notice.current?.scrollIntoView({block:'nearest'});},[message,error]);
   const set=(key,value)=>{
     setDraft(d=>({...d,[key]:value}));
@@ -40,7 +46,11 @@ export default function FoodSalesClient({embedded=false}) {
     setDraft(d=>({...d,amount,paymentStatus:paymentStatus(receiptCents(amount),quote?.total),paymentReceivedConfirmed:false}));
   }
   async function refresh(q='') {
-    const d=await call('/api/food-sales/?q='+encodeURIComponent(q));setData(d);member.current=d.member.id;return d;
+    const epoch=authEpoch.current;
+    const d=await call('/api/food-sales/?q='+encodeURIComponent(q));
+    if(epoch!==authEpoch.current)return;
+    if(member.current&&member.current!==d.member.id){setDraft(blank());setCustomer(null);setQuote(null);setPending(null);setQuery('');setSearchResult({query:'',customers:[]});setCustomerOpen(false);setCustomerEdit(null);setRecentAction(null);setMessage('');setError('');}
+    setData(d);member.current=d.member.id;return d;
   }
   useEffect(()=>{refresh().catch(e=>{if(e.status!==401)setError(e.message);}).finally(()=>setLoaded(true));},[]);
   useEffect(()=>{
@@ -55,11 +65,11 @@ export default function FoodSalesClient({embedded=false}) {
   },[data?.member.id]);
   useEffect(()=>{if(data?.member.id)try{sessionStorage.setItem('opwp-food-sales:'+data.member.id+':draft',JSON.stringify({draft,customer}));}catch{/* Saving is still server confirmed; no offline queue. */}},[draft,customer,data?.member.id]);
   useEffect(()=>{
-    if(!data)return;const version=++searchVersion.current;setSearchBusy(true);
+    if(!data||needsSignIn)return;const version=++searchVersion.current;setSearchBusy(true);
     const timer=setTimeout(()=>call('/api/food-sales/?q='+encodeURIComponent(query)).then(d=>{if(version===searchVersion.current){setData(d);setSearchResult({query,customers:d.customers});}}).catch(e=>{if(version===searchVersion.current)setError(e.message);}).finally(()=>{if(version===searchVersion.current)setSearchBusy(false);}),180);
     return ()=>{clearTimeout(timer);searchVersion.current++;};
-  },[query]);
-  useEffect(()=>{if(!data?.member.id||!draft.customerId)return;let cancelled=false;setCustomerLoading(true);call('/api/food-sales/customers/?id='+encodeURIComponent(draft.customerId)).then(d=>{if(!cancelled)setCustomer(d.customer);}).catch(e=>{if(!cancelled){setError(e.message);setCustomer(c=>c?{...c,intakeComplete:false}:c);}}).finally(()=>{if(!cancelled)setCustomerLoading(false);});return()=>{cancelled=true;};},[draft.customerId,data?.member.id,customerVersion]);
+  },[query,data?.member.id,needsSignIn]);
+  useEffect(()=>{if(!data?.member.id||needsSignIn||!draft.customerId)return;let cancelled=false;setCustomerLoading(true);call('/api/food-sales/customers/?id='+encodeURIComponent(draft.customerId)).then(d=>{if(!cancelled)setCustomer(d.customer);}).catch(e=>{if(!cancelled){setError(e.message);setCustomer(c=>c?{...c,intakeComplete:false}:c);}}).finally(()=>{if(!cancelled)setCustomerLoading(false);});return()=>{cancelled=true;};},[draft.customerId,data?.member.id,customerVersion,needsSignIn]);
   function persist(payload) {
     const key='opwp-food-sales:'+member.current,ref={commandId:payload.commandId};
     // Store the exact retry payload before sending. If storage is unavailable,
@@ -75,8 +85,10 @@ export default function FoodSalesClient({embedded=false}) {
   }
   async function submit(payload) {
     if(busy)return;setBusy(true);setError('');setMessage('');
+    // A rejected retry says nothing about an earlier request whose outcome was lost.
+    const hadUnknownOutcome=Boolean(pending&&!pending.rejected);
     try {persist(payload);const d=await call('/api/food-sales/',payload);await confirmed(d.result);}
-    catch(e){if(e.definitive){const ref={commandId:payload.commandId,rejected:true};localStorage.setItem('opwp-food-sales:'+member.current+':pending',JSON.stringify(ref));setPending({...ref,payload});}setError((e.definitive?'This attempt was rejected. ':'The save outcome is uncertain. ')+e.message+' Check this submission before starting another.');}
+    catch(e){const rejected=e.definitive&&!hadUnknownOutcome;if(rejected){const ref={commandId:payload.commandId,rejected:true};localStorage.setItem('opwp-food-sales:'+member.current+':pending',JSON.stringify(ref));setPending({...ref,payload});}setError(e.status===401?'Your session expired. Sign in again to check or retry this same submission. Your draft is kept on this device.':(rejected?'This attempt was rejected. ':'The save outcome is uncertain. ')+e.message+' Check this submission before starting another.');}
     finally{setBusy(false);}
   }
   async function checkPending() {
@@ -96,9 +108,9 @@ export default function FoodSalesClient({embedded=false}) {
     await submit({...fields,action:'save',commandId:crypto.randomUUID(),quoteHash:quote.quoteHash,amountReceivedCents:amount,paymentStatus:paymentStatus(amount,quote.total)});
   }
   async function signIn(event) {
-    event.preventDefault();setBusy(true);setError('');
+    event.preventDefault();authEpoch.current++;setBusy(true);setError('');
     const normalizedLogin={...login,email:login.email.trim().toLowerCase()};setLogin(normalizedLogin);
-    try{await call('/api/food-sales/session/',normalizedLogin);setLogin({email:'',password:''});setShowLoginPassword(false);await refresh();}catch(e){setError(e.message);}finally{setBusy(false);}
+    try{await call('/api/food-sales/session/',normalizedLogin);setLogin({email:'',password:''});setShowLoginPassword(false);await refresh();setNeedsSignIn(false);}catch(e){setError(e.message);}finally{setBusy(false);}
   }
   async function setStaffPassword(event){event.preventDefault();setBusy(true);setError('');try{const d=await call('/api/food-sales/session/',{action:'set_password',token:setupToken,...passwordSetup});setPasswordSetup({password:'',passwordConfirm:''});setShowSetupPasswords(false);setSetupToken('');setMessage(d.message);}catch(e){setError(e.message);}finally{setBusy(false);}}
   async function signOut() {
@@ -108,13 +120,23 @@ export default function FoodSalesClient({embedded=false}) {
   const overpayment=Boolean(quote&&amountCents>quote.total);
   const manual=draft.billingProvider==='manual';
   const customerReady=manual?customer?.contactComplete:customer?.intakeComplete;
+  const signedIn=Boolean(data&&!needsSignIn);
+  const saveBlockedReason=pending?'Check or retry the pending submission before starting another sale.':
+    data?.recordingEnabled===false?'New sale recording is paused. Contact the office before saving.':
+    data?.inventoryConfigured===false?'No verified bags are available to sell. Ask the office to verify usable stock.':
+    customerLoading?'Loading customer information...':
+    !draft.customerId&&!draft.newCustomer?'Choose an existing customer before saving.':
+    !customerReady?(manual?'This customer needs a first name, last name and phone number. Ask the office to complete their contact information before saving.':'Ask the office to complete this customer\'s contact and delivery information before using Sweep & Go billing.'):
+    !draft.items.length?'Choose at least one bag before saving.':
+    !quote?'Select Review current price before saving.':
+    overpayment?'Amount collected exceeds the sale total. Check the bags and amount received.':'';
   return <div className={`opwp-field-shell ${styles.shell}`}>
-    {data?.office&&customerOpen&&<FoodCustomerDialog customer={customerEdit} endpoint={data?.office?'/api/admin/dog-food/customers/':'/api/food-sales/customers/'} onClose={()=>setCustomerOpen(false)} onSaved={async(c,messages)=>{setCustomer(c);setDraft(d=>({...d,customerId:c.id,newCustomer:null,addressId:'',saleCustomerType:d.customerId===c.id?d.saleCustomerType:c.customer_type==='route_partner'?'route_partner':'individual'}));setQuote(null);setCustomerOpen(false);setCustomerEdit(null);setCustomerVersion(v=>v+1);setMessage('Customer saved. '+messages.map(m=>m.channel+': '+invitationLabel(m.status)).join('; '));await refresh();}}/>}
-    {!embedded&&<header className={styles.header}><a href='/food-sales/' className={styles.brand}><span className={styles.mark}>OP</span><span>OHIO PET WASTE PROS<small>Extreme Dog Fuel · Staff sales</small></span></a>{data&&<button className={styles.quiet} onClick={signOut} disabled={busy}>Sign out</button>}</header>}
+    {signedIn&&data.office&&customerOpen&&<FoodCustomerDialog customer={customerEdit} endpoint={data?.office?'/api/admin/dog-food/customers/':'/api/food-sales/customers/'} onClose={()=>setCustomerOpen(false)} onSaved={async(c,messages)=>{setCustomer(c);setDraft(d=>({...d,customerId:c.id,newCustomer:null,addressId:'',saleCustomerType:d.customerId===c.id?d.saleCustomerType:c.customer_type==='route_partner'?'route_partner':'individual'}));setQuote(null);setCustomerOpen(false);setCustomerEdit(null);setCustomerVersion(v=>v+1);setMessage('Customer saved. '+messages.map(m=>m.channel+': '+invitationLabel(m.status)).join('; '));await refresh();}}/>}
+    {!embedded&&<header className={styles.header}><a href='/food-sales/' className={styles.brand}><span className={styles.mark}>OP</span><span>OHIO PET WASTE PROS<small>Extreme Dog Fuel · Staff sales</small></span></a>{signedIn&&<button className={styles.quiet} onClick={signOut} disabled={busy}>Sign out</button>}</header>}
     <div className={styles.content}>
-      {!data?<section className={styles.login}>
-        <span className={styles.eyebrow}>YOUR INDIVIDUAL STAFF ACCESS</span><h1>Good food.<br/>One simple sale.</h1><p>Find an existing client and record a new dog-food sale.</p>
-        {loaded&&(setupToken?<form onSubmit={setStaffPassword}>
+      {!signedIn?<section className={styles.login}>
+        <span className={styles.eyebrow}>{embedded?'OFFICE ACCESS':'YOUR INDIVIDUAL STAFF ACCESS'}</span><h1>Good food.<br/>One simple sale.</h1><p>Find an existing client and record a new dog-food sale.</p>
+        {loaded&&(embedded?<><h2>Office sign-in required</h2><p>Sign in to the management workspace again to continue. Your draft and pending submission are kept on this device.</p><a href='/admin/login/?next=%2Fadmin%2Fdog-food%2Frecord-sale%2F'>Sign in to the office</a></>:setupToken?<form onSubmit={setStaffPassword}>
           <h2>Choose your password</h2><p>Use at least 12 characters, including one capital letter and one symbol. This link can be used once.</p>
           <label>New password<input type={showSetupPasswords?'text':'password'} autoComplete='new-password' minLength={12} maxLength={256} required value={passwordSetup.password} onChange={e=>setPasswordSetup({...passwordSetup,password:e.target.value})}/></label>
           <label>Confirm password<input type={showSetupPasswords?'text':'password'} autoComplete='new-password' minLength={12} maxLength={256} required value={passwordSetup.passwordConfirm} onChange={e=>setPasswordSetup({...passwordSetup,passwordConfirm:e.target.value})}/></label>
@@ -126,7 +148,7 @@ export default function FoodSalesClient({embedded=false}) {
           <label className={`${styles.check} ${styles.passwordVisibility}`}><input type='checkbox' checked={showLoginPassword} onChange={e=>setShowLoginPassword(e.target.checked)}/>Show password</label>
           <button className={styles.primary} disabled={busy}>Sign in securely</button>
         </form>)}
-        <small>Access is provided by the office. Your session expires after 30 minutes of inactivity.</small>
+        {!embedded&&<small>Access is provided by the office. Your session expires after 30 minutes of inactivity.</small>}
       </section>:<>
       <div className={styles.intro}><div><span className={styles.eyebrow}>EXTREME DOG FUEL</span><h1>{tab==='sale'?'Record a sale':'Your recent entries'}</h1><p>Signed in as <strong>{data.member.name}</strong></p></div><span className={styles.live}><i/>Shared customer & stock records</span></div>
       <nav className={styles.tabs} aria-label='Food sales'><button aria-current={tab==='sale'?'page':undefined} onClick={()=>setTab('sale')}>New sale</button><button aria-current={tab==='recent'?'page':undefined} onClick={()=>setTab('recent')}>Recent entries <span>{data.recent.length}</span></button></nav>
@@ -179,12 +201,12 @@ export default function FoodSalesClient({embedded=false}) {
           {amountCents>0&&<label className={styles.check}><input type='checkbox' required checked={draft.paymentReceivedConfirmed} onChange={e=>set('paymentReceivedConfirmed',e.target.checked)}/>I confirm this amount was actually received.</label>}
           <label>Who will collect any remaining balance?<select value={draft.billingProvider} onChange={e=>set('billingProvider',e.target.value)}><option value='manual'>Office / manual collection</option><option value='sweep_and_go'>Existing Sweep & Go billing</option></select></label>
         </fieldset>
-        <section className={styles.summary}><div><span className={styles.eyebrow}>REVIEW BEFORE SAVING</span><h2>{quote?money(quote.total):'Confirm your total'}</h2><p>{quote?(quote.tax?`${money(quote.subtotal)} food + ${money(quote.tax)} tax`:'Food subtotal. No tax added.'):'Review the current price after choosing your bags.'}</p></div>{quote&&<dl><div><dt>Received</dt><dd>{amountCents==null?'—':money(amountCents)}</dd></div><div><dt>Remaining balance</dt><dd>{amountCents==null?'—':money(balance)}</dd></div></dl>}{overpayment&&<p role='status'>Amount collected exceeds the sale total. Check the number of bags and the amount received.</p>}<button type='button' disabled={busy||Boolean(pending)||!draft.items.length} onClick={async()=>{setBusy(true);setError('');try{const priced=(await call('/api/food-sales/',{action:'quote',intakeVersion:draft.intakeVersion,items:draft.items,billingProvider:draft.billingProvider,includeTax:draft.includeTax})).result;setQuote(priced);setDraft(d=>({...d,paymentStatus:paymentStatus(receiptCents(d.amount),priced.total)}));}catch(e){setError(e.message);}finally{setBusy(false);}}}>Review current price</button><button className={styles.primary} disabled={busy||Boolean(pending)||!quote||data.inventoryConfigured===false||data.recordingEnabled===false||customerLoading||!customerReady||overpayment||!draft.customerId&&!draft.newCustomer}>Save sale · {quote?money(quote.total):'review first'}</button><small>{pending?'Submission awaiting confirmation.':'Unsaved draft · Stock is reserved only when the save is confirmed.'}</small></section>
+        <section className={styles.summary}><div><span className={styles.eyebrow}>REVIEW BEFORE SAVING</span><h2>{quote?money(quote.total):'Confirm your total'}</h2><p>{quote?(quote.tax?`${money(quote.subtotal)} food + ${money(quote.tax)} tax`:'Food subtotal. No tax added.'):'Review the current price after choosing your bags.'}</p></div>{quote&&<dl><div><dt>Received</dt><dd>{amountCents==null?'—':money(amountCents)}</dd></div><div><dt>Remaining balance</dt><dd>{amountCents==null?'—':money(balance)}</dd></div></dl>}{overpayment&&<p role='status'>Amount collected exceeds the sale total. Check the number of bags and the amount received.</p>}<button type='button' disabled={busy||Boolean(pending)||!draft.items.length} onClick={async()=>{setBusy(true);setError('');try{const priced=(await call('/api/food-sales/',{action:'quote',intakeVersion:draft.intakeVersion,items:draft.items,billingProvider:draft.billingProvider,includeTax:draft.includeTax})).result;setQuote(priced);setDraft(d=>({...d,paymentStatus:paymentStatus(receiptCents(d.amount),priced.total)}));}catch(e){setError(e.message);}finally{setBusy(false);}}}>Review current price</button>{saveBlockedReason&&<p className={styles.hint} role='status'>{saveBlockedReason}</p>}<button className={styles.primary} disabled={busy||Boolean(pending)||!quote||data.inventoryConfigured===false||data.recordingEnabled===false||customerLoading||!customerReady||overpayment||!draft.customerId&&!draft.newCustomer}>Save sale · {quote?money(quote.total):'review first'}</button><small>{pending?'Submission awaiting confirmation.':'Unsaved draft · Stock is reserved only when the save is confirmed.'}</small></section>
       </form>:<section className={styles.recent}>{data.recent.length?data.recent.map(o=><article key={o.id} className={styles.card}><div className={styles.recentHead}><div><strong>{o.customerName}</strong><small>{o.orderNumber}</small></div><strong>{money(o.totalCents)}</strong></div><div className={styles.badges}><span>{o.paymentStatus==='paid'?'Paid':o.paymentStatus==='partial'?'Partially paid':o.paymentStatus==='refunded'?'Refund recorded':'Unpaid'}</span><span>{o.fulfillmentMethod} · {o.fulfillmentStatus}</span></div><p>{money(o.receivedCents)} received · <strong>{money(o.balanceCents)} remaining</strong></p><div className={styles.actions}>{data.office&&o.balanceCents>0&&<button onClick={()=>setRecentAction({kind:'receipt',order:o,amount:'',method:'cash',reference:'',confirmed:false})}>Add receipt</button>}{data.office&&o.fulfillmentStatus==='pending'&&<button onClick={()=>setRecentAction({kind:'handoff',order:o,receivedBy:'',confirmed:false})}>Record handoff</button>}{data.office&&<button onClick={()=>setRecentAction({kind:'correction',order:o,reason:''})}>Request correction</button>}</div></article>):<div className={styles.card}><h2>No entries yet</h2><p>Your confirmed sales will appear here.</p></div>}
         {data.office&&recentAction&&<form className={styles.card} onSubmit={e=>{e.preventDefault();const a=recentAction;submit({action:a.kind,orderId:a.order.id,commandId:crypto.randomUUID(),...(a.kind==='receipt'?{amountReceivedCents:Math.round(Number(a.amount)*100),paymentMethod:a.method,paymentReference:a.reference,paymentReceivedConfirmed:a.confirmed}:a.kind==='handoff'?{receivedBy:a.receivedBy,handoffConfirmed:a.confirmed}:{reason:a.reason})});}}><h2>{recentAction.kind==='receipt'?'Add actual receipt':recentAction.kind==='handoff'?'Confirm physical handoff':'Office correction request'}</h2><p>{recentAction.order.orderNumber}</p>{recentAction.kind==='receipt'?<><label>Amount received ($)<input inputMode='decimal' required value={recentAction.amount} onChange={e=>setRecentAction({...recentAction,amount:e.target.value})}/></label><label>Method<select value={recentAction.method} onChange={e=>setRecentAction({...recentAction,method:e.target.value})}>{FOOD_RECEIPT_METHODS.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>{recentAction.method!=='cash'&&<label>Reference<input required value={recentAction.reference} onChange={e=>setRecentAction({...recentAction,reference:e.target.value})}/></label>}</>:recentAction.kind==='handoff'?<label>Received by<input required value={recentAction.receivedBy} onChange={e=>setRecentAction({...recentAction,receivedBy:e.target.value})}/></label>:<label>What needs correcting?<textarea required maxLength={1000} value={recentAction.reason} onChange={e=>setRecentAction({...recentAction,reason:e.target.value})}/></label>}{recentAction.kind!=='correction'&&<label className={styles.check}><input type='checkbox' required checked={recentAction.confirmed} onChange={e=>setRecentAction({...recentAction,confirmed:e.target.checked})}/>I confirm this {recentAction.kind==='receipt'?'money was actually received':'physical handoff happened'}.</label>}<div className={styles.actions}><button className={styles.primary} disabled={busy||Boolean(pending)}>Save confirmation</button><button type='button' onClick={()=>setRecentAction(null)}>Cancel</button></div></form>}
       </section>}
       </>}
-      {!data&&<div ref={notice}>{message&&<div className={styles.notice} role='status'>{message}</div>}{error&&<div className={styles.error} role='alert'>{error}</div>}</div>}
+      {!signedIn&&<div ref={notice}>{message&&<div className={styles.notice} role='status'>{message}</div>}{error&&<div className={styles.error} role='alert'>{error}</div>}</div>}
       <footer className={styles.footer}>Ohio Pet Waste Pros · Food sales workspace<br/>Questions or corrections? Contact the office.</footer>
     </div>
   </div>;
