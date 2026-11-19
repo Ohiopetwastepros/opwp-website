@@ -25,6 +25,7 @@ import { nextMetaResponse, metaWebsiteQuote } from "../lib/meta-conversation.mjs
 import { auditMetaRoute, routeGuidanceFromSnapshot } from "../lib/meta-route-guidance.mjs";
 import { readBoundedBytes } from "../lib/bounded-body.mjs";
 import { recordVerifiedMetaPayment, reconcileMetaConversions } from "../lib/meta-conversion.mjs";
+import { buildMetaOwnerNotification } from "../lib/meta-owner-notifications.mjs";
 
 function database() {
   const sqlite = new DatabaseSync(":memory:");
@@ -170,6 +171,86 @@ test("overlapping replies preserve committed facts and hand off instead of answe
   await Promise.all([recordMetaReply(db, saved.id, reply), recordMetaReply(db, saved.id, reply)]);
   assert.equal(select(db, "meta_reply_decisions").length, 1);
   assert.equal(select(db, "meta_sms_jobs").filter((job) => job.purpose === "reply").length, 1);
+});
+
+test("Meta personal-text requests queue one owner email and pause the thread without sending", async () => {
+  const db = database(), env = environment(db), saved = await storeMetaLead(db, env, form(), event());
+  db.sqlite.exec("UPDATE meta_sms_jobs SET status='sent',sent_at=CURRENT_TIMESTAMP WHERE purpose='confirmation'");
+  const oldFetch = globalThis.fetch;
+  let externalRequests = 0;
+  globalThis.fetch = async () => { externalRequests++; throw new Error("This queue test must not send email or SMS"); };
+  try {
+    await recordMetaReply(db, saved.id, { providerMessageId: "identity-question", text: "are you a real person?", from: "+14195550100" }, { env });
+    const disclosure = select(db, "meta_sms_jobs").find((job) => job.purpose === "reply");
+    assert.equal(disclosure.message_body, "Good question! These first texts are automated to help me get your info quickly, but I'm a real person and I read every conversation. Want me to text you personally? Reply STOP to opt out.");
+    assert.equal((disclosure.message_body.match(/Reply STOP/g) || []).length, 1);
+    assert.equal(select(db, "submission_notifications").length, 0);
+    const yes = { providerMessageId: "identity-yes", text: "yes please", from: "+14195550100" };
+    // Even a reply overlapping the pending disclosure must honor the human request.
+    await recordMetaReply(db, saved.id, yes, { env });
+    await recordMetaReply(db, saved.id, yes, { env });
+    assert.equal(select(db, "lead_conversations")[0].automation_mode, "paused");
+    assert.equal(select(db, "meta_sms_jobs").filter((job) => job.status === "queued").length, 0);
+    assert.equal(select(db, "meta_sms_jobs").filter((job) => job.trigger_id === yes.providerMessageId).length, 0);
+    const growth = select(db, "growth_leads")[0];
+    assert.equal(growth.priority, "high");
+    assert.equal(growth.next_action, "Craig: customer asked you to text personally. Reply personally; automated texts are paused.");
+    const emails = select(db, "submission_notifications");
+    assert.equal(emails.length, 1);
+    assert.equal(emails[0].recipient, env.OWNER_NOTIFICATION_EMAIL);
+    assert.equal(emails[0].status, "queued");
+    assert.equal(emails[0].notification_type, "question");
+    assert.equal(emails[0].subject, "Facebook lead requests a personal text from Craig");
+    assert.match(emails[0].text_body, /Name: ExampleLead Example\nPhone: \+14195550100/);
+    assert.match(emails[0].text_body, /Automated texts are paused/);
+    await recordMetaReply(db, saved.id, { ...yes, providerMessageId: "later-reply", text: "43615" }, { env });
+    assert.equal(select(db, "submission_notifications").length, 1);
+    assert.equal(select(db, "meta_sms_jobs").filter((job) => job.status === "queued").length, 0);
+    assert.equal(externalRequests, 0);
+  } finally { globalThis.fetch = oldFetch; }
+});
+
+test("an accepted Meta quote and address atomically queue a deduplicated owner audit email", async () => {
+  const db = database(), env = environment(db), saved = await storeMetaLead(db, env, form(), event());
+  const details = { number_of_dogs: 2, zip: "43615", clean_up_frequency: "Weekly", yard_size_tier: "tiny", last_cleaned: "one_month" };
+  const state = { details, details_confirmed: true, quote: metaWebsiteQuote(details), quote_accepted: true, expected: "address" };
+  db.sqlite.exec("UPDATE meta_sms_jobs SET status='sent',sent_at=CURRENT_TIMESTAMP WHERE purpose='confirmation'");
+  db.sqlite.prepare("UPDATE meta_lead_intakes SET response_state=? WHERE submission_id=?").run(JSON.stringify(state), saved.id);
+  const address = { providerMessageId: "accepted-address", text: "123 Maple Street, Toledo", from: "+14195550100" };
+  const oldFetch = globalThis.fetch;
+  let externalRequests = 0;
+  globalThis.fetch = async () => { externalRequests++; throw new Error("This queue test must not send email or SMS"); };
+  try {
+    const broken = { ...db, batch: async (statements) => db.batch([...statements, db.prepare("INSERT INTO missing_table VALUES (1)")]) };
+    await assert.rejects(recordMetaReply(broken, saved.id, address, { env }));
+    assert.equal(select(db, "submission_notifications").length, 0);
+    assert.equal(JSON.parse(select(db, "meta_lead_intakes")[0].response_state).ready_for_route_audit, undefined);
+    await recordMetaReply(db, saved.id, address, { env });
+    await recordMetaReply(db, saved.id, address, { env });
+    const finalState = JSON.parse(select(db, "meta_lead_intakes")[0].response_state);
+    assert.equal(finalState.ready_for_route_audit, true);
+    assert.equal(select(db, "growth_leads")[0].priority, "high");
+    assert.equal(select(db, "growth_leads")[0].next_action, "Craig: quote accepted and address received. Create the account and audit the route/service day before confirming a start date.");
+    const email = select(db, "submission_notifications")[0];
+    assert.equal(select(db, "submission_notifications").length, 1);
+    assert.equal(email.recipient, env.OWNER_NOTIFICATION_EMAIL);
+    assert.equal(email.status, "queued");
+    assert.equal(email.notification_type, "partial_quote");
+    const rendered = buildMetaOwnerNotification({ submissionId: saved.id, lead: { name: "ExampleLead Example", phone: "+14195550100" }, state: finalState });
+    assert.equal(email.subject, "Facebook lead ready for signup and route audit");
+    assert.equal(email.text_body, rendered.content.text);
+    assert.equal(email.text_body, `Craig,\n\nThis Facebook lead accepted the quote and provided a service address. Create the account and audit the route/service day before confirming a start date.\n\nName: ExampleLead Example\nPhone: +14195550100\nAddress: 123 Maple Street, Toledo\nZIP: 43615\nDogs: 2\nFrequency: Weekly\nQuoted price: $100.00 per month\nInitial cleanup estimate: $55.00-$65.00 (exact price after yard inspection)\nSubmission ID: ${saved.id}\n\nGrowth Desk: https://www.ohiopetwastepros.com/admin/quote-funnel/`);
+    assert.equal(externalRequests, 0);
+  } finally { globalThis.fetch = oldFetch; }
+});
+
+test("Meta owner email renderer only alerts on actionable states and escapes lead content", () => {
+  assert.equal(buildMetaOwnerNotification({ submissionId: "fixture", lead: {}, state: { quote_accepted: true } }), null);
+  assert.equal(buildMetaOwnerNotification({ submissionId: "fixture", lead: {}, state: { ready_for_route_audit: true, details: { address: "123 Example Street" } } }), null);
+  const email = buildMetaOwnerNotification({ submissionId: "fixture", lead: { name: "<script>bad</script>", phone: "+14195550100" }, state: { human_requested: true } });
+  assert.match(email.content.text, /Name: <script>bad<\/script>/);
+  assert.doesNotMatch(email.content.html, /<script>/);
+  assert.match(email.content.html, /&lt;script&gt;/);
 });
 
 test("reply branches and exact website pricing progress to audited signup without inventing a price or day", () => {
