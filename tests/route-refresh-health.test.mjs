@@ -3,42 +3,70 @@ import routingPrivate from '../lib/routing-private.json' with {type:'json'};
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import vm from 'node:vm';
+import { DatabaseSync } from 'node:sqlite';
 import { webcrypto } from 'node:crypto';
+import { ROUTE_BOOK_RUN_CREDITS, routeBookSchedule, routeBookFingerprint, claimRouteBookRebuild } from '../lib/route-book-policy.mjs';
 
 const source=fs.readFileSync(new URL('../lib/route-intelligence.js',import.meta.url),'utf8').replace(/^import[\s\S]*?;\r?\n/gm,'').replace(/^export \{.*\} from .*;\r?\n/gm,'').replace(/^export /gm,'');
-async function refresh({planStatus='complete',auditStatus='verified',remaining=0,attempted=0,unchanged=false,cachedStatus='complete',fail=false}={}) {
-  const writes=[],logs=[];
-  const capturedAt='2026-10-08T23:00:00Z';
-  const db={prepare(sql){return {args:[],bind(...args){this.args=args;return this;},async first(){assert.doesNotMatch(sql,/WHERE status='complete'/);return {status:cachedStatus,source_snapshot_at:unchanged?capturedAt:'older',payload:JSON.stringify({planningWeekStart:'2026-10-05',routeModelVersion:11})};},async run(){writes.push({sql,args:this.args});return {meta:{changes:1}};}};}};
+function fixture({planStatus='complete',auditStatus='verified',remaining=0,attempted=0,changed=true,cachedStatus='complete',fail=false,budgetFailure=false}={}) {
+  const sql=new DatabaseSync(':memory:');
+  sql.exec(`CREATE TABLE airtable_cockpit_snapshots(snapshot_key TEXT PRIMARY KEY,payload TEXT,status TEXT,captured_at TEXT,updated_at TEXT);
+    CREATE TABLE route_subscription_plans(source_snapshot_at TEXT,payload TEXT,status TEXT,created_at TEXT);
+    CREATE TABLE system_sync_runs(id TEXT,sync_name TEXT,status TEXT,snapshot_date TEXT,records_processed INTEGER,error TEXT,completed_at TEXT);`);
+  sql.prepare('INSERT INTO route_subscription_plans VALUES (?,?,?,CURRENT_TIMESTAMP)').run('old-capture',JSON.stringify({rosterFingerprint:changed?'older':'same'}),cachedStatus);
+  const db={prepare(query){const args=[];return {bind(...values){args.splice(0,args.length,...values);return this;},async first(){return sql.prepare(query).get(...args)||null;},async all(){return {results:sql.prepare(query).all(...args)};},async run(){return sql.prepare(query).run(...args);}};}};
+  const logs=[],calls=[];
   const context={routingPrivate,crypto:webcrypto,console:{log:value=>logs.push(JSON.parse(value)),error:value=>logs.push(JSON.parse(value))},
+    ROUTE_BOOK_RUN_CREDITS,routeBookSchedule,routeBookFingerprint,claimRouteBookRebuild,
     runScheduledRouteAssignmentAudit:async()=>({status:auditStatus}),
-    mockGeocode:async()=>({remaining,attempted,geocodedCustomers:208,sourceSnapshotAt:capturedAt}),
-    mockPlan:async()=>{if(fail)throw Error('provider unavailable');return {id:'new-plan',status:planStatus};},
-    mockMonday:()=>new Date('2026-10-05T00:00:00Z'),
+    mockGeocode:async()=>({remaining,attempted,geocodedCustomers:208,sourceSnapshotAt:'new-capture',rosterFingerprint:'same'}),
+    mockPlan:async(_,options)=>{calls.push(options);if(budgetFailure)throw Object.assign(Error('budget'),{code:'run_budget_exceeded'});if(fail)throw Error('provider unavailable');return {id:'new-plan',status:planStatus};},
   };
-  const fn=runPrivateInNewContext(source+'\ngeocodeActiveSubscriptionRouteBook=mockGeocode; calculateActiveSubscriptionPlan=mockPlan; mondayStart=mockMonday; runScheduledRouteBookRefresh;',context);
-  let error;try{await fn({DB:db});}catch(e){error=e;}
-  return {writes,logs,error};
+  const fn=runPrivateInNewContext(source+'\ngeocodeActiveSubscriptionRouteBook=mockGeocode; calculateActiveSubscriptionPlan=mockPlan; runScheduledRouteBookRefresh;',context);
+  return {sql,logs,calls,run:(at='2026-10-08T19:35:00Z')=>fn({DB:db},at),health:()=>sql.prepare('SELECT * FROM system_sync_runs ORDER BY rowid DESC LIMIT 1').get()};
 }
+
 test('partial road plans remain partial when the assignment audit passes',async()=>{
-  const r=await refresh({planStatus:'partial'});assert.equal(r.writes[0].args[1],'partial');assert.match(r.writes[0].args[4],/Route plan incomplete/);assert.equal(r.logs[0].planStatus,'partial');assert.equal(r.logs[0].status,'partial');
+  const h=fixture({planStatus:'partial'});await h.run();assert.equal(h.health().status,'partial');assert.match(h.health().error,/Route plan incomplete/);assert.equal(h.logs[0].planStatus,'partial');h.sql.close();
 });
-test('complete calculations and verified assignments record successful health',async()=>{
-  const r=await refresh();assert.equal(r.writes[0].args[1],'success');assert.equal(r.writes[0].args[4],null);assert.equal(r.logs[0].planStatus,'complete');
+
+test('complete calculations and verified assignments record successful health and share the 800 credit budget',async()=>{
+  const h=fixture();await h.run();assert.equal(h.health().status,'success');assert.equal(h.health().error,null);assert.equal(h.calls[0].budget.remaining,800);h.sql.close();
 });
+
 test('completed calculations do not mask an unverified assignment audit',async()=>{
-  const r=await refresh({auditStatus:'unverified'});assert.equal(r.writes[0].args[1],'partial');assert.match(r.writes[0].args[4],/not verified/);
+  const h=fixture({auditStatus:'unverified'});await h.run();assert.equal(h.health().status,'partial');assert.match(h.health().error,/not verified/);h.sql.close();
 });
+
 test('pending geocoding never reports a complete route refresh',async()=>{
-  for(const options of [{remaining:1},{attempted:1}]) {const r=await refresh(options);assert.equal(r.writes[0].args[1],'partial');assert.equal(r.logs[0].planStatus,'pending');}
+  const h=fixture({remaining:1});await h.run();assert.equal(h.health().status,'partial');assert.equal(h.logs[0].planStatus,'pending');assert.equal(h.calls.length,0);h.sql.close();
 });
-test('reusing the matching complete plan is successful without another calculation',async()=>{
-  const r=await refresh({unchanged:true});assert.equal(r.writes[0].args[1],'success');assert.equal(r.logs[0].planStatus,'unchanged_complete');assert.equal(r.logs[0].planId,null);
+
+test('newly geocoded changed addresses may complete the same bounded rebuild',async()=>{
+  const h=fixture({attempted:1});await h.run();assert.equal(h.calls.length,1);h.sql.close();
 });
-test('a newer partial plan is recalculated rather than hidden behind a completed cache',async()=>{
-  const r=await refresh({unchanged:true,cachedStatus:'partial'});assert.equal(r.logs[0].planStatus,'complete');assert.equal(r.logs[0].planId,'new-plan');
+
+test('new snapshot timestamps never trigger an hourly rebuild of the same roster',async()=>{
+  const h=fixture({changed:false});await h.run();await h.run();assert.equal(h.calls.length,0);assert.equal(h.health().status,'success');assert.equal(h.logs[0].planStatus,'unchanged_complete');h.sql.close();
 });
+
+test('unchanged partial plans wait overnight and daily leases prevent hourly retries',async()=>{
+  const h=fixture({changed:false,cachedStatus:'partial'});await h.run();assert.equal(h.calls.length,0);
+  await h.run('2026-10-09T06:35:00Z');await h.run('2026-10-09T06:35:00Z');assert.equal(h.calls.length,1);h.sql.close();
+});
+
+test('changed roster runs once and an exceeded budget preserves the last plan with a warning',async()=>{
+  const h=fixture({budgetFailure:true});await h.run();await h.run();assert.equal(h.calls.length,1);assert.equal(h.logs[0].planStatus,'retained_budget');assert.equal(h.logs[1].planStatus,'retained_budget');assert.equal(h.health().status,'partial');
+  const runs=h.sql.prepare('SELECT * FROM system_sync_runs ORDER BY rowid').all();assert.equal(runs[0].status,'partial');assert.match(runs[0].error,/800-credit.*last good plan/);
+  assert.equal(h.sql.prepare('SELECT COUNT(*) AS n FROM route_subscription_plans').get().n,1);h.sql.close();
+});
+
 test('a thrown calculation failure records a failed run and remains an error',async()=>{
-  const r=await refresh({fail:true});assert.match(r.writes[0].sql,/'failed'/);assert.match(r.error.message,/provider unavailable/);assert.equal(r.logs[0].event,'active_route_book_refresh_failed');
+  const h=fixture({fail:true});await assert.rejects(h.run(),/provider unavailable/);assert.equal(h.health().status,'failed');assert.equal(h.logs[0].event,'active_route_book_refresh_failed');h.sql.close();
+});
+
+test('a failed changed-roster rebuild cannot report the old saved plan as current on the next hourly tick',async()=>{
+  const h=fixture({fail:true});await assert.rejects(h.run(),/provider unavailable/);await h.run();
+  assert.equal(h.calls.length,1);assert.equal(h.health().status,'partial');assert.equal(h.logs[1].planStatus,'pending');
+  assert.match(h.health().error,/not complete/);h.sql.close();
 });

@@ -16,7 +16,7 @@ function fixture({configured=true,providerOk=true}={}) {
   const db={prepare:query=>({bind:(...args)=>({first:async()=>sql.prepare(query).get(...args)||null,all:async()=>({results:sql.prepare(query).all(...args)}),run:async()=>({meta:sql.prepare(query).run(...args)})})})};
   let calls=0;
   const context={...logic,shiftRouteDate,crypto,TextEncoder,console,getDb:()=>db,geoapifyConfigured:()=>configured,calculateTravelLegs:async points=>{calls++;return {ok:providerOk,data:Array.from({length:points.length-1},(_,i)=>({minutes:i%2?900:10,miles:i%2?900:2}))};}};
-  const service=runPrivateInNewContext(`${source}\n({refreshStopTravelDate,readStopTravel,validTravelDate})`,context);
+  const service=runPrivateInNewContext(`${source}\n({refreshStopTravelDate,readStopTravel,validTravelDate,runScheduledStopTravel})`,context);
   const date=shiftRouteDate(logic.travelDate(),-1);
   function addJobs(count=3){for(let i=0;i<count;i++)sql.prepare("INSERT INTO sng_events VALUES (?,?,?,?,?,?)").run(String(i),"job:completed","sweep_and_go",`${i}.0`,JSON.stringify({data:{job_id:i,employee_id:Number(staffPrivate.providerIds.primary),employee_name:staffPrivate.primaryShort,client_name:`Stop ${i}`,start_time:`${date} ${String(9+i).padStart(2,"0")}:00:00`,end_time:`${date} ${String(9+i).padStart(2,"0")}:10:00`,start_latitude:41+i/100,start_longitude:-83}}),`${date} 20:00:00`);}
   return {sql,db,service,date,addJobs,calls:()=>calls,unlock:()=>sql.prepare("DELETE FROM airtable_cockpit_snapshots WHERE snapshot_key LIKE 'stop_travel_lock:%'").run()};
@@ -34,8 +34,28 @@ test("unconfigured or failed mapping persists gaps as pending, never fabricated 
   for(const options of [{configured:false},{providerOk:false}]){const f=fixture(options);f.addJobs();const r=await f.service.refreshStopTravelDate(f.date);assert.equal(r.pending,2);assert.equal(r.flagged,0);const data=await f.service.readStopTravel(f.date,f.date);assert.equal(data.rows[0].elapsedMinutes,50);assert.equal(data.rows[0].roadMiles,null);}
 });
 test("global daily provider cap applies before network calls",async()=>{
-  const f=fixture();f.addJobs();f.sql.prepare("INSERT INTO api_rate_limits VALUES ('stop_travel_geo','global',?,120,'2099-01-01')").run(Math.floor(Date.now()/86400000)*86400);
+  const f=fixture();f.addJobs();f.sql.prepare("INSERT INTO api_rate_limits VALUES ('stop_travel_geo','global',?,20,'2099-01-01')").run(Math.floor(Date.now()/86400000)*86400);
   const r=await f.service.refreshStopTravelDate(f.date);assert.equal(f.calls(),0);assert.equal(r.pending,2);
+  assert.equal(f.sql.prepare("SELECT request_count FROM api_rate_limits WHERE scope='stop_travel_geo'").get().request_count,20);
+});
+
+test("hourly triggers acquire one durable evening lease for the Eastern date",async()=>{
+  const f=fixture();f.addJobs();
+  const before=await f.service.runScheduledStopTravel({DB:f.db},logic.parseTravelTime(`${f.date} 20:59:00`));
+  assert.equal(before.skipped,true);assert.equal(f.sql.prepare("SELECT COUNT(*) AS n FROM airtable_cockpit_snapshots").get().n,0);
+  const runs=await Promise.all([21,22,23].map(hour=>f.service.runScheduledStopTravel({DB:f.db},logic.parseTravelTime(`${f.date} ${hour}:05:00`))));
+  assert.equal(runs.filter(Array.isArray).length,1);assert.equal(f.calls(),1);
+  assert.deepEqual(f.sql.prepare("SELECT snapshot_key FROM airtable_cockpit_snapshots WHERE snapshot_key LIKE 'stop_travel_v1:%'").all().map(r=>r.snapshot_key),[`stop_travel_v1:${f.date}`]);
+  assert.equal(f.sql.prepare("SELECT COUNT(*) AS n FROM airtable_cockpit_snapshots WHERE snapshot_key LIKE 'stop_travel_daily:%'").get().n,1);
+});
+
+test("manual refresh remains available after the evening attempt and shares its twenty-call cap",async()=>{
+  const f=fixture({providerOk:false});f.addJobs();
+  f.sql.prepare("INSERT INTO api_rate_limits VALUES ('stop_travel_geo','global',?,19,'2099-01-01')").run(Math.floor(Date.now()/86400000)*86400);
+  await f.service.runScheduledStopTravel({DB:f.db},logic.parseTravelTime(`${f.date} 21:05:00`));assert.equal(f.calls(),1);
+  f.unlock();const manual=await f.service.refreshStopTravelDate(f.date);assert.equal(manual.pending,2);assert.equal(f.calls(),1);
+  assert.equal(f.sql.prepare("SELECT request_count FROM api_rate_limits WHERE scope='stop_travel_geo'").get().request_count,20);
+  const repeat=await f.service.runScheduledStopTravel({DB:f.db},logic.parseTravelTime(`${f.date} 22:05:00`));assert.equal(repeat.skipped,true);
 });
 test("oversized source scans preserve prior records and do no paid work",async()=>{
   const f=fixture();f.addJobs();await f.service.refreshStopTravelDate(f.date);f.unlock();
