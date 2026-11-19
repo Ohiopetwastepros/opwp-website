@@ -38,12 +38,14 @@ test("the shared formatter repairs existing same-line closings and does not dupl
   assert.ok(formatCustomerSms("x".repeat(1100)).length <= 1000);
 });
 
-test("review requests retain STOP before the direct Google final-link line", () => {
+test("review requests keep the Google link inline and STOP alone as the final line", () => {
   const previewToken = "00000000-0000-4000-a000-000000000001";
   for (const template of ["standard", "initial-cleanup"]) {
     const body = buildReviewRequestSms({ firstName: "Alex", tech: "Tony", previewToken, template });
-    assert.match(body, /\n\nReply STOP to opt out\n\nhttps:\/\/\S+$/);
-    assert.equal(body.trim().split("\n").at(-1), REVIEW_URL);
+    checkSpacing(body);
+    assert.equal(body.split("\n").at(-1), "Reply STOP to opt out");
+    assert.ok(body.split("\n")[0].includes(`You can leave one here: ${REVIEW_URL}`));
+    assert.equal(body.split("\n").includes(REVIEW_URL), false);
     assert.deepEqual(body.match(/https?:\/\/\S+/g), [REVIEW_URL]);
     assert.doesNotMatch(body, /ohiopetwastepros\.com\/review\//);
     assert.equal(body.match(/Reply STOP to opt out/g).length, 1);
