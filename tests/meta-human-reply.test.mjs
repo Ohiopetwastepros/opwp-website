@@ -71,6 +71,28 @@ test("identity handling does not take ordinary pricing, ZIP or quote-acceptance 
   assert.equal(priceAfterOffer.response, quote.text);
 });
 
+test("a personal-reply acceptance at the turn limit still requests Craig while terminal safeguards stay in force", () => {
+  const offer = nextMetaResponse({ lead, state: { turns: 15, expected: "yard" }, text: "are you a real person?" });
+  assert.equal(offer.state.turns, 16);
+  assert.equal(offer.state.expected, "human_offer");
+  const accepted = nextMetaResponse({ lead, state: offer.state, text: "yes" });
+  assert.equal(accepted.state.turns, 17);
+  assert.equal(accepted.state.human_requested, true);
+  assert.equal(accepted.handoff, true);
+  assert.equal(accepted.response, "");
+  assert.equal(accepted.state.ready_for_route_audit, false);
+  const stopped = nextMetaResponse({ lead, state: offer.state, text: "STOP" });
+  assert.equal(stopped.branch, "opted_out");
+  assert.notEqual(stopped.state.human_requested, true);
+  const alreadyHandedOff = nextMetaResponse({ lead, state: { ...offer.state, handoff: true, ready_for_route_audit: false }, text: "yes" });
+  assert.notEqual(alreadyHandedOff.state.human_requested, true);
+  assert.equal(alreadyHandedOff.response, "");
+  const capped = nextMetaResponse({ lead, state: { turns: 16, expected: "yard" }, text: "A" });
+  assert.equal(capped.handoff, true);
+  assert.equal(capped.response, "");
+  assert.notEqual(capped.state.human_requested, true);
+});
+
 test("STOP takes priority over identity questions and an existing handoff cannot restart", () => {
   const stop = nextMetaResponse({ lead, text: "Stop texting me. Are you a bot?" });
   assert.equal(stop.branch, "opted_out");
