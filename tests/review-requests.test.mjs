@@ -115,6 +115,19 @@ test('turning the review feature off leaves existing queued rows untouched and c
   } finally { f.sqlite.close(); }
 });
 
+test('the scheduler excludes manual owner tests even if a delivery is mistakenly queued', async () => {
+  const f = fixture();
+  try {
+    await f.queue();
+    f.sqlite.prepare("UPDATE review_requests SET job_type='manual_owner_test'").run();
+    const result = await f.run();
+    assert.equal(result.attempted, 0); assert.equal(result.sent, 0);
+    assert.equal(f.sends.length, 0); assert.equal(f.previews.length, 0);
+    assert.equal(f.lookups.length, 1); // Only the original queue's dispatch lookup.
+    assert.ok(f.rows().every(row => row.status === 'queued'));
+  } finally { f.sqlite.close(); }
+});
+
 test('real Dispatch type, cell_phone, numeric marketing flag and assignment enrich a sparse completion webhook', async () => {
   const f = fixture();
   try {
