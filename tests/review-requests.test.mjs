@@ -349,3 +349,30 @@ test('unavailable review snapshot or dispatch defers without sending and never i
     assert.equal(f.sends.length, 0); assert.ok(f.rows().every(row => row.status === 'queued'));
   } finally { f.sqlite.close(); }
 });
+
+test('manual DNC set through an ID alias blocks and clears its existing phone-only owner',async()=>{
+  const f=fixture();
+  try {
+    await f.queue(f.job({client_id:''}));
+    await f.queue(f.job({id:'job-2',client_id:'client-1'}));
+    const canonical=f.rows().find(row=>row.channel==='sms').customer_key;
+    assert.match(canonical,/^phone:/);
+    await f.methods.setReviewDoNotContact(f.env,{customerKey:'sng:client-1',blocked:true,actor:'owner@example.test'});
+    assert.equal(f.sqlite.prepare('SELECT do_not_contact FROM review_request_customers WHERE customer_key=?').get(canonical).do_not_contact,1);
+    assert.equal((await f.run()).sent,0);
+    assert.ok(f.rows().some(row=>row.reason==='manual_do_not_contact'));
+    await f.methods.setReviewDoNotContact(f.env,{customerKey:'sng:client-1',blocked:false,actor:'owner@example.test'});
+    assert.equal(f.sqlite.prepare('SELECT do_not_contact FROM review_request_customers WHERE customer_key=?').get(canonical).do_not_contact,0);
+  } finally {f.sqlite.close();}
+});
+
+test('crossing 8 PM after an asynchronous claim returns the row to the queue without sending',async()=>{
+  const f=fixture();
+  try {
+    await f.queue();let ticks=0;
+    const result=await f.run({now:()=>new Date(++ticks<4?'2026-11-19T00:59:59Z':'2026-11-19T01:00:00Z')});
+    assert.equal(result.sent,0);assert.equal(f.sends.length,0);
+    assert.ok(f.rows().every(row=>row.status==='queued'));
+    assert.ok(f.rows().some(row=>row.reason==='quiet_hours'));
+  } finally {f.sqlite.close();}
+});
