@@ -1,0 +1,22 @@
+.content { display:grid; gap:20px; max-width:1500px; margin:auto; color:#172b38; }
+.notice,.panel { padding:20px 24px; border:1px solid #cbdcd3; border-radius:12px; background:#fff; font-size:14px; line-height:1.6; }
+.notice { background:#f0f6ee; }
+.notice p:last-child,.panel p:last-child { margin-bottom:0; }
+.notice > strong { font-size:17px; }
+.panel h2 { margin:0 0 8px; font-size:20px; }
+.toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+.toolbar label { display:grid; gap:5px; font-size:13px; font-weight:650; }
+.toolbar input { min-width:280px; max-width:100%; }
+.content input,.content select,.content button { box-sizing:border-box; border:1px solid #a8bbb0; border-radius:7px; padding:9px 12px; font:inherit; background:#fff; color:#173c2a; }
+.content button { cursor:pointer; font-size:13px; font-weight:650; }
+.content button:hover { background:#edf3e9; }
+.content button:disabled { cursor:wait; opacity:.55; }
+.content input:focus-visible,.content select:focus-visible,.content button:focus-visible { outline:2px solid #255540; outline-offset:2px; }
+.tableWrap { overflow-x:auto; }
+.tableWrap table { width:100%; border-collapse:collapse; text-align:left; font-size:13px; }
+.tableWrap th { background:#edf3ef; font-weight:700; }
+.tableWrap td,.tableWrap th { padding:12px; border-bottom:1px solid #dce6df; vertical-align:top; }
+.tableWrap td small { display:block; margin-top:4px; color:#53665e; overflow-wrap:anywhere; }
+.content li { display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding:6px 0; }
+.error { border:1px solid #d29d92; border-radius:7px; padding:12px 16px; background:#fff2ee; color:#7d281c; }
+@media(max-width:600px) { .notice,.panel { padding:16px; }.toolbar label,.toolbar input { width:100%; min-width:0; } }

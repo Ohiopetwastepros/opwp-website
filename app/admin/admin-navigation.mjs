@@ -9,6 +9,7 @@ export const ADMIN_NAVIGATION = [
   { id: "customers", label: "Customers & growth", items: [
     { id: "customers", label: "Customers & retention", href: "/admin/?view=customers" },
     { id: "pipeline", label: "Leads", href: "/admin/quote-funnel/" },
+    { id: "review-requests", label: "Google review requests", href: "/admin/review-requests/" },
     { id: "acquisition", label: "Acquisition", href: "/admin/acquisition/" },
   ] },
   { id: "operations", label: "Operations", items: [
