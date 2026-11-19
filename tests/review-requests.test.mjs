@@ -19,10 +19,14 @@ function fixture({ enabled = true, initialize = true } = {}) {
   sqlite.exec(readFileSync(new URL('../schema-proposals/0067_review_requests.sql', import.meta.url), 'utf8'));
   sqlite.exec(`CREATE TABLE airtable_cockpit_snapshots(snapshot_key TEXT PRIMARY KEY,payload TEXT);
     CREATE TABLE field_message_suppression(phone TEXT PRIMARY KEY,suppressed INTEGER);
-    CREATE TABLE lead_suppressions(organization_id TEXT,phone_hash TEXT,reason TEXT);`);
+    CREATE TABLE lead_suppressions(organization_id TEXT,phone_hash TEXT,reason TEXT);
+    CREATE TABLE submissions(id TEXT PRIMARY KEY,status TEXT,kind TEXT,sng_entity_id TEXT,email TEXT,phone TEXT);
+    CREATE TABLE growth_leads(submission_id TEXT,organization_id TEXT);
+    CREATE TABLE lead_conversations(submission_id TEXT,organization_id TEXT);`);
   sqlite.prepare('INSERT INTO airtable_cockpit_snapshots VALUES (?,?)').run('business_cockpit', JSON.stringify({ opwp: { reviewTracker: [] } }));
   if (initialize) sqlite.prepare('INSERT INTO review_request_settings VALUES (?,?)').run('automation', ENABLED_AT);
   const writes = [];
+  let afterWrite = null;
   const db = {
     prepare(sql) {
       const statement = {
@@ -32,7 +36,9 @@ function fixture({ enabled = true, initialize = true } = {}) {
         async all() { return { results: sqlite.prepare(sql).all(...this.values) }; },
         async run() {
           writes.push(sql);
-          return { meta: { changes: sqlite.prepare(sql).run(...this.values).changes } };
+          const result = { meta: { changes: sqlite.prepare(sql).run(...this.values).changes } };
+          if(afterWrite)await afterWrite(sql);
+          return result;
         },
       };
       return statement;
@@ -51,6 +57,7 @@ function fixture({ enabled = true, initialize = true } = {}) {
   const jobs = new Map(), sends = [], lookups = [], previews = [];
   let beforeRequest = null;
   let beforePreview = null;
+  let beforeProviderReturn = null;
   let failureChannel = null;
   const request = async (path, options) => {
     lookups.push({ path, options });
@@ -69,8 +76,8 @@ function fixture({ enabled = true, initialize = true } = {}) {
       const tech = content.reviewTechSlug(options.tech);
       return { token: options.token, tech, pageUrl: content.reviewRequestPageUrl(options.token), imageUrl: content.reviewRequestImageUrl(options.token) };
     },
-    sendQuoText: async (_env, row, options) => { sends.push({ channel: 'sms', row, options }); if (failureChannel === 'sms') throw new Error('fixture uncertain response'); return 'fixture-sms'; },
-    sendTransactionalEmail: async (_env, options) => { sends.push({ channel: 'email', options }); if (failureChannel === 'email') throw new Error('fixture uncertain response'); return 'fixture-email'; },
+    sendQuoText: async (_env, row, options) => { sends.push({ channel: 'sms', row, options }); if (failureChannel === 'sms') throw new Error('fixture uncertain response'); if(beforeProviderReturn)await beforeProviderReturn('sms'); return 'fixture-sms'; },
+    sendTransactionalEmail: async (_env, options) => { sends.push({ channel: 'email', options }); if (failureChannel === 'email') throw new Error('fixture uncertain response'); if(beforeProviderReturn)await beforeProviderReturn('email'); return 'fixture-email'; },
   });
   function job(overrides = {}) {
     const value = { id: 'job-1', client_id: 'client-1', full_name: 'Jordan Example', type: 'initial', assigned_to_name: 'Tony B', cell_phone_number: '202-555-0100', email: 'jordan@example.test', marketing_allowed: 'yes', end_time: '2026-11-18T16:00:00Z', ...overrides };
@@ -79,7 +86,7 @@ function fixture({ enabled = true, initialize = true } = {}) {
   async function queue(value = job(), options = {}) { return methods.queueReviewRequest(env, { body: { data: { ...value, job_id: value.id } }, now: NOW, request, ...options }); }
   async function run(options = {}) { return methods.runScheduledReviewRequests(env, { now: NOW, request, ...options }); }
   const rows = () => sqlite.prepare('SELECT d.*,r.customer_key,r.job_type,r.page_slug FROM review_request_deliveries d JOIN review_requests r ON r.id=d.request_id ORDER BY d.channel').all();
-  return { sqlite, db, env, writes, jobs, sends, lookups, previews, methods, job, queue, run, rows, beforeRequest: callback => { beforeRequest = callback; }, beforePreview: callback => { beforePreview = callback; }, failProvider: channel => { failureChannel = channel; } };
+  return { sqlite, db, env, writes, jobs, sends, lookups, previews, methods, job, queue, run, rows, beforeRequest: callback => { beforeRequest = callback; }, beforePreview: callback => { beforePreview = callback; }, beforeProviderReturn: callback => { beforeProviderReturn = callback; }, afterWrite: callback => { afterWrite = callback; }, failProvider: channel => { failureChannel = channel; } };
 }
 
 test('only initial and one_time completion jobs qualify for review requests', async t => {
@@ -206,6 +213,74 @@ test('turning the feature off during preview preparation prevents both provider 
     assert.equal(f.sends.length, 0);
     assert.ok(f.previews.length > 0);
   } finally { f.sqlite.close(); }
+});
+
+test('review requests tied to trashed or deleted leads are skipped by contact, customer ID, or submission ID without sending',async t=>{
+  for(const [status,fields] of [
+    ['trashed',{phone:'(202) 555-0100'}],['deleted',{email:'JORDAN@example.test'}],
+    ['trashed',{sng_entity_id:'client-1'}],['deleted',{id:'linked-lead'}],
+  ])await t.test(status+' '+Object.keys(fields).join(','),async()=>{
+    const f=fixture();try{
+      f.sqlite.prepare('INSERT INTO submissions(id,status,kind,sng_entity_id,email,phone) VALUES(?,?,?,?,?,?)')
+        .run(fields.id||'trashed-lead',status,'partial_quote',fields.sng_entity_id||null,fields.email||null,fields.phone||null);
+      await f.queue(f.job({submission_id:'linked-lead'}));
+      assert.ok(f.rows().every(row=>row.status==='skipped'&&row.reason==='lead_trashed'));
+      assert.equal((await f.run()).sent,0);assert.equal(f.sends.length,0);
+    }finally{f.sqlite.close();}
+  });
+});
+
+test('trashing a linked lead during asynchronous preview preparation prevents SMS and email sends',async()=>{
+  const f=fixture();try{
+    await f.queue();
+    f.beforePreview(()=>{
+      f.sqlite.prepare("INSERT OR IGNORE INTO submissions(id,status,kind,phone) VALUES('race-lead','trashed','partial_quote','2025550100')").run();
+    });
+    assert.equal((await f.run()).sent,0);assert.equal(f.sends.length,0);
+    assert.ok(f.rows().every(row=>row.status==='skipped'&&row.reason==='lead_trashed'));
+  }finally{f.sqlite.close();}
+});
+
+test('a delivery cancelled during async preview preparation stays skipped and never calls its provider',async()=>{
+  const f=fixture();try{
+    await f.queue();
+    f.beforePreview(()=>{f.sqlite.exec("UPDATE review_request_deliveries SET status='skipped',reason='lead_trashed' WHERE status='queued'");});
+    assert.equal((await f.run()).sent,0);assert.equal(f.sends.length,0);
+    assert.ok(f.rows().every(row=>row.status==='skipped'&&row.reason==='lead_trashed'));
+  }finally{f.sqlite.close();}
+});
+
+test('cancellation after the async sending claim is rechecked before either provider call',async()=>{
+  const f=fixture();try{
+    await f.queue();
+    f.afterWrite(sql=>{if(sql.includes("SET status='sending'"))f.sqlite.exec("UPDATE review_request_deliveries SET status='skipped',reason='lead_trashed' WHERE status IN ('queued','sending')");});
+    assert.equal((await f.run()).sent,0);assert.equal(f.sends.length,0);
+    assert.ok(f.rows().every(row=>row.status==='skipped'&&row.reason==='lead_trashed'));
+  }finally{f.sqlite.close();}
+});
+
+test('a lead trashed during the async email token write is checked again before sending',async()=>{
+  const f=fixture();try{
+    await f.queue(f.job({cell_phone_number:''}));
+    f.afterWrite(sql=>{if(sql.includes('SET unsubscribe_token_hash='))f.sqlite.exec("INSERT INTO submissions(id,status,kind,email) VALUES('email-race','trashed','question','jordan@example.test')");});
+    assert.equal((await f.run()).sent,0);assert.equal(f.sends.length,0);
+    assert.equal(f.rows()[0].status,'skipped');assert.equal(f.rows()[0].reason,'lead_trashed');
+  }finally{f.sqlite.close();}
+});
+
+test('a provider acceptance racing with Trash is retained as sent history and is never resent',async()=>{
+  const f=fixture();try{
+    await f.queue();
+    f.beforeProviderReturn(()=>{
+      f.sqlite.exec("INSERT OR IGNORE INTO submissions(id,status,kind,phone) VALUES('accepted-race','trashed','partial_quote','2025550100'); UPDATE review_request_deliveries SET status='skipped',reason='lead_trashed' WHERE status IN ('queued','sending')");
+    });
+    assert.equal((await f.run()).sent,1);assert.equal(f.sends.length,1);
+    const sent=f.rows().filter(row=>row.status==='sent');assert.equal(sent.length,1);
+    assert.equal(sent[0].provider_message_id,'fixture-'+f.sends[0].channel);
+    assert.equal(sent[0].reason,'provider_accepted_delivery_not_confirmed');assert.ok(sent[0].sent_at);
+    assert.equal(f.rows().filter(row=>row.status==='skipped'&&row.reason==='lead_trashed').length,1);
+    assert.equal((await f.run()).sent,0);assert.equal(f.sends.length,1);
+  }finally{f.sqlite.close();}
 });
 
 test('preview preparation failure leaves deliveries queued and calls neither provider', async () => {

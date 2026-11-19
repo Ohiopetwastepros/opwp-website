@@ -33,8 +33,8 @@ function fixture() {
       .run(parent, parent, "+14195550100");
     db.sqlite.prepare(`INSERT INTO quote_follow_up_deliveries
       (id,follow_up_id,submission_id,channel,status,attempt_count,sending_at,updated_at,provider_message_id)
-      VALUES (?,?,?,'customer_sms',?,?,CASE WHEN ? THEN datetime(CURRENT_TIMESTAMP,?) END,datetime(CURRENT_TIMESTAMP,?),'existing-provider-evidence')`)
-      .run(id, parent, parent, status, attempts, Number(sendingAt), age, age);
+      VALUES (?,?,?,'customer_sms',?,?,CASE WHEN ? THEN datetime(CURRENT_TIMESTAMP,?) END,datetime(CURRENT_TIMESTAMP,?),?)`)
+      .run(id, parent, parent, status, attempts, Number(sendingAt), age, age, status === "queued" ? null : "existing-provider-evidence");
   };
   const row = (id) => db.sqlite.prepare("SELECT * FROM quote_follow_up_deliveries WHERE id=?").get(id);
   const parent = (id) => db.sqlite.prepare("SELECT * FROM quote_follow_ups WHERE id=?").get(id);

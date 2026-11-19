@@ -2,6 +2,8 @@ import { queuePartialQuoteFollowUp, saveSubmission, upsertPartialQuoteSubmission
 import { queueSubmissionNotificationSafe } from "@/lib/submission-notifications";
 import { protectJsonRequest, verifyTurnstile } from "@/lib/public-api-security";
 import { validateLeadInput } from "@/lib/public-input";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { runScheduledQuoteFollowUps } from "@/lib/quote-follow-up-delivery";
 
 export const dynamic = "force-dynamic";
 
@@ -27,13 +29,25 @@ export async function POST(request) {
         funnelId: validation.value.funnel_id,
         lifecycleStage: isPartial ? validation.value.lifecycle_stage : "details_started",
       });
+  const smsFollowup = isPartial
+    ? await queuePartialQuoteFollowUp({ submissionId: saved.id, phone: validation.value.phone, consentAt: validation.value.follow_up_consent_at, delayMinutes: 0 })
+    : null;
+  if (smsFollowup?.configured && ["queued", "failed"].includes(smsFollowup.status)) {
+    try {
+      const { env, ctx } = getCloudflareContext();
+      // The same atomic delivery claims serve this request and the cron fallback.
+      ctx.waitUntil(runScheduledQuoteFollowUps(env, 3, { submissionId: saved.id }).catch(() => {
+        console.error(JSON.stringify({ event: "immediate_quote_follow_up_failed", submissionId: saved.id }));
+      }));
+    } catch {
+      // Persisted due rows remain available to cron if request context is absent.
+      console.error(JSON.stringify({ event: "immediate_quote_follow_up_unavailable", submissionId: saved.id }));
+    }
+  }
   const notification = await queueSubmissionNotificationSafe({
     submissionId: saved.id,
     type: isPartial ? "partial_quote" : "question",
     body: validation.value,
   });
-  const smsFollowup = isPartial
-    ? await queuePartialQuoteFollowUp({ submissionId: saved.id, phone: validation.value.phone, consentAt: validation.value.follow_up_consent_at })
-    : null;
   return Response.json({ ok: true, stored: saved.configured, id: saved.id, notification: notification.status, smsFollowup: smsFollowup?.status || null });
 }

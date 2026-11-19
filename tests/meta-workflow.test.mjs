@@ -19,7 +19,7 @@ async function fixtureAdminSession(email) {
   if (result.recoveryCodes.length) env.__recoveryCodes[email] = result.recoveryCodes;
   return result.sessionToken;
 }
-import { storeMetaLead, processMetaConfirmations, recordMetaReply, recordQuoDelivery, metaReleaseApproved, markMetaNoResponse } from "../lib/meta-lead-workflow.mjs";
+import { storeMetaLead, processMetaConfirmations, refreshPendingMetaConfirmations, queueMetaCadence, recordMetaReply, recordQuoDelivery, metaReleaseApproved, markMetaNoResponse } from "../lib/meta-lead-workflow.mjs";
 import { exactDogs, mapMetaAnswers, metaCadenceQuietHours, metaConsentEvidence, buildMetaConfirmation, formatMetaSms } from "../lib/meta-lead-policy.mjs";
 import { nextMetaResponse, metaWebsiteQuote, META_RESPONSES } from "../lib/meta-conversation.mjs";
 import { auditMetaRoute, routeGuidanceFromSnapshot } from "../lib/meta-route-guidance.mjs";
@@ -110,6 +110,49 @@ test("confirmation storage, mocked Quo delivery and message history preserve the
   assert.equal(select(db, "lead_messages").find((message) => message.provider_message_id === "copy-preserved-sms").body, expected);
 });
 
+test("pending confirmation copy refresh never sends, releases, or rewrites attempted and sent history", async () => {
+  const db = database(), env = environment(db, false);
+  const statuses = ["queued", "blocked", "sending", "sent", "delivered", "failed", "unknown", "cancelled"];
+  for (let index = 0; index < statuses.length; index++) {
+    const id = `copy-${index}`;
+    await storeMetaLead(db, env, form(id, { phone_number: `+141955501${String(index).padStart(2, "0")}` }), event(id));
+    const status = statuses[index];
+    db.sqlite.prepare("UPDATE meta_sms_jobs SET status=?,message_body='Legacy confirmation. This is an automated confirmation. Reply STOP to opt out.' WHERE trigger_id=?").run(status, id);
+  }
+  // A queued job which was already attempted is deliberately not safe to rewrite.
+  await storeMetaLead(db, env, form("attempted", { phone_number: "+14195550120" }), event("attempted"));
+  db.sqlite.exec("UPDATE meta_sms_jobs SET message_body='Attempted legacy text',attempted_at=CURRENT_TIMESTAMP WHERE trigger_id='attempted'");
+  const before = select(db, "meta_sms_jobs");
+  assert.deepEqual(await refreshPendingMetaConfirmations(db), { reviewed: 2, updated: 2 });
+  for (const job of select(db, "meta_sms_jobs")) {
+    const prior = before.find((item) => item.id === job.id);
+    assert.equal(job.status, prior.status);
+    assert.equal(job.attempted_at, prior.attempted_at);
+    assert.equal(job.sent_at, prior.sent_at);
+    assert.equal(job.provider_message_id, prior.provider_message_id);
+    if (["queued", "blocked"].includes(job.status) && !job.attempted_at) {
+      assert.match(job.message_body, /^Hi ExampleLead, this is Craig with Ohio Pet Waste Pros\. Thanks for filling out our Facebook form\./);
+      assert.match(job.message_body, /\n\nReply STOP to opt out$/);
+      assert.doesNotMatch(job.message_body, /automated confirmation|[\u2013\u2014]/);
+    } else assert.equal(job.message_body, prior.message_body);
+  }
+  assert.equal(select(db, "lead_messages").length, 0);
+  assert.deepEqual(await refreshPendingMetaConfirmations(db), { reviewed: 2, updated: 0 });
+});
+
+test("paused restored leads and trashed leads cannot acquire missing Meta cadence jobs",async()=>{
+  const db=database();approve(db);const env=environment(db);
+  const lead=await storeMetaLead(db,env,form(),event());
+  db.sqlite.prepare("UPDATE meta_sms_jobs SET status='sent',sent_at=CURRENT_TIMESTAMP WHERE submission_id=?").run(lead.id);
+  db.sqlite.prepare("UPDATE lead_conversations SET automation_mode='paused' WHERE submission_id=?").run(lead.id);
+  assert.equal(await queueMetaCadence(db,env,lead.id),false);
+  assert.equal(select(db,'meta_sms_jobs').filter(row=>row.purpose==='follow_up').length,0);
+  db.sqlite.prepare("UPDATE lead_conversations SET automation_mode='approved' WHERE submission_id=?").run(lead.id);
+  db.sqlite.prepare("UPDATE submissions SET status='trashed' WHERE id=?").run(lead.id);
+  assert.equal(await queueMetaCadence(db,env,lead.id),false);
+  assert.equal(select(db,'meta_sms_jobs').filter(row=>row.purpose==='follow_up').length,0);
+});
+
 test("Meta cadence uses 8 AM through 9 PM New York time across standard, daylight and transition dates", () => {
   for (const [timestamp, quiet] of [
     ["2026-01-15T12:59:00Z", true], ["2026-01-15T13:00:00Z", false],
@@ -133,7 +176,7 @@ test("complete first confirmations send overnight in winter and summer regardles
       content.push(JSON.parse(request.body).content); return Response.json({ data: { id: "overnight-first" } });
     } });
     assert.equal(result.sent, 1, timestamp); assert.deepEqual(content, [queued.message_body]);
-    assert.match(content[0], /You have 2 dogs, live in 43615, and would like cleanups weekly\. Is that correct\?\n\nReply STOP to opt out$/);
+    assert.match(content[0], /I have you down for 2 dogs in ZIP 43615 with weekly service\. Did I get that right\?\n\nReply STOP to opt out$/);
     assert.equal(select(db, "lead_messages")[0].body, queued.message_body);
     assert.equal(select(db, "meta_sms_jobs").filter((job) => job.purpose === "follow_up").length, 0);
   }
@@ -227,7 +270,7 @@ test("disabled cadence neither queues new touches nor sends existing queued touc
   await processMetaConfirmations(disabled, { now: noon, fetcher: async (_url, request) => {
     content.push(JSON.parse(request.body).content); return Response.json({ data: { id: "second-initial" } });
   } });
-  assert.equal(content.length, 1); assert.match(content[0], /I received your Facebook form/);
+  assert.equal(content.length, 1); assert.match(content[0], /Thanks for filling out our Facebook form/);
   assert.equal(select(db, "meta_sms_jobs").filter((job) => job.submission_id === second.id && job.purpose === "follow_up").length, 0);
   assert.equal(select(db, "meta_sms_jobs").filter((job) => job.purpose === "follow_up" && job.status === "queued").length, 3);
   assert.equal((await markMetaNoResponse(disabled)).marked, 0);
@@ -428,7 +471,7 @@ test("reply branches and exact website pricing progress to audited signup withou
   }
   const correction = nextMetaResponse({ lead, text: "actually 3 dogs", confirmationSent: true });
   assert.equal(correction.state.details.number_of_dogs, 3); assert.equal(correction.state.expected, "confirm");
-  assert.equal(correction.response, "Hello ExampleLead, this is Craig with Ohio Pet Waste Pros. Thanks for clarifying. You have 3 dogs, live in 43615, and would like cleanups weekly. Is that correct?\n\nReply STOP to opt out");
+  assert.equal(correction.response, "Hi ExampleLead, this is Craig with Ohio Pet Waste Pros. Thanks for clarifying. I have you down for 3 dogs in ZIP 43615 with weekly service. Did I get that right?\n\nReply STOP to opt out");
   assert.doesNotMatch(correction.response, /automated confirmation|[\u2013\u2014]/i);
 });
 

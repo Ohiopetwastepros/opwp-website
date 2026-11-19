@@ -5,15 +5,16 @@ import { listGrowthDesk } from '@/lib/growth-desk';
 import { protectJsonRequest } from '@/lib/public-api-security';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { createInboxLead, LeadInboxError } from '@/lib/lead-inbox-store';
+import { listLeadTrash } from '@/lib/lead-trash.mjs';
 export const dynamic='force-dynamic';
 const privateHeaders={'Cache-Control':'no-store, private','X-Content-Type-Options':'nosniff'};
 export async function GET(request){
   const auth=await verifyAdminRequest(await headers());if(!auth.authorized)return Response.json({error:'Unauthorized'},{status:401,headers:privateHeaders});
   const db=getDb();if(!db)return Response.json({error:'Lead storage unavailable.'},{status:503,headers:privateHeaders});
   const rate=await checkRateLimit(request,{scope:'admin_lead_reads',identity:auth.email,limit:120,windowSeconds:60,failClosed:true});if(!rate.allowed)return rateLimitResponse(rate);
-  const url=new URL(request.url),cursor=url.searchParams.get('cursor')||'0',query=url.searchParams.get('q')||'';
-  if([...url.searchParams.keys()].some(k=>!['cursor','q'].includes(k))||!/^\d{1,7}$/.test(cursor)||query.length>120)return Response.json({error:'Invalid search or cursor.'},{status:400,headers:privateHeaders});
-  try{const desk=await listGrowthDesk(100,{offset:Number(cursor),query});return Response.json({ok:true,...desk,nextCursor:desk.leads.length===100?String(Number(cursor)+100):null},{headers:privateHeaders});}
+  const url=new URL(request.url),cursor=url.searchParams.get('cursor')||'0',query=url.searchParams.get('q')||'',view=url.searchParams.get('view')||'active';
+  if([...url.searchParams.keys()].some(k=>!['cursor','q','view'].includes(k))||!['active','trash'].includes(view)||!/^\d{1,7}$/.test(cursor)||query.length>120)return Response.json({error:'Invalid search or cursor.'},{status:400,headers:privateHeaders});
+  try{const desk=view==='trash'?await listLeadTrash(db,{offset:Number(cursor),query}):await listGrowthDesk(100,{offset:Number(cursor),query});return Response.json({ok:true,...desk,nextCursor:desk.leads.length===100?String(Number(cursor)+100):null},{headers:privateHeaders});}
   catch{console.error(JSON.stringify({event:'lead_inbox_read_failed'}));return Response.json({error:'Leads could not be loaded.'},{status:500,headers:privateHeaders});}
 }
 export async function POST(request){

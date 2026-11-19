@@ -40,6 +40,11 @@
       "path": "migrations/0067_review_requests.sql",
       "reviewedSource": "schema-proposals/0067_review_requests.sql",
       "sha256": "60d6f65e923fd67fb87fa7f159441c2fc539b8e88124eb572223876032b7b2c5"
+    },
+    {
+      "path": "migrations/0068_lead_inbox_trash.sql",
+      "reviewedSource": "schema-proposals/0068_lead_inbox_trash.sql",
+      "sha256": "f704a60455a2cac8eada1de6cc73c7125ec976545bdc2c780c6942d6e91b9643"
     }
   ]
 }

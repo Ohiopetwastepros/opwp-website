@@ -9,6 +9,7 @@ import { saveInboxChange, readInboxRow, quoteMessage, LeadInboxError } from '@/l
 import { createLeadHandoff } from '@/lib/lead-handoff';
 import { reviewLeadDay } from '@/lib/lead-routing';
 import { getRuntimeEnv } from '@/lib/cloudflare';
+import { restoreLead, LeadTrashError } from '@/lib/lead-trash.mjs';
 export const dynamic='force-dynamic';
 const privateHeaders={'Cache-Control':'no-store, private','X-Content-Type-Options':'nosniff'};
 export async function GET(request,{params}){
@@ -31,10 +32,13 @@ export async function PATCH(request,{params}){
       const rate=await checkRateLimit(request,{scope:'lead_day_review',identity:auth.email,limit:30,windowSeconds:300,failClosed:true});if(!rate.allowed)return rateLimitResponse(rate);
       context={routeAudit:await reviewLeadDay(db,getRuntimeEnv(),id,protectedRequest.body,auth.email)};
     }
-    const result=await saveInboxChange(db,id,protectedRequest.body,auth.email,context);
+    const result=protectedRequest.body.action==='restore'
+      ?await restoreLead(db,id,protectedRequest.body,auth.email)
+      :await saveInboxChange(db,id,protectedRequest.body,auth.email,context);
+    if(result.trashed)return Response.json({ok:true,lead:null,summary:result.summary,trashed:true},{headers:privateHeaders});
     let signup=null,draft=null;
     if(protectedRequest.body.action==='handoff')signup=await createLeadHandoff(db,id,auth.email);
     if(protectedRequest.body.action==='save_intake'&&!result.workspace.quote.custom)draft=quoteMessage(await readInboxRow(db,id),result.workspace);
     const desk=await listGrowthDesk(1,{id});return Response.json({ok:true,lead:desk.leads[0],summary:result.summary,draft,signup},{headers:privateHeaders});
-  }catch(e){if(!(e instanceof LeadInboxError))console.error(JSON.stringify({event:'lead_inbox_save_failed',action:protectedRequest.body?.action}));return Response.json({error:e instanceof LeadInboxError?e.message:'The lead could not be saved. Reload to check its current state.'},{status:e instanceof LeadInboxError?e.status:500,headers:privateHeaders});}
+  }catch(e){const expected=e instanceof LeadInboxError||e instanceof LeadTrashError;if(!expected)console.error(JSON.stringify({event:'lead_inbox_save_failed',action:protectedRequest.body?.action}));return Response.json({error:expected?e.message:'The lead could not be saved. Reload to check its current state.'},{status:expected?e.status:500,headers:privateHeaders});}
 }

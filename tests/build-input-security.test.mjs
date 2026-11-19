@@ -10,6 +10,10 @@ function fixture(t){
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   fs.mkdirSync(path.join(root,'scripts'));
   fs.mkdirSync(path.join(root,'tests/fixtures'),{recursive:true});
+  fs.mkdirSync(path.join(root,'data'),{recursive:true});
+  fs.mkdirSync(path.join(root,'schema-proposals'),{recursive:true});
+  fs.copyFileSync(new URL('../data/production-schema-changes.json',import.meta.url),path.join(root,'data/production-schema-changes.json'));
+  for(const file of ['0067_review_requests.sql','0068_lead_inbox_trash.sql'])fs.copyFileSync(new URL('../schema-proposals/'+file,import.meta.url),path.join(root,'schema-proposals',file));
   fs.copyFileSync(new URL('../scripts/prepare-build-inputs.mjs',import.meta.url),path.join(root,'scripts/prepare-build-inputs.mjs'));
   fs.copyFileSync(new URL('../scripts/render-test-migrations.mjs',import.meta.url),path.join(root,'scripts/render-test-migrations.mjs'));
   fs.cpSync(new URL('./fixtures/migration-templates/',import.meta.url),path.join(root,'tests/fixtures/migration-templates'),{recursive:true});
@@ -37,4 +41,11 @@ test('changed inputs fail closed and synthetic preparation cannot overwrite a pr
   const value=JSON.parse(fs.readFileSync(manifest,'utf8'));value.mode='private';fs.writeFileSync(manifest,JSON.stringify(value));
   const before=fs.readFileSync(input,'utf8');const result=f.run(['--synthetic']);
   assert.notEqual(result.status,0);assert.match(result.stderr,/Refusing to overwrite/);assert.equal(fs.readFileSync(input,'utf8'),before);
+});
+
+test('test preparation verifies additive inbox schema bytes before rendering its isolated database',t=>{
+  const f=fixture(t);assert.equal(f.run(['--synthetic']).status,0);
+  assert.equal(fs.readFileSync(path.join(f.root,'tmp/test-migrations/0068_lead_inbox_trash.sql'),'utf8'),fs.readFileSync(path.join(f.root,'schema-proposals/0068_lead_inbox_trash.sql'),'utf8'));
+  fs.appendFileSync(path.join(f.root,'schema-proposals/0068_lead_inbox_trash.sql'),'\n-- unreviewed change\n');
+  const result=f.run();assert.notEqual(result.status,0);assert.match(result.stderr,/Reviewed inbox test schema bytes changed/);
 });

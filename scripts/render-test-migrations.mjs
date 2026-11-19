@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 
 export function renderTestMigrations(root,mode){
   const read=file=>JSON.parse(fs.readFileSync(path.join(root,file),'utf8'));
@@ -18,6 +19,21 @@ export function renderTestMigrations(root,mode){
     if(!fs.existsSync(target)||fs.readFileSync(target,'utf8')!==text){
       const staging=target+'.'+process.pid+'.'+Math.random().toString(16).slice(2)+'.tmp';
       fs.writeFileSync(staging,text);fs.renameSync(staging,target);
+    }
+  }
+  // Inbox integration tests need its additive trash schema and the review outbox
+  // it cancels. Copy reviewed schema-only proposals into ignored test scaffolding;
+  // never edit the historical templates or use this directory for production.
+  const additions=read('data/production-schema-changes.json');
+  for(const number of ['0067','0068']){
+    const entry=additions.files.find(row=>row.reviewedSource.startsWith('schema-proposals/'+number+'_'));
+    if(!entry)throw Error('Missing reviewed inbox test schema '+number);
+    const bytes=fs.readFileSync(path.join(root,entry.reviewedSource));
+    if(createHash('sha256').update(bytes).digest('hex')!==entry.sha256)throw Error('Reviewed inbox test schema bytes changed');
+    const target=path.join(directory,path.basename(entry.reviewedSource));
+    if(!fs.existsSync(target)||!fs.readFileSync(target).equals(bytes)){
+      const staging=target+'.'+process.pid+'.'+Math.random().toString(16).slice(2)+'.tmp';
+      fs.writeFileSync(staging,bytes);fs.renameSync(staging,target);
     }
   }
   return index.files.length;
