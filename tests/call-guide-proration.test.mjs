@@ -72,7 +72,7 @@ test('office customer scripts explain whole-dollar cleanup ranges and preserve p
     assert.equal(message.split(CLEANUP_RANGE_EXPLANATION).length - 1, 1);
     assert.doesNotMatch(message, /[\u2013\u2014]/);
   }
-  assert.match(recurring, /Subtotal<\/span><b>\$141\.14 to \$153\.14</);
+  assert.match(recurring, /Subtotal<\/span><b>\$137\.68 to \$149\.68</);
   const custom = welcome(render('one_time', '5_6_months'));
   assert.match(custom, /Custom review/);
   assert.equal(custom.includes(CLEANUP_RANGE_EXPLANATION), false);

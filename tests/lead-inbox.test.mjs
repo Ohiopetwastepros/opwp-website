@@ -16,7 +16,7 @@ test('identity fallback, milestones and duplicate review stay recognizable',()=>
 test('saved intake rejects consent, price and payment injection and preserves unknowns',()=>{for(const extra of [{follow_up_consent:true},{monthly:1},{paymentStatus:'paid'},{termsConfirmed:true}])assert.throws(()=>validateIntake({...intake,...extra}));assert.equal(validateIntake({phone:'4195550100'}).dogs,'');assert.throws(()=>validateIntake({...intake,email:'bad'}));assert.throws(()=>validateIntake({...intake,notes:'a'.repeat(2001)}));});
 test('server pricing requires exact supported inputs and chart history', () => {
   const q = intakeQuote(intake);
-  assert.equal(q.monthly, 110);
+  assert.equal(q.monthly, 105);
   assert.deepEqual(q.cleanupRange, [58, 70]);
   for (const change of [{dogs:''}, {dogs:'6'}, {dogs:'7'}, {dogs:'8'}, {lastCleaned:''}, {lastCleaned:'5_6_months'}, {lastCleaned:'10_plus'}, {yardSize:'unsure'}, {yardSize:'xlarge'}, {zip:'90210'}, {frequency:'once_a_month',dogs:'3'}]) {
     assert.equal(intakeQuote({...intake, ...change}).custom, true, JSON.stringify(change));
@@ -37,7 +37,7 @@ test('signed prefill grants only bounded customer form fields, expires and is in
 test('quote drafts use whole-dollar chart ranges and explain each cleanup estimate once', () => {
   const row = {name:"ExampleLead"};
   for (const [inputs, expected] of [
-    [intake, /\$110\/month, plus an initial cleanup estimate of \$58 to \$70\./],
+    [intake, /\$105\/month, plus an initial cleanup estimate of \$58 to \$70\./],
     [{...intake, frequency:'one_time', yardSize:'small'}, /one-time cleanup estimate is \$80 to \$110\./],
   ]) {
     const text = quoteMessage(row, {intake:inputs, quote:intakeQuote(inputs)});

@@ -9,6 +9,7 @@ import {nextPlaybookResponse, renderPlaybookTemplate} from '../lib/lead-playbook
 import {preparePlaybookIntros} from '../lib/lead-playbook-ingest.js';
 import {createPlaybookLink, readPlaybookLink, playbookHash} from '../lib/lead-playbook-links.mjs';
 import {processPlaybookMirror, queuePlaybookMirrorStatement} from '../lib/lead-playbook-mirror.mjs';
+import {controlledLeadRecipientAllowed} from '../lib/lead-rollout-policy.mjs';
 const bundle = await build({stdin: {contents: "export * from './lib/lead-playbook-service.js';", resolveDir: process.cwd()}, bundle: true, platform: 'node', format: 'esm', write: false, plugins: [{name: 'fake-provider', setup(builder) { builder.onResolve({filter: /^\.\/lead-assistant$/}, () => ({path: 'provider', namespace: 'fixture'})); builder.onLoad({filter: /.*/, namespace: 'fixture'}, () => ({contents: "export async function sendLeadMessage(){throw new Error('Real sends forbidden in tests');}", loader: 'js'})); }}]});
 const api = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
 const adminBundle = await build({stdin: {contents: "export * from './lib/lead-playbook-admin.js';", resolveDir: process.cwd()}, bundle: true, platform: 'node', format: 'esm', write: false, plugins: [{name: 'admin-boundary', setup(builder) {
@@ -110,13 +111,13 @@ test('explicit takeover and hand-back persist an ownership event watermark in th
   owner = db.sqlite.prepare('SELECT owner,owner_event_at,owner_event_id,owner_event_priority FROM lead_conversations WHERE id=?').get(conversationId);
   assert.equal(owner.owner, 'backend'); assert.equal(owner.owner_event_at, later.toISOString()); assert.notEqual(owner.owner_event_id, firstEvent); assert.equal(owner.owner_event_priority, 3);
 });
-test('Sona, Craig ownership, suppressions, quiet hours and paused settings block sending', async () => {
-  for (const mode of ['sona', 'craig', 'suppressed', 'quiet', 'paused']) {
+test('Sona, Craig ownership, suppressions and paused settings block sending', async () => {
+  for (const mode of ['sona', 'craig', 'suppressed', 'paused']) {
     const {db, draft, conversationId} = await fixture(); let sends = 0;
     if (['sona', 'craig'].includes(mode)) db.sqlite.prepare('UPDATE lead_conversations SET owner=? WHERE id=?').run(mode, conversationId);
     if (mode === 'suppressed') db.sqlite.prepare("INSERT INTO lead_suppressions(organization_id,phone_hash,reason,source,created_by) VALUES ('org-opwp',?,'stop','test','test')").run(await playbookHash('+14195550100'));
     if (mode === 'paused') db.sqlite.prepare("UPDATE lead_automation_settings SET assistant_enabled=0 WHERE organization_id='org-opwp'").run();
-    await assert.rejects(() => api.actOnPlaybookDraft(db, env, draft.id, {action: 'approve'}, 'owner', {sender: async () => { sends++; }, now: mode === 'quiet' ? new Date('2026-11-20T02:00:00Z') : noon}));
+    await assert.rejects(() => api.actOnPlaybookDraft(db, env, draft.id, {action: 'approve'}, 'owner', {sender: async () => { sends++; }, now: noon}));
     assert.equal(sends, 0, mode);
   }
 });
@@ -188,9 +189,50 @@ test('notification transport is separately gated and deduplicated using a fake p
   const fetcher = async (_url, request) => { calls++; const payload = JSON.parse(request.body); assert.equal(payload.to[0], '+14195550199'); assert.ok(payload.content.includes('/admin/playbook/d/')); return Response.json({data: {id: 'ACnotify'}}); };
   assert.equal((await api.notifyPlaybookDraft(db, env, draft.id, {fetcher, now: noon})).enabled, false);
   const configured = {...env, LEAD_PLAYBOOK_NOTIFY_ENABLED: 'true', QUO_API_KEY: 'fake', QUO_FROM_NUMBER: '+14195550188'};
-  assert.equal((await api.notifyPlaybookDraft(db, configured, draft.id, {fetcher, now: new Date('2026-11-20T02:00:00Z')})).deferred, true); assert.equal(calls, 0);
-  assert.equal((await api.notifyPlaybookDraft(db, configured, draft.id, {fetcher, now: noon})).accepted, true);
-  assert.equal((await api.notifyPlaybookDraft(db, configured, draft.id, {fetcher, now: noon})).skipped, true); assert.equal(calls, 1);
+  assert.equal((await api.notifyPlaybookDraft(db, configured, draft.id, {fetcher, now: new Date('2026-11-20T02:00:00Z')})).accepted, true); assert.equal(calls, 1);
+  assert.equal((await api.notifyPlaybookDraft(db, configured, draft.id, {fetcher, now: noon})).accepted, false);
+  assert.equal((await api.notifyPlaybookDraft(db, configured, draft.id, {fetcher, now: noon})).deferred, 1); assert.equal(calls, 1);
+});
+
+test('a reviewed active reply can send overnight while cadence remains a separate policy',async()=>{
+  const {db,draft}=await fixture();let sends=0;
+  await api.actOnPlaybookDraft(db,env,draft.id,{action:'approve'},'owner',{now:new Date('2026-11-20T02:00:00Z'),sender:async()=>{sends++;return {provider_message_id:'night-review'};}});
+  assert.equal(sends,1);
+});
+test('verified approved templates automatically send once overnight without counting a human approval',async()=>{
+  const {db,draft,conversationId}=await fixture();let sends=0;
+  db.sqlite.prepare("UPDATE lead_conversations SET automation_mode='approved' WHERE id=?").run(conversationId);
+  db.sqlite.exec("UPDATE lead_automation_settings SET human_review_required=0");
+  const configured={...env,LEAD_PLAYBOOK_AUTO_SEND_ENABLED:'true'};
+  const options={now:new Date('2026-11-20T02:00:00Z'),sender:async(_db,_env,_lead,_body,actor,automated)=>{sends++;assert.equal(automated,true);assert.match(actor,/playbook-automatic/);return {provider_message_id:'automatic-template'};}};
+  assert.equal((await api.sendVerifiedPlaybookDraft(db,configured,draft.id,options)).status,'sent');
+  assert.equal((await api.sendVerifiedPlaybookDraft(db,configured,draft.id,options)).status,'sent');
+  assert.equal(sends,1);assert.equal(db.sqlite.prepare("SELECT approvals FROM lead_playbook_intent_stats WHERE intent='confirm_yes'").get().approvals,0);
+});
+test('uncertain automatic sends never retry and nonapproved replies stay pending',async()=>{
+  const {db,draft,conversationId}=await fixture();let sends=0;
+  db.sqlite.prepare("UPDATE lead_conversations SET automation_mode='approved' WHERE id=?").run(conversationId);
+  db.sqlite.exec("UPDATE lead_automation_settings SET human_review_required=0");
+  const configured={...env,LEAD_PLAYBOOK_AUTO_SEND_ENABLED:'true'};
+  db.sqlite.prepare('UPDATE lead_reply_drafts SET confidence=0 WHERE id=?').run(draft.id);
+  assert.equal((await api.sendVerifiedPlaybookDraft(db,configured,draft.id,{sender:async()=>{sends++;}})).status,'pending');
+  db.sqlite.prepare('UPDATE lead_reply_drafts SET confidence=1 WHERE id=?').run(draft.id);
+  const options={sender:async()=>{sends++;throw new Error('Fabricated provider response loss');}};
+  assert.equal((await api.sendVerifiedPlaybookDraft(db,configured,draft.id,options)).status,'failed');
+  assert.equal((await api.sendVerifiedPlaybookDraft(db,configured,draft.id,options)).status,'failed');assert.equal(sends,1);
+});
+test('automatic send rechecks ownership after its durable claim',async()=>{
+  const {db,draft,conversationId}=await fixture();let sends=0;
+  db.sqlite.prepare("UPDATE lead_conversations SET automation_mode='approved' WHERE id=?").run(conversationId);db.sqlite.exec("UPDATE lead_automation_settings SET human_review_required=0");
+  const batch=db.batch;db.batch=async statements=>{const result=await batch(statements);if(db.sqlite.prepare('SELECT status FROM lead_reply_drafts WHERE id=?').get(draft.id).status==='sending')db.sqlite.prepare("UPDATE lead_conversations SET owner='sona' WHERE id=?").run(conversationId);return result;};
+  const result=await api.sendVerifiedPlaybookDraft(db,{...env,LEAD_PLAYBOOK_AUTO_SEND_ENABLED:'true'},draft.id,{sender:async()=>{sends++;}});
+  assert.equal(result.status,'failed');assert.equal(sends,0);
+});
+test('controlled rollout blocks draft creation and queue delegation for an unapproved customer',async()=>{
+  const {db,draft,conversationId,id,inboundId,decision}=await fixture();db.sqlite.prepare('DELETE FROM lead_reply_drafts WHERE id=?').run(draft.id);
+  const configured={...env,LEAD_AUTOMATION_CONTROLLED_TEST_ONLY:'true',META_TEST_RECIPIENTS:'+14195550101'};
+  await assert.rejects(()=>api.createPlaybookDraft(db,configured,{conversation:{id:conversationId},lead:{id},inboundMessageId:inboundId,decision}),/controlled-test/);
+  assert.equal(db.sqlite.prepare('SELECT COUNT(*) count FROM lead_reply_drafts').get().count,0);
 });
 test('a confirmed same-turn quote can be reviewed while price, state and cleared route approvals block sending', async () => {
   for (const mutation of ['none', 'price', 'state', 'route']) {
@@ -224,6 +266,7 @@ function legacyQuoteWorker(onSend) {
     console: {log() {}, error() {}},
     prepareIntro: preparePlaybookIntros,
     sendQuoText: onSend,
+    controlledLeadRecipientAllowed,
     createSngPartialLead: async () => { throw new Error('Unexpected SNG write in rollback test'); },
     sendCustomerEmail: async () => { throw new Error('Unexpected email in rollback test'); },
     fail: async () => {},

@@ -1,6 +1,6 @@
 // Website quote pricing mirrors Sweep & Go Pricing Setup. Recurring prices are
 // prepaid fixed monthly totals. Unlisted cleanup ranges require a custom quote.
-export const PRICING_VERSION = "sng-2026-11-18";
+export const PRICING_VERSION = "sng-2026-11-20";
 export const CLEANUP_RANGE_EXPLANATION = "We provide a range which is based on how much waste is in the yard and how long it takes the technician.";
 
 const wholeDollars = new Intl.NumberFormat("en-US", {
@@ -14,7 +14,7 @@ export function formatCleanupRange([low, high]) {
 export const PRICING = {
   monthly: {
     twice_a_week:     { 1: 175, 2: 190, 3: 225, 4: 245, 5: 275, 6: 305, 7: 335 },
-    once_a_week:      { 1: 95, 2: 110, 3: 125, 4: 140, 5: 155, 6: 170, 7: 185 },
+    once_a_week:      { 1: 95, 2: 105, 3: 120, 4: 130, 5: 140, 6: 150, 7: 160 },
     every_other_week: { 1: 72, 2: 80, 3: 92, 4: null, 5: null, 6: null, 7: null },
     once_a_month:     { 1: 55, 2: 65, 3: null, 4: null, 5: null, 6: null, 7: null },
   },

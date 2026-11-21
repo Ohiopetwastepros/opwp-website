@@ -1,0 +1,286 @@
+import assert from 'node:assert/strict';
+import {createHmac} from 'node:crypto';
+import test from 'node:test';
+import {build} from 'esbuild';
+import {leadTestDatabase} from './helpers/lead-inbox-fixture.mjs';
+
+const CUSTOMER = '+14195550100';
+const OTHER = '+14195550101';
+const BUSINESS = '+14195550188';
+const OWNER_PHONE = '+14195550199';
+const OWNER_EMAIL = 'owner@example.test';
+const META_SECRET = 'fixture-meta-webhook-secret-never-production';
+const QUO_SECRET = 'fixture-quo-webhook-secret-never-production';
+const entry = `
+export {POST as metaPost} from './app/api/webhooks/meta-leads/route.js';
+export {POST as quoPost} from './app/api/webhooks/quo-messages/route.js';
+export {getLeadRecord,setLeadAutomation,runScheduledYardOps} from './lib/lead-assistant.js';
+export {readInboxRow,inboxVersion,saveInboxChange} from './lib/lead-inbox-store.js';
+export {processMetaConfirmations} from './lib/meta-lead-workflow.mjs';
+export {listPlaybookWorkspace} from './lib/lead-playbook-service.js';
+export {readPlaybookLink} from './lib/lead-playbook-links.mjs';`;
+const output = await build({stdin: {contents: entry, resolveDir: process.cwd()}, bundle: true, write: false,
+  format: 'esm', platform: 'node', packages: 'external', alias: {'@': process.cwd()},
+  plugins: [{name: 'fixture-runtime-only', setup(builder) {
+    builder.onResolve({filter: /(?:^|\/)cloudflare(?:\.js)?$/}, () => ({path: 'runtime', namespace: 'fixture'}));
+    builder.onLoad({filter: /.*/, namespace: 'fixture'}, () => ({loader: 'js', contents: `
+      export function getRuntimeEnv(){return globalThis.__metaPlaybookE2E.env;}
+      export function getCloudflareContext(){return {env:globalThis.__metaPlaybookE2E.env,ctx:{waitUntil(p){globalThis.__metaPlaybookE2E.background.push(p);}}};}` }));
+  }}]});
+const api = await import('data:text/javascript;base64,' + Buffer.from(output.outputFiles[0].text).toString('base64'));
+
+function signedMeta(id) {
+  const body = JSON.stringify({entry: [{id: 'fixture-page', changes: [{field: 'leadgen', value: {leadgen_id: id, form_id: 'fixture-form'}}]}]});
+  return new Request('https://opwp.example/api/webhooks/meta-leads/', {method: 'POST', body,
+    headers: {'x-hub-signature-256': 'sha256=' + createHmac('sha256', META_SECRET).update(body).digest('hex')}});
+}
+function signedInbound(text, id, phone = CUSTOMER) {
+  const body = JSON.stringify({id: `fixture-event-${id}`, type: 'message.received', data: {object: {
+    id, direction: 'incoming', text, from: phone, to: [BUSINESS], createdAt: new Date().toISOString(),
+  }}});
+  const timestamp = Date.now();
+  return new Request('https://opwp.example/api/webhooks/quo-messages/', {method: 'POST', body,
+    headers: {'openphone-signature': `hmac;1;${timestamp};${createHmac('sha256', QUO_SECRET).update(`${timestamp}.${body}`).digest('base64')}`}});
+}
+function signedDelivery(text, id, phone = CUSTOMER) {
+  const body = JSON.stringify({id: `fixture-delivered-${id}`, type: 'message.delivered', data: {object: {
+    id, direction: 'outgoing', text, from: BUSINESS, to: [phone], createdAt: new Date().toISOString(),
+  }}});
+  const timestamp = Date.now();
+  return new Request('https://opwp.example/api/webhooks/quo-messages/', {method: 'POST', body,
+    headers: {'openphone-signature': `hmac;1;${timestamp};${createHmac('sha256', QUO_SECRET).update(`${timestamp}.${body}`).digest('base64')}`}});
+}
+
+async function fixture(t, {confirmationUncertain = false, ownerPhone = OWNER_PHONE} = {}) {
+  const db = leadTestDatabase();
+  db.sqlite.exec(`INSERT INTO meta_automation_releases VALUES ('fixture-live','org-opwp','meta-confirmation-v2','fixture-owner','Offline integration only',datetime('now','-1 minute'),NULL);
+    UPDATE lead_automation_settings SET assistant_enabled=1,human_review_required=0;`);
+  const env = {DB: db, META_APP_SECRET: META_SECRET, META_PAGE_ACCESS_TOKEN: 'fixture-meta-token', META_GRAPH_API_VERSION: 'v26.0', META_ALLOWED_PAGE_IDS: 'fixture-page',
+    META_AUTOMATION_ENABLED: 'true', META_TEST_MODE: 'false', META_AUTOMATION_APPROVAL_ID: 'fixture-live', META_CADENCE_ENABLED: 'false',
+    LEAD_PLAYBOOK_ENABLED: 'true', LEAD_PLAYBOOK_AUTO_SEND_ENABLED: 'true', LEAD_PLAYBOOK_NOTIFY_ENABLED: 'true',
+    LEAD_AUTOMATION_CONTROLLED_TEST_ONLY: 'true', META_TEST_RECIPIENTS: CUSTOMER, LEAD_CLASSIFIER_ENABLED: 'false', LEAD_CLASSIFIER_KILL_SWITCH: 'true',
+    LEAD_PLAYBOOK_LINK_SECRET: 'fixture-review-link-secret-never-production', LEAD_PLAYBOOK_HASH_KEY: 'fixture-learning-hash-key-never-production',
+    LEAD_PLAYBOOK_CRAIG_CELL: ownerPhone, SITE_ORIGIN: 'https://opwp.example', LEAD_PLAYBOOK_ADMIN_ORIGIN: 'https://opwp.example',
+    QUO_WEBHOOK_SIGNING_KEY: Buffer.from(QUO_SECRET).toString('base64'), QUO_API_KEY: 'fixture-quo-key', QUO_FROM_NUMBER: BUSINESS,
+    SNG_API_KEY: 'fixture-sng-key', EMAIL_PROVIDER: 'resend', EMAIL_SENDING_ENABLED: 'true', EMAIL_FROM: OWNER_EMAIL, OWNER_NOTIFICATION_EMAIL: OWNER_EMAIL, RESEND_API_KEY: 'fixture-resend-key',
+    META_APPROVED_SMS_FORMS: JSON.stringify({'fixture-form': {pageId: 'fixture-page', consentField: 'sms_consent', version: 'fixture-disclosure', disclosure: 'Fixture automated quote texts. Reply STOP to opt out.'}})};
+  const forms = new Map(), customerSms = [], ownerSms = [], ownerEmails = [], directoryReads = [], background = [], unexpectedRequests = [];
+  const previousFetch = globalThis.fetch;
+  globalThis.__metaPlaybookE2E = {env, background};
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(String(input)), method = options.method || 'GET';
+    if (url.origin === 'https://graph.facebook.com' && method === 'GET') {
+      const form = forms.get(url.pathname.split('/').at(-1));
+      assert.ok(form, 'Only an explicitly seeded fake Meta lead may be fetched');
+      return Response.json(form);
+    }
+    if (url.origin === 'https://openapi.sweepandgo.com' && method === 'GET' && ['/api/v1/clients/active', '/api/v1/clients/active_no_subscription'].includes(url.pathname)) {
+      directoryReads.push(url.pathname); return Response.json({data: [], last_page: 1});
+    }
+    if (url.origin === 'https://api.openphone.com' && url.pathname === '/v1/messages' && method === 'POST') {
+      const payload = JSON.parse(options.body);
+      assert.equal(payload.from, BUSINESS);
+      assert.equal(payload.to.length, 1);
+      if (payload.to[0] === ownerPhone && /^A lead /.test(payload.content)) {
+        assert.match(payload.content, /A lead .*https:\/\/opwp\.example\/admin\//);
+        assert.doesNotMatch(payload.content, /Casey|customer@example\.test|123 Fictional/);
+        ownerSms.push(payload); return Response.json({data: {id: `fixture-owner-${ownerSms.length}`}});
+      }
+      assert.deepEqual(payload.to, [CUSTOMER], 'Customer sends are restricted to the controlled recipient');
+      assert.match(payload.content, /\n\nReply STOP to opt out$/);
+      assert.doesNotMatch(payload.content, /[\u2013\u2014]/);
+      customerSms.push(payload);
+      if (confirmationUncertain && customerSms.length === 1) throw new Error('Fixture provider outcome unknown');
+      return Response.json({data: {id: `fixture-customer-${customerSms.length}`}});
+    }
+    if (url.origin === 'https://api.resend.com' && url.pathname === '/emails' && method === 'POST') {
+      const payload = JSON.parse(options.body);
+      assert.deepEqual(payload.to, [OWNER_EMAIL], 'Only the owner notification role may receive email');
+      ownerEmails.push(payload); return Response.json({id: `fixture-email-${ownerEmails.length}`});
+    }
+    unexpectedRequests.push({origin: url.origin, pathname: url.pathname, method});
+    throw new Error('Unmocked network request forbidden in Meta/playbook integration');
+  };
+  t.after(async () => {
+    await Promise.allSettled(background);
+    globalThis.fetch = previousFetch;
+    delete globalThis.__metaPlaybookE2E;
+    db.sqlite.close();
+    assert.deepEqual(unexpectedRequests, [], 'Every attempted provider request must use an explicitly allowlisted fake');
+  });
+  async function meta(id = 'fixture-lead', {phone = CUSTOMER, extra = {}} = {}) {
+    const fields = {full_name: 'Casey Example', email: 'customer@example.test', phone_number: phone, zip_code: '43615', number_of_dogs: '2', service_frequency: 'weekly', contact_preference: 'text', sms_consent: 'yes', ...extra};
+    forms.set(id, {id, form_id: 'fixture-form', created_time: new Date().toISOString(), field_data: Object.entries(fields).map(([name, value]) => ({name, values: [value]}))});
+    const response = await api.metaPost(signedMeta(id));
+    assert.equal(response.status, 200, 'Signed Meta intake must succeed');
+    return db.sqlite.prepare('SELECT * FROM submissions WHERE phone=? ORDER BY rowid DESC LIMIT 1').get(phone);
+  }
+  async function inbound(text, id, phone = CUSTOMER) {
+    const response = await api.quoPost(signedInbound(text, id, phone));
+    assert.equal(response.status, 200, `Signed inbound ${id} must succeed`);
+    return response.json();
+  }
+  const state = id => JSON.parse(db.sqlite.prepare('SELECT state_json FROM lead_playbook_state WHERE submission_id=?').get(id).state_json);
+  return {db, env, customerSms, ownerSms, ownerEmails, directoryReads, meta, inbound, state};
+}
+
+test('signed Meta and Quo handlers drive the approved playbook once through owner route review, quote, discount and signup handoff', async t => {
+  const f = await fixture(t);
+  assert.ok(f.db.sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='lead_playbook_owner_notifications'").get(), 'The actual 0069 schema must be present');
+  const saved = await f.meta();
+  assert.equal(f.customerSms.length, 1, 'The webhook itself sends the instant confirmation');
+  assert.match(f.customerSms[0].content, /2 dogs.*Did I get that right\?/);
+  assert.equal(f.state(saved.id).stage, 'confirm_details_sent');
+  await f.meta();
+  assert.equal(f.customerSms.length, 1, 'Meta retries cannot duplicate the confirmation');
+  const conversation = f.db.sqlite.prepare('SELECT * FROM lead_conversations WHERE submission_id=?').get(saved.id);
+  assert.equal(conversation.owner, 'backend');
+  assert.equal(conversation.automation_mode, 'approved');
+  for (const [text, id, pattern] of [
+    ['yes', 'yes-missing-yard', /About how large/],
+    ['A', 'yard-answer', /last thoroughly cleaned/],
+    ['about 1 month', 'cleanup-answer', /Just to make sure.*about 1 month/],
+    ['how much?', 'price-before-confirmation', /Is that all correct\?/],
+    ['yes', 'confirmed-details', /address for the service/],
+  ]) {
+    const before = f.customerSms.length;
+    await f.inbound(text, id);
+    assert.equal(f.customerSms.length, before + 1, id);
+    assert.match(f.customerSms.at(-1).content, pattern);
+    assert.doesNotMatch(f.customerSms.at(-1).content, /\$/);
+    await f.inbound(text, id);
+    assert.equal(f.customerSms.length, before + 1, 'A repeated signed webhook is idempotent');
+  }
+  const beforeHold = f.customerSms.length;
+  const address = '123 Fictional Avenue, Toledo';
+  await f.inbound(address, 'address-needs-owner-route');
+  assert.equal(f.customerSms.length, beforeHold, 'An unaudited property cannot receive an automatic quote');
+  const hold = f.db.sqlite.prepare("SELECT * FROM lead_reply_drafts WHERE status='pending' ORDER BY rowid DESC LIMIT 1").get();
+  assert.equal(hold.reason, 'route_day_requires_confirmation');
+  assert.equal(JSON.parse(hold.state_json).details.address, address);
+  assert.ok(f.ownerSms.length > 0 && f.ownerEmails.length > 0);
+  const notice = f.ownerSms.find(row => row.content.includes('/admin/playbook/d/'));
+  assert.ok(notice, 'The owner receives a real bounded draft-review link');
+  const token = notice.content.match(/\/admin\/playbook\/d\/([^/\s]+)\//)[1];
+  assert.equal((await api.readPlaybookLink(f.db, f.env, token)).draft_id, hold.id);
+  assert.equal(f.db.sqlite.prepare('SELECT used_at FROM lead_playbook_links WHERE draft_id=?').get(hold.id).used_at, null);
+
+  // Use the supported owner intake/version and route-audit commands for this
+  // exact collected property, then explicitly return automation to approved.
+  let row = await api.readInboxRow(f.db, saved.id);
+  const intake = {firstName: 'Casey', lastName: 'Example', email: 'customer@example.test', phone: CUSTOMER,
+    address, city: 'Toledo', state: 'OH', zip: '43615', dogs: '2', frequency: 'once_a_week', lastCleaned: 'one_month', yardSize: 'tiny', serviceDay: 'Tuesday', areas: ['Back yard'], addons: []};
+  await api.saveInboxChange(f.db, saved.id, {action: 'save_intake', intake, version: await api.inboxVersion(row)}, OWNER_EMAIL);
+  row = await api.readInboxRow(f.db, saved.id);
+  const workspace = JSON.parse(row.workspace_payload);
+  await api.saveInboxChange(f.db, saved.id, {action: 'approve_day', version: await api.inboxVersion(row)}, OWNER_EMAIL,
+    {routeAudit: {actor: OWNER_EMAIL, handoffKey: workspace.handoffKey, day: 'Tuesday', at: new Date().toISOString()}});
+  await api.setLeadAutomation(f.db, await api.getLeadRecord(f.db, saved.id), 'approved', OWNER_EMAIL);
+  await f.inbound(address, 'address-after-exact-owner-audit');
+  assert.match(f.customerSms.at(-1).content, /\$58 to \$70.*\$105 a month.*Tuesday/);
+  assert.equal(f.state(saved.id).stage, 'quote_sent');
+  assert.doesNotMatch(f.customerSms.at(-1).content, /\$15/);
+  await f.inbound('too expensive', 'price-objection');
+  assert.match(f.customerSms.at(-1).content, /\$15 off your first full month/);
+  assert.equal(f.state(saved.id).discount_offered, true);
+  await f.inbound('yes', 'accept-quote');
+  assert.match(f.customerSms.at(-1).content, /confirm the account name is Casey Example.*customer@example\.test.*facing the house/);
+  await f.inbound('yes', 'confirm-signup-identity');
+  assert.match(f.customerSms.at(-1).content, /which side is the gate/);
+  await f.inbound('left', 'gate-side');
+  assert.match(f.customerSms.at(-1).content, /Where is the trash can/);
+  await f.inbound('trash can is by the garage', 'trash-location');
+  assert.match(f.customerSms.at(-1).content, /pass the confirmed account and access details to Craig/);
+  const done = f.state(saved.id);
+  assert.equal(done.stage, 'handoff_signup');
+  assert.equal(done.signup_identity_confirmed, true);
+  assert.equal(done.details.gateSide, 'left');
+  assert.equal(done.details.trashLocation, 'by the garage');
+  assert.equal(f.db.sqlite.prepare("SELECT COUNT(*) n FROM lead_playbook_owner_notifications WHERE kind='signup_ready' AND status='accepted'").get().n, 2);
+  const finalCount = f.customerSms.length;
+  await api.processMetaConfirmations(f.env);
+  await api.runScheduledYardOps(f.env);
+  await f.inbound('yes', 'after-craig-handoff');
+  assert.equal(f.customerSms.length, finalCount, 'Legacy jobs and post-handoff replies cannot duplicate customer sends');
+  assert.equal(f.db.sqlite.prepare("SELECT COUNT(*) n FROM meta_sms_jobs WHERE purpose IN ('reply','follow_up','signup') AND status IN ('sent','delivered')").get().n, 0);
+  assert.ok(f.directoryReads.includes('/api/v1/clients/active') && f.directoryReads.includes('/api/v1/clients/active_no_subscription'));
+});
+
+test('a signed large-yard answer uses approved wording and notifies the owner without continuing automation', async t => {
+  const f = await fixture(t);
+  const saved = await f.meta();
+  await f.inbound('yes', 'large-yes');
+  await f.inbound('E', 'large-yard');
+  assert.match(f.customerSms.at(-1).content, /3\/4 of an acre or larger.*property walk/);
+  assert.doesNotMatch(f.customerSms.at(-1).content, /\$/);
+  assert.equal(f.state(saved.id).stage, 'escalated');
+  assert.equal(f.db.sqlite.prepare("SELECT COUNT(*) n FROM lead_playbook_owner_notifications WHERE kind='property_walk' AND status='accepted'").get().n, 2);
+  const count = f.customerSms.length;
+  await f.inbound('yes', 'after-large-handoff');
+  assert.equal(f.customerSms.length, count);
+});
+
+test('signed AI disclosure is truthful and stops further automatic answers', async t => {
+  const f = await fixture(t);
+  const saved = await f.meta();
+  await f.inbound('Is this AI?', 'identity-question');
+  assert.match(f.customerSms.at(-1).content, /use AI and Craig's approved replies.*hand this conversation to Craig/);
+  assert.equal(f.state(saved.id).stage, 'escalated');
+  assert.ok(f.ownerEmails.some(row => /needs your review/.test(row.subject)));
+  const count = f.customerSms.length;
+  await f.inbound('yes', 'after-identity-handoff');
+  assert.equal(f.customerSms.length, count);
+});
+
+test('controlled signed intake holds other leads, while signed STOP suppresses the approved thread', async t => {
+  const f = await fixture(t);
+  const other = await f.meta('fixture-other', {phone: OTHER});
+  assert.equal(f.customerSms.length, 0);
+  assert.equal(f.db.sqlite.prepare('SELECT status FROM meta_sms_jobs WHERE submission_id=?').get(other.id).status, 'queued');
+  await f.inbound('I need a quote for weekly poop cleanup', 'other-inbound', OTHER);
+  assert.equal(f.customerSms.length, 0);
+  const saved = await f.meta();
+  assert.equal(f.customerSms.length, 1);
+  await f.inbound('STOP', 'opt-out');
+  await f.inbound('yes', 'reply-after-stop');
+  await api.processMetaConfirmations(f.env);
+  assert.equal(f.customerSms.length, 1);
+  assert.equal(f.db.sqlite.prepare('SELECT COUNT(*) n FROM lead_suppressions').get().n, 1);
+  assert.equal(f.db.sqlite.prepare('SELECT owner FROM lead_conversations WHERE submission_id=?').get(saved.id).owner, 'backend');
+});
+
+test('an uncertain confirmation through the actual signed Meta handler never retries or seeds a confirmed prompt', async t => {
+  const f = await fixture(t, {confirmationUncertain: true});
+  const saved = await f.meta();
+  assert.equal(f.customerSms.length, 1);
+  assert.equal(f.db.sqlite.prepare('SELECT status FROM meta_sms_jobs WHERE submission_id=?').get(saved.id).status, 'unknown');
+  await f.meta();
+  await api.processMetaConfirmations(f.env);
+  assert.equal(f.customerSms.length, 1);
+  assert.equal(f.db.sqlite.prepare('SELECT COUNT(*) n FROM lead_playbook_state WHERE submission_id=?').get(saved.id).n, 0);
+});
+
+test('using the owner cell as the controlled lead keeps signed replies active and owner notices out of customer learning and ownership', async t => {
+  const f = await fixture(t, {ownerPhone: CUSTOMER});
+  const saved = await f.meta();
+  await f.inbound('yes', 'shared-owner-yes');
+  assert.match(f.customerSms.at(-1).content, /About how large/);
+  await f.inbound('I have an unusual question about this.', 'shared-owner-review');
+  const notice = f.db.sqlite.prepare("SELECT * FROM lead_playbook_owner_notifications WHERE channel='sms' AND status='accepted' ORDER BY rowid DESC LIMIT 1").get();
+  assert.ok(notice, 'An uncertain reply produces a real owner notice at the same phone');
+  assert.deepEqual(f.ownerSms.at(-1).to, [CUSTOMER]);
+  const before = f.db.sqlite.prepare('SELECT owner,owner_event_id FROM lead_conversations WHERE submission_id=?').get(saved.id);
+  const outboundCount = f.db.sqlite.prepare("SELECT COUNT(*) n FROM lead_messages WHERE direction='outbound'").get().n;
+  assert.equal((await api.quoPost(signedDelivery(f.ownerSms.at(-1).content, notice.provider_message_id))).status, 200);
+  assert.deepEqual(f.db.sqlite.prepare('SELECT owner,owner_event_id FROM lead_conversations WHERE submission_id=?').get(saved.id), before);
+  assert.equal(f.db.sqlite.prepare('SELECT COUNT(*) n FROM playbook_turns WHERE provider_message_id=?').get(notice.provider_message_id).n, 0);
+  assert.equal(f.db.sqlite.prepare("SELECT COUNT(*) n FROM lead_messages WHERE direction='outbound'").get().n, outboundCount);
+  const customerCount = f.customerSms.length;
+  await f.inbound('A', 'shared-owner-yard-answer');
+  assert.equal(f.customerSms.length, customerCount + 1, 'A later signed customer reply must not be swallowed as an owner notice');
+  assert.match(f.customerSms.at(-1).content, /last thoroughly cleaned/);
+  const replyId = `fixture-customer-${f.customerSms.length}`;
+  assert.equal((await api.quoPost(signedDelivery(f.customerSms.at(-1).content, replyId))).status, 200);
+  assert.equal(f.db.sqlite.prepare('SELECT delivery_status FROM lead_messages WHERE provider_message_id=?').get(replyId).delivery_status, 'delivered');
+  assert.equal(f.db.sqlite.prepare('SELECT owner FROM lead_conversations WHERE submission_id=?').get(saved.id).owner, 'backend');
+});

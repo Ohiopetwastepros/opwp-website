@@ -8,6 +8,8 @@ import { PARTIAL_QUOTE_FOLLOW_UP_DELAY_MINUTES } from "../lib/quote-funnel.mjs";
 import { metaFollowUpDrafts } from "../lib/meta-conversation.mjs";
 import { metaCadenceQuietHours } from "../lib/meta-lead-policy.mjs";
 import { listLeadTrash, restoreLead } from "../lib/lead-trash.mjs";
+import { controlledLeadRecipientAllowed } from "../lib/lead-rollout-policy.mjs";
+import { websiteQuestionHoldStatements, normalizedQuestionPhone, questionPhoneSql, WebsiteQuestionIdentityConflict } from "../lib/website-question-hold.mjs";
 
 const source = (file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8")
   .replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "");
@@ -27,6 +29,7 @@ function fixture() {
   const console = { log: (value) => logs.push(JSON.parse(value)), error: (value) => logs.push(JSON.parse(value)) };
   const run = runPrivateInNewContext(`${source("lib/quote-follow-up-delivery.js")}\nrunScheduledQuoteFollowUps;`, {
     URL, console, Error,
+    controlledLeadRecipientAllowed,
     normalizeFrequency: (value) => value,
     normalizeLastCleaned: (value) => value,
     transactionalEmailConfig: (env) => ({ configured: true, provider: env.EMAIL_PROVIDER }),
@@ -50,6 +53,7 @@ function fixture() {
   });
   const store = runPrivateInNewContext(`${source("lib/db.js")}\n({queuePartialQuoteFollowUp,upsertPartialQuoteSubmission,saveSubmission});`, {
     crypto, getRuntimeEnv: () => env, PARTIAL_QUOTE_FOLLOW_UP_DELAY_MINUTES,
+    websiteQuestionHoldStatements, normalizedQuestionPhone, questionPhoneSql, WebsiteQuestionIdentityConflict,
     queueLeadSync: async () => {},
   });
   let contextAvailable = true;

@@ -19,16 +19,22 @@ export async function POST(request) {
 
   const isPartial = validation.value.source === "partial_quote";
   if (isPartial) validation.value.follow_up_consent_at = new Date().toISOString();
-  const saved = isPartial && validation.value.funnel_id
-    ? await upsertPartialQuoteSubmission({ body: validation.value, funnelId: validation.value.funnel_id, lifecycleStage: validation.value.lifecycle_stage })
-    : await saveSubmission({
+  let saved;
+  try {
+    saved = isPartial && validation.value.funnel_id
+      ? await upsertPartialQuoteSubmission({ body: validation.value, funnelId: validation.value.funnel_id, lifecycleStage: validation.value.lifecycle_stage })
+      : await saveSubmission({
         kind: isPartial ? "partial_quote" : "question",
         source: "website",
         status: isPartial ? "follow_up_pending" : "new",
         body: validation.value,
         funnelId: validation.value.funnel_id,
         lifecycleStage: isPartial ? validation.value.lifecycle_stage : "details_started",
-      });
+        });
+  } catch (error) {
+    if (error?.code === "website_question_identity_conflict" && error.status === 409) return Response.json({ ok: false, error: error.message }, { status: 409 });
+    throw error;
+  }
   const smsFollowup = isPartial
     ? await queuePartialQuoteFollowUp({ submissionId: saved.id, phone: validation.value.phone, consentAt: validation.value.follow_up_consent_at, delayMinutes: 0 })
     : null;

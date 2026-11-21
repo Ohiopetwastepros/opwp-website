@@ -58,10 +58,79 @@ test('the first form intro verifies customers and defers on a match or unavailab
     let calls=0;await preparePlaybookIntros(db,env,{loadCustomerDirectory:async()=>{calls++;throw new Error('must not retry escalation');}});assert.equal(calls,0);
   }
 });
+
+test('customer-directory holds immediately notify both owner channels once without drafting or texting the customer',async()=>{
+  for(const path of ['inbound','intro'])for(const matched of [true,false]){
+    const db=database();if(path==='intro')seedIntro(db);else seed(db);
+    let sms=0,email=0,customerSends=0,directoryReads=0;
+    const config={...env,LEAD_PLAYBOOK_NOTIFY_ENABLED:'true',LEAD_PLAYBOOK_CRAIG_CELL:'+14195550198',LEAD_PLAYBOOK_LINK_SECRET:'fabricated-directory-alert-secret-123456789',QUO_API_KEY:'fabricated',OWNER_NOTIFICATION_EMAIL:'owner@example.test'};
+    const options={now:new Date('2026-11-22T03:00:00Z'),loadCustomerDirectory:async()=>{directoryReads++;return matched?{ok:true,complete:true,rows:[{cell_phone_number:event.to}]}:{ok:false,complete:false,rows:[]};},sender:async()=>{customerSends++;throw new Error('Customer must stay held');},notificationOptions:{fetcher:async(_url,request)=>{sms++;const message=JSON.parse(request.body);assert.deepEqual(message.to,[config.LEAD_PLAYBOOK_CRAIG_CELL]);assert.match(message.content,/\/admin\/quote-funnel\//);return Response.json({id:'directory-owner-sms'});},emailSender:async(_env,message)=>{email++;assert.equal(message.to,config.OWNER_NOTIFICATION_EMAIL);return 'directory-owner-email';}}};
+    const run=()=>path==='intro'?preparePlaybookIntros(db,config,options):processPlaybookInbound(db,config,{conversationId:'conv',submissionId:'lead',event:inbound},options);
+    const result=await run();assert.equal(result.escalated,path==='intro'?1:true);
+    const initialReads=directoryReads;await run();
+    assert.equal(directoryReads,initialReads);assert.deepEqual([sms,email,customerSends],[1,1,0]);
+    assert.equal(db.sqlite.prepare('SELECT count(*) n FROM lead_reply_drafts').get().n,0);
+    const notices=db.sqlite.prepare('SELECT kind,status FROM lead_playbook_owner_notifications').all();assert.equal(notices.length,2);assert.ok(notices.every(row=>row.kind==='lead_review'&&row.status==='accepted'));
+    const state=JSON.parse(db.sqlite.prepare("SELECT state_json FROM lead_playbook_state WHERE conversation_id='conv'").get().state_json);assert.equal(state.escalation_reason,matched?'existing_customer':'customer_directory_unverified');
+  }
+});
 test('verified noncustomers can receive an intro draft using only fake directory reads',async()=>{
   const db=database();seedIntro(db);const result=await preparePlaybookIntros(db,env,{loadCustomerDirectory:emptyDirectory});
   assert.equal(result.drafted,1);assert.equal(db.sqlite.prepare('SELECT status FROM lead_reply_drafts').get().status,'pending');
   assert.equal(db.sqlite.prepare('SELECT count(*) n FROM lead_messages').get().n,0);
+});
+
+test('Facebook confirmation stays in its immediate confirmation ledger without an intro draft',async()=>{
+  const db=database();seedIntro(db);db.sqlite.exec("UPDATE lead_conversations SET channel='facebook_lead'");let reads=0;
+  const result=await preparePlaybookIntros(db,env,{loadCustomerDirectory:async()=>{reads++;return {ok:true,complete:true,rows:[]};}});
+  assert.equal(result.drafted,0);assert.equal(reads,0);assert.equal(db.sqlite.prepare('SELECT count(*) n FROM lead_reply_drafts').get().n,0);
+  assert.equal(db.sqlite.prepare('SELECT status FROM quote_follow_up_deliveries').get().status,'queued');
+});
+test('Facebook inbound-first forms retain backend ownership and prepare a reply',async()=>{
+  const db=database();seed(db);db.sqlite.exec("UPDATE lead_conversations SET channel='facebook_lead',last_outbound_at=NULL");
+  const result=await processPlaybookInbound(db,env,{conversationId:'conv',submissionId:'lead',event:inbound},{loadCustomerDirectory:emptyDirectory});
+  assert.equal(db.sqlite.prepare("SELECT owner FROM lead_conversations WHERE id='conv'").get().owner,'backend');assert.ok(result.draft);
+});
+test('Sona or unknown Facebook receipts retain backend ownership without approving an exact draft',async()=>{
+  for(const metadata of [{authorType:'sona'},{userId:'unmapped-fixture'}]){
+    const db=database();seed(db);db.sqlite.exec("UPDATE lead_conversations SET channel='facebook_lead'");
+    db.sqlite.prepare("INSERT INTO lead_reply_drafts(id,conversation_id,submission_id,organization_id,intent,confidence,body,policy_version) VALUES ('fb-draft','conv','lead','org-opwp','other',0,?,'fixture')").run(event.text+'\n\nReply STOP to opt out');
+    await recordPlaybookQuoEvent(db,env,{...event,userId:null,...metadata});
+    assert.equal(db.sqlite.prepare("SELECT owner FROM lead_conversations WHERE id='conv'").get().owner,'backend');
+    assert.equal(db.sqlite.prepare("SELECT status FROM lead_reply_drafts WHERE id='fb-draft'").get().status,'pending');assert.equal(db.sqlite.prepare('SELECT author FROM lead_messages').get().author,'sona');
+  }
+});
+test('controlled intro selection finds its approved recipient beyond old rows without drafting historical leads',async()=>{
+  const db=database();
+  for(let index=0;index<15;index++){
+    db.sqlite.prepare("INSERT INTO submissions(id,kind,source,status,name,phone,payload) VALUES (?,'partial_quote','website','new','Fictional historical lead','4195550101',?)").run('older-'+index,JSON.stringify({follow_up_consent:true}));
+    db.sqlite.prepare("INSERT INTO lead_conversations(id,submission_id,organization_id,owner) VALUES (?,?,'org-opwp','backend')").run('old-conv-'+index,'older-'+index);
+    db.sqlite.prepare("INSERT INTO quote_follow_ups(id,submission_id,recipient,consent_text,consent_version,consent_at,scheduled_at) VALUES (?,?,'4195550101','fixture consent','v1',CURRENT_TIMESTAMP,datetime('now','-1 hour'))").run('old-follow-'+index,'older-'+index);
+    db.sqlite.prepare("INSERT INTO quote_follow_up_deliveries(id,follow_up_id,submission_id,channel,status) VALUES (?,?,?,'customer_sms','queued')").run('old-sms-'+index,'old-follow-'+index,'older-'+index);
+  }
+  seedIntro(db);let reads=0;
+  const result=await preparePlaybookIntros(db,{...env,LEAD_AUTOMATION_CONTROLLED_TEST_ONLY:'true',META_TEST_RECIPIENTS:event.to},{limit:1,loadCustomerDirectory:async()=>{reads++;return {ok:true,complete:true,rows:[]};}});
+  assert.equal(result.drafted,1);assert.equal(reads,2);
+  assert.equal(db.sqlite.prepare('SELECT count(*) n FROM lead_playbook_state').get().n,1);assert.equal(db.sqlite.prepare('SELECT submission_id FROM lead_reply_drafts').get().submission_id,'lead');
+  assert.equal(db.sqlite.prepare("SELECT count(*) n FROM quote_follow_up_deliveries WHERE submission_id LIKE 'older-%' AND status='queued'").get().n,15);
+});
+test('a submitted website question is preserved as an inbound and uncertain reply stays in approval',async()=>{
+  const db=database();seedIntro(db);
+  db.sqlite.prepare("UPDATE submissions SET payload=? WHERE id='lead'").run(JSON.stringify({follow_up_consent:true,pending_quote_question:'Can you explain a special yard situation?'}));
+  await preparePlaybookIntros(db,{...env,LEAD_PLAYBOOK_AUTO_SEND_ENABLED:'true'},{loadCustomerDirectory:emptyDirectory,sender:async()=>{throw new Error('Uncertain text must not auto-send');}});
+  const draft=db.sqlite.prepare('SELECT * FROM lead_reply_drafts').get();
+  assert.equal(draft.status,'pending');assert.equal(draft.template_key,null);assert.equal(draft.confidence,0);assert.match(draft.body,/Craig review your question/);assert.doesNotMatch(draft.body,/saw that you filled out/);
+  assert.equal(db.sqlite.prepare("SELECT body FROM lead_messages WHERE direction='inbound'").get().body,'Can you explain a special yard situation?');
+});
+test('verified Facebook replies automatically send overnight while unknown questions produce pending drafts',async()=>{
+  const db=database();seed(db);db.sqlite.exec("UPDATE lead_conversations SET channel='facebook_lead',automation_mode='approved';UPDATE lead_automation_settings SET human_review_required=0");let sends=0;
+  const configured={...env,LEAD_PLAYBOOK_AUTO_SEND_ENABLED:'true'};
+  const options={loadCustomerDirectory:emptyDirectory,now:new Date('2026-11-20T02:00:00Z'),sender:async()=>{sends++;return {provider_message_id:'fb-night-verified'};}};
+  const verified=await processPlaybookInbound(db,configured,{conversationId:'conv',submissionId:'lead',event:inbound},options);
+  assert.equal(verified.draft.status,'sent');assert.equal(sends,1);
+  const duplicate=await processPlaybookInbound(db,configured,{conversationId:'conv',submissionId:'lead',event:inbound},options);assert.equal(duplicate.duplicate,true);assert.equal(sends,1);
+  const unknown=await processPlaybookInbound(db,configured,{conversationId:'conv',submissionId:'lead',event:{...inbound,providerMessageId:'fb-uncertain-inbound',text:'This is an unusual situation nobody understands.'}},options);
+  assert.equal(unknown.draft.status,'pending');assert.equal(unknown.draft.confidence,0);assert.equal(unknown.draft.template_key,null);assert.equal(sends,1);
 });
 function seedAuditedRoute(db,source){
   seed(db);
@@ -75,8 +144,9 @@ test('changed and out-of-area addresses cannot inherit a previously audited rout
     const db=database();seedAuditedRoute(db,source);
     const result=await processPlaybookInbound(db,env,{conversationId:'conv',submissionId:'lead',event:{...inbound,text:address}},{loadCustomerDirectory:emptyDirectory});
     assert.equal(result.escalated,true);assert.equal(result.reason,'route_day_requires_confirmation');
-    assert.equal(db.sqlite.prepare('SELECT count(*) n FROM lead_reply_drafts').get().n,0);
-    const state=JSON.parse(db.sqlite.prepare("SELECT state_json FROM lead_playbook_state WHERE conversation_id='conv'").get().state_json);assert.equal(state.details.address,address);
+    assert.equal(db.sqlite.prepare('SELECT count(*) n FROM lead_reply_drafts').get().n,1);
+    assert.equal(result.draft.status,'pending');assert.equal(result.draft.template_key,null);assert.doesNotMatch(result.draft.body,/\$|schedule for/);
+    const state=JSON.parse(result.draft.state_json);assert.equal(state.details.address,address);
   }
 });
 test('an audited route remains usable only for the same normalized service address',async()=>{
@@ -92,7 +162,7 @@ test('a rotated workspace handoff key invalidates the retained route audit',asyn
   workspace.handoffKey='fixture-new-address';workspace.intake.address='124 Test Street';
   db.sqlite.prepare("UPDATE airtable_cockpit_snapshots SET payload=? WHERE snapshot_key='lead_workspace:org-opwp:lead'").run(JSON.stringify(workspace));
   const result=await processPlaybookInbound(db,env,{conversationId:'conv',submissionId:'lead',event:{...inbound,text:'124 Test Street'}},{loadCustomerDirectory:emptyDirectory});
-  assert.equal(result.reason,'route_day_requires_confirmation');assert.equal(db.sqlite.prepare('SELECT count(*) n FROM lead_reply_drafts').get().n,0);
+  assert.equal(result.reason,'route_day_requires_confirmation');assert.equal(result.draft.status,'pending');assert.equal(result.draft.template_key,null);assert.doesNotMatch(result.draft.body,/\$|schedule for/);
 });
 test('duplicate historical human receipts do not undo an explicit handback',async()=>{
   const db=database();seed(db);await recordPlaybookQuoEvent(db,env,event);

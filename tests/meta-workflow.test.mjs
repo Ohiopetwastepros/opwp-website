@@ -48,7 +48,7 @@ function database() {
 const form = (id = "lead-1", extra = {}) => ({ id, form_id: "form-1", created_time: new Date().toISOString(), field_data: Object.entries({ full_name: "ExampleLead Example", phone_number: "+14195550100", zip_code: "43615", number_of_dogs: "2 dogs", service_frequency: "weekly", contact_preference: "text", sms_consent: "I agree", ...extra }).map(([name, value]) => ({ name, values: [value] })) });
 const event = (id = "lead-1") => ({ leadId: id, formId: "form-1", pageId: "page-1" });
 function environment(db, enabled = true) {
-  return { DB: db, META_AUTOMATION_ENABLED: enabled ? "true" : "false", META_AUTOMATION_APPROVAL_ID: "test-release", META_CADENCE_APPROVAL_ID: "test-cadence", META_ALLOWED_PAGE_IDS: "page-1", META_APP_SECRET: "test-meta-secret", META_GRAPH_API_VERSION: "v26.0", META_PAGE_ACCESS_TOKEN: "test-meta-token", QUO_WEBHOOK_SIGNING_KEY: Buffer.from("test-quo-secret").toString("base64"),
+  return { DB: db, META_AUTOMATION_ENABLED: enabled ? "true" : "false", META_AUTOMATION_APPROVAL_ID: "test-release", META_CADENCE_APPROVAL_ID: "test-cadence", META_CADENCE_ENABLED: "true", META_ALLOWED_PAGE_IDS: "page-1", META_APP_SECRET: "test-meta-secret", META_GRAPH_API_VERSION: "v26.0", META_PAGE_ACCESS_TOKEN: "test-meta-token", QUO_WEBHOOK_SIGNING_KEY: Buffer.from("test-quo-secret").toString("base64"),
     QUO_API_KEY: "test-quo-key", QUO_FROM_NUMBER: "+14192622371", AIRTABLE_API_KEY: "test-airtable-key", ADMIN_SESSION_SECRET: "fixture-admin-signing-key", OWNER_NOTIFICATION_EMAIL: "craig@ohiopetwastepros.com",
     META_APPROVED_SMS_FORMS: JSON.stringify({ "form-1": { pageId: "page-1", consentField: "sms_consent", version: "test-disclosure-v1", disclosure: "Test disclosure: automated OPWP quote texts; STOP to opt out." } }) };
 }
@@ -219,7 +219,7 @@ test("identity, assistant, handoff, correction and pricing replies send at night
     ["yes", META_RESPONSES.yard],
     ["I have lots of poop buildup", META_RESPONSES.buildup],
     ["actually 3 dogs", "Thanks for clarifying."],
-    ["what is the price?", "$110.00 per month"],
+    ["what is the price?", "$105.00 per month"],
   ]) {
     const db = database(); approve(db); const env = { ...environment(db), META_CADENCE_APPROVAL_ID: "" };
     db.sqlite.exec("UPDATE lead_automation_settings SET quiet_hours_enabled=1,quiet_hours_start='20:00',quiet_hours_end='08:00'");
@@ -442,7 +442,7 @@ test("an accepted Meta quote and address atomically queue a deduplicated owner a
     const rendered = buildMetaOwnerNotification({ submissionId: saved.id, lead: { name: "ExampleLead Example", phone: "+14195550100" }, state: finalState });
     assert.equal(email.subject, "Facebook lead ready for signup and route audit");
     assert.equal(email.text_body, rendered.content.text);
-    assert.equal(email.text_body, `Craig,\n\nThis Facebook lead accepted the quote and provided a service address. Create the account and audit the route/service day before confirming a start date.\n\nName: ExampleLead Example\nPhone: +14195550100\nAddress: 123 Maple Street, Toledo\nZIP: 43615\nDogs: 2\nFrequency: Weekly\nQuoted price: $110.00 per month\nInitial cleanup estimate: $58 to $70\nSubmission ID: ${saved.id}\n\nGrowth Desk: https://www.ohiopetwastepros.com/admin/quote-funnel/`);
+    assert.equal(email.text_body, `Craig,\n\nThis Facebook lead accepted the quote and provided a service address. Create the account and audit the route/service day before confirming a start date.\n\nName: ExampleLead Example\nPhone: +14195550100\nAddress: 123 Maple Street, Toledo\nZIP: 43615\nDogs: 2\nFrequency: Weekly\nQuoted price: $105.00 per month\nInitial cleanup estimate: $58 to $70\nSubmission ID: ${saved.id}\n\nGrowth Desk: https://www.ohiopetwastepros.com/admin/quote-funnel/`);
     assert.equal(externalRequests, 0);
   } finally { globalThis.fetch = oldFetch; }
 });
@@ -461,7 +461,7 @@ test("reply branches and exact website pricing progress to audited signup withou
   let step = nextMetaResponse({ lead, text: "yes", confirmationSent: true });
   assert.equal(step.state.expected, "yard");
   step = nextMetaResponse({ lead, state: step.state, text: "A", confirmationSent: true }); assert.equal(step.state.expected, "cleaned");
-  step = nextMetaResponse({ lead, state: step.state, text: "D", confirmationSent: true }); assert.equal(step.state.expected, "quote_acceptance"); assert.equal(step.state.quote.monthly, 110);
+  step = nextMetaResponse({ lead, state: step.state, text: "D", confirmationSent: true }); assert.equal(step.state.expected, "quote_acceptance"); assert.equal(step.state.quote.monthly, 105);
   step = nextMetaResponse({ lead, state: step.state, text: "yes", confirmationSent: true }); assert.equal(step.state.expected, "address");
   step = nextMetaResponse({ lead, state: step.state, text: "123 Maple Street, Toledo", confirmationSent: true }); assert.equal(step.state.ready_for_route_audit, true); assert.match(step.response, /No day is booked/);
   assert.equal(metaWebsiteQuote({ ...lead, yard_size_tier: "tiny", last_cleaned: "one_month", number_of_dogs: 20 }), null);
@@ -530,7 +530,7 @@ test("signed Meta → YardOps → Airtable → Quo → reply integration, retrie
     assert.equal(select(db, "meta_sms_jobs").filter((job) => job.purpose === "follow_up" && job.status === "queued").length, 0);
     const snapshotAt = new Date().toISOString();
     db.sqlite.prepare(`INSERT INTO airtable_cockpit_snapshots(snapshot_key,payload,status,captured_at) VALUES ('business_cockpit',?,'success',?)`).run(JSON.stringify({ opwp: { customers: [{ fields: { Status: "Active", ZIP: "43615", "Service Day": "Tuesday" } }] } }), snapshotAt);
-    for (const [text, id, pattern] of [["A", "yard", /last thoroughly cleared/], ["about 1 month", "cleaned", /\$110\.00 per month/], ["yes", "accept", /street address/], ["123 Maple Street, Toledo", "address", /audit the current route/]]) {
+    for (const [text, id, pattern] of [["A", "yard", /last thoroughly cleared/], ["about 1 month", "cleaned", /\$105\.00 per month/], ["yes", "accept", /street address/], ["123 Maple Street, Toledo", "address", /audit the current route/]]) {
       assert.equal((await api.quoPost(signedQuo(text, id))).status, 200);
       await processMetaConfirmations(env, { now: noon });
       assert.match(sends.at(-1).content, pattern);

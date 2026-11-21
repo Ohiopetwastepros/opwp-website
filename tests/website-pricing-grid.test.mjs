@@ -8,7 +8,7 @@ import {
 
 const monthly = {
   twice_a_week:     [175, 190, 225, 245, 275, 305, 335],
-  once_a_week:      [95, 110, 125, 140, 155, 170, 185],
+  once_a_week:      [95, 105, 120, 130, 140, 150, 160],
   every_other_week: [72, 80, 92, null, null, null, null],
   once_a_month:     [55, 65, null, null, null, null, null],
 };
@@ -32,7 +32,7 @@ const histories = [...Object.keys(initial), "5_6_months", "7_9_months", "10_plus
 const form = readFileSync(new URL("../app/free-quote/QuoteForm.js", import.meta.url), "utf8");
 
 test("the versioned recurring grid returns the approved total and availability for every dog count", () => {
-  assert.equal(PRICING_VERSION, "sng-2026-11-18");
+  assert.equal(PRICING_VERSION, "sng-2026-11-20");
   assert.deepEqual(Object.keys(PRICING.monthly).sort(), Object.keys(monthly).sort());
   for (const [frequency, prices] of Object.entries(monthly)) {
     assert.deepEqual(Object.keys(PRICING.monthly[frequency]), ["1", "2", "3", "4", "5", "6", "7"]);
@@ -65,7 +65,7 @@ test("both cleanup grids match all 60 priced cells and all 66 custom cells", () 
 });
 
 test("seven dogs keeps its recurring service rate and eight or more requires a custom quote for all service", () => {
-  assert.equal(calcLocalQuote({ frequency: "once_a_week", dogs: 7, lastCleaned: "two_weeks" }).monthly, 185);
+  assert.equal(calcLocalQuote({ frequency: "once_a_week", dogs: 7, lastCleaned: "two_weeks" }).monthly, 160);
   assert.match(form, /id="quote-dog-count"[^>]*max="7"/);
   assert.match(form, /For 8 or more dogs,[^\n]*custom quote/);
   for (const { id: frequency } of PRICING.frequencies) {

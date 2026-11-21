@@ -23,8 +23,24 @@ test("initial and one-time estimates match all 60 listed cleanup chart cells wit
   }
   assert.equal(cells, 60);
   assert.deepEqual(metaWebsiteQuote(details).initialRange, [58, 70]);
-  assert.equal(metaWebsiteQuote({ ...details, yard_size_tier: "small" }).monthly, 120);
+  assert.equal(metaWebsiteQuote({ ...details, yard_size_tier: "small" }).monthly, 115);
   assert.deepEqual(metaWebsiteQuote({ ...details, clean_up_frequency: "One Time" }).range, [80, 110]);
+});
+
+test("Meta weekly quotes use the current base rate and add each yard fee only to recurring service", () => {
+  const weeklyRates = [95, 105, 120, 130, 140];
+  const yardFees = { tiny: 0, small: 10, medium: 20, large: 30 };
+  for (const [index, base] of weeklyRates.entries()) {
+    const dogs = index + 1;
+    for (const [yard_size_tier, fee] of Object.entries(yardFees)) {
+      const quote = metaWebsiteQuote({ ...details, number_of_dogs: dogs, yard_size_tier });
+      assert.equal(quote.monthly, base + fee, `${dogs} dogs / ${yard_size_tier}`);
+      assert.equal(quote.basis.monthlyBase, base);
+      assert.equal(quote.basis.yardUpcharge, fee);
+      assert.deepEqual(quote.initialRange, PRICING.initialCleanup.one_month[dogs]);
+      assert.ok(quote.text.includes(`$${(base + fee).toFixed(2)} per month`));
+    }
+  }
 });
 
 test("unlisted history, dog counts, yard sizes and service combinations never produce automatic prices", () => {

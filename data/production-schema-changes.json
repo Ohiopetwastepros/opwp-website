@@ -49,7 +49,7 @@
     {
       "path": "migrations/0069_lead_playbook.sql",
       "reviewedSource": "schema-proposals/0069_lead_playbook.sql",
-      "sha256": "09a74ab79bb3cc2bf22dfda4a97c090805010f5b5c24a7e74b528bc5d4f94af3"
+      "sha256": "d69338415bff37f80d0614c9a2f6932ad37a82c22a269cb2febe0ba205298419"
     }
   ]
 }

@@ -82,11 +82,13 @@ export async function POST(request) {
     try {
       const data = await fetchMetaLead(env, event);
       const lead = await storeMetaLead(db, env, data, event);
-      await processAirtableQueue({ ...env, DB: db }, 1, lead.id);
       await db.prepare(`UPDATE lead_webhook_events SET status='processed',processed_at=CURRENT_TIMESTAMP WHERE provider='meta' AND event_id=?`).bind(event.leadId).run();
       accepted += 1;
       // The durable outbox remains available to cron if this immediate attempt is interrupted.
       await processMetaConfirmations({ ...env, DB: db }, { submissionId: lead.id, limit: 1 });
+      // D1 owns intake and its durable mirror queue. A reporting-provider delay
+      // must never sit ahead of the customer's instant confirmation.
+      await processAirtableQueue({ ...env, DB: db }, 1, lead.id);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Meta lead processing failed.";
       await db.prepare(`UPDATE lead_webhook_events SET status='failed',error_message=?,processed_at=CURRENT_TIMESTAMP WHERE provider='meta' AND event_id=?`).bind(message.slice(0, 500), event.leadId).run();

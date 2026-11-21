@@ -3,6 +3,7 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import { runPrivateInNewContext } from "./helpers/private-vm.mjs";
 import { leadTestDatabase } from "./helpers/lead-inbox-fixture.mjs";
+import { controlledLeadRecipientAllowed } from "../lib/lead-rollout-policy.mjs";
 
 const source = readFileSync(new URL("../lib/quote-follow-up-delivery.js", import.meta.url), "utf8")
   .replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, "");
@@ -14,6 +15,7 @@ function fixture() {
   const logs = []; const requests = [];
   const run = runPrivateInNewContext(`${source}\nrunScheduledQuoteFollowUps;`, {
     URL,
+    controlledLeadRecipientAllowed,
     console: { log: (value) => logs.push(JSON.parse(value)), error: (value) => logs.push(JSON.parse(value)) },
     outboundFetch: async (...args) => { requests.push(args); return Response.json({ data: { id: "provider-example" } }); },
     normalizeFrequency: (value) => value,

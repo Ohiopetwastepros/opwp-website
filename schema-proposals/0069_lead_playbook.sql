@@ -25,7 +25,7 @@ CREATE TABLE lead_playbook_state (
   conversation_id TEXT PRIMARY KEY REFERENCES lead_conversations(id) ON DELETE CASCADE,
   submission_id TEXT NOT NULL REFERENCES submissions(id),
   organization_id TEXT NOT NULL DEFAULT 'org-opwp',
-  stage TEXT NOT NULL DEFAULT 'intro_sent' CHECK(stage IN ('intro_sent','confirm_details_sent','details_confirmed','details_corrected','quote_sent','objection','discount_offered','ready','access_questions_sent','handoff_signup','closed_won','closed_lost','escalated')),
+  stage TEXT NOT NULL DEFAULT 'intro_sent' CHECK(stage IN ('intro_sent','collect_details','confirm_details_sent','details_confirmed','details_corrected','quote_sent','objection','discount_offered','ready','access_questions_sent','handoff_signup','closed_won','closed_lost','escalated')),
   state_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(state_json)),
   prior_state_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(prior_state_json)),
   revision INTEGER NOT NULL DEFAULT 1,
@@ -185,6 +185,28 @@ CREATE TABLE lead_playbook_intent_stats (
   rejections INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY(organization_id,intent)
 );
+-- Owner-only alerts use independent channel claims. A response lost after a
+-- provider call stays uncertain and is never blindly retried by the scheduler.
+CREATE TABLE lead_playbook_owner_notifications (
+  id TEXT PRIMARY KEY,
+  event_key TEXT NOT NULL,
+  organization_id TEXT NOT NULL DEFAULT 'org-opwp',
+  kind TEXT NOT NULL CHECK(kind IN ('pending_draft','signup_ready','property_walk','lead_review')),
+  submission_id TEXT NOT NULL REFERENCES submissions(id),
+  conversation_id TEXT NOT NULL REFERENCES lead_conversations(id),
+  draft_id TEXT REFERENCES lead_reply_drafts(id),
+  channel TEXT NOT NULL CHECK(channel IN ('sms','email')),
+  status TEXT NOT NULL DEFAULT 'queued' CHECK(status IN ('queued','sending','accepted','uncertain','cancelled')),
+  claim_token TEXT,
+  provider_message_id TEXT,
+  sending_at TEXT,
+  accepted_at TEXT,
+  error_code TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(event_key,channel)
+);
+CREATE INDEX lead_playbook_owner_notifications_queue ON lead_playbook_owner_notifications(organization_id,status,created_at);
 -- A new inbound always invalidates pending approvals before any worker can send.
 CREATE TRIGGER lead_playbook_supersede_inbound AFTER INSERT ON lead_messages
 WHEN NEW.direction='inbound'
