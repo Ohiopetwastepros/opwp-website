@@ -51,7 +51,7 @@ function signedDelivery(text, id, phone = CUSTOMER) {
     headers: {'openphone-signature': `hmac;1;${timestamp};${createHmac('sha256', QUO_SECRET).update(`${timestamp}.${body}`).digest('base64')}`}});
 }
 
-async function fixture(t, {confirmationUncertain = false, ownerPhone = OWNER_PHONE} = {}) {
+async function fixture(t, {confirmationUncertain = false, ownerPhone = OWNER_PHONE, existingCustomer = false} = {}) {
   const db = leadTestDatabase();
   db.sqlite.exec(`INSERT INTO meta_automation_releases VALUES ('fixture-live','org-opwp','meta-confirmation-v2','fixture-owner','Offline integration only',datetime('now','-1 minute'),NULL);
     UPDATE lead_automation_settings SET assistant_enabled=1,human_review_required=0;`);
@@ -75,19 +75,20 @@ async function fixture(t, {confirmationUncertain = false, ownerPhone = OWNER_PHO
       return Response.json(form);
     }
     if (url.origin === 'https://openapi.sweepandgo.com' && method === 'GET' && ['/api/v1/clients/active', '/api/v1/clients/active_no_subscription'].includes(url.pathname)) {
-      directoryReads.push(url.pathname); return Response.json({data: [], last_page: 1});
+      directoryReads.push(url.pathname); return Response.json({data: existingCustomer && url.pathname === '/api/v1/clients/active' ? [{cell_phone_number: CUSTOMER}] : [], last_page: 1});
     }
     if (url.origin === 'https://api.openphone.com' && url.pathname === '/v1/messages' && method === 'POST') {
       const payload = JSON.parse(options.body);
       assert.equal(payload.from, BUSINESS);
       assert.equal(payload.to.length, 1);
-      if (payload.to[0] === ownerPhone && /^A lead /.test(payload.content)) {
+      if (payload.to[0] === ownerPhone && /^\[OPWP STAFF ALERT\] /.test(payload.content)) {
         assert.match(payload.content, /A lead .*https:\/\/opwp\.example\/admin\//);
         assert.doesNotMatch(payload.content, /Casey|customer@example\.test|123 Fictional/);
         ownerSms.push(payload); return Response.json({data: {id: `fixture-owner-${ownerSms.length}`}});
       }
       assert.deepEqual(payload.to, [CUSTOMER], 'Customer sends are restricted to the controlled recipient');
-      assert.match(payload.content, /\n\nReply STOP to opt out$/);
+      if (customerSms.length === 0) assert.match(payload.content, /\n\nReply STOP to opt out$/);
+      else assert.doesNotMatch(payload.content, /Reply STOP to opt out|Text STOP to unsubscribe/i);
       assert.doesNotMatch(payload.content, /[\u2013\u2014]/);
       customerSms.push(payload);
       if (confirmationUncertain && customerSms.length === 1) throw new Error('Fixture provider outcome unknown');
@@ -203,7 +204,26 @@ test('signed Meta and Quo handlers drive the approved playbook once through owne
   await f.inbound('yes', 'after-craig-handoff');
   assert.equal(f.customerSms.length, finalCount, 'Legacy jobs and post-handoff replies cannot duplicate customer sends');
   assert.equal(f.db.sqlite.prepare("SELECT COUNT(*) n FROM meta_sms_jobs WHERE purpose IN ('reply','follow_up','signup') AND status IN ('sent','delivered')").get().n, 0);
-  assert.ok(f.directoryReads.includes('/api/v1/clients/active') && f.directoryReads.includes('/api/v1/clients/active_no_subscription'));
+  assert.ok(f.directoryReads.length > 0, 'New contacts are verified against the customer directory before automated messages');
+});
+
+test('a signed ordinary customer thread cannot start lead automation even when it shares the owner test phone', async t => {
+  const f = await fixture(t, {existingCustomer: true, ownerPhone: CUSTOMER});
+  const saved = await f.meta();
+  assert.equal(f.customerSms.length, 0);
+  const held = f.db.sqlite.prepare('SELECT status,block_reason,attempted_at FROM meta_sms_jobs WHERE submission_id=?').get(saved.id);
+  assert.equal(held.status, 'blocked');
+  assert.equal(held.block_reason, 'existing_customer');
+  assert.equal(held.attempted_at, null);
+  for (const [text, id] of [['yes', 'customer-yes'], ['I need a quote for weekly poop cleanup', 'customer-quote'], ['please reschedule my service', 'customer-service']]) await f.inbound(text, id);
+  assert.equal(f.customerSms.length, 0);
+  assert.equal(f.db.sqlite.prepare('SELECT count(*) n FROM lead_reply_drafts').get().n, 0);
+  assert.ok(f.directoryReads.length > 0);
+  const payload = JSON.parse(f.db.sqlite.prepare('SELECT payload FROM submissions WHERE id=?').get(saved.id).payload);
+  assert.equal(payload.sms_consent_evidence.valid, true);
+  await f.inbound('STOP', 'existing-customer-stop');
+  assert.equal(f.customerSms.length, 0);
+  assert.equal(f.db.sqlite.prepare('SELECT count(*) n FROM lead_suppressions').get().n, 1);
 });
 
 test('a signed large-yard answer uses approved wording and notifies the owner without continuing automation', async t => {
@@ -269,6 +289,8 @@ test('using the owner cell as the controlled lead keeps signed replies active an
   const notice = f.db.sqlite.prepare("SELECT * FROM lead_playbook_owner_notifications WHERE channel='sms' AND status='accepted' ORDER BY rowid DESC LIMIT 1").get();
   assert.ok(notice, 'An uncertain reply produces a real owner notice at the same phone');
   assert.deepEqual(f.ownerSms.at(-1).to, [CUSTOMER]);
+  assert.match(f.ownerSms.at(-1).content, /^\[OPWP STAFF ALERT\] /);
+  assert.doesNotMatch(f.ownerSms.at(-1).content, /Reply STOP to opt out|Text STOP to unsubscribe/i);
   const before = f.db.sqlite.prepare('SELECT owner,owner_event_id FROM lead_conversations WHERE submission_id=?').get(saved.id);
   const outboundCount = f.db.sqlite.prepare("SELECT COUNT(*) n FROM lead_messages WHERE direction='outbound'").get().n;
   assert.equal((await api.quoPost(signedDelivery(f.ownerSms.at(-1).content, notice.provider_message_id))).status, 200);

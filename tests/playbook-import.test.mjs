@@ -119,7 +119,7 @@ test("miner pairs only Craig answers, clusters support per thread, records wins 
   turns.push({ id: "s1", thread_id: "sona", author: "lead", body_redacted: "It is too expensive", created_at: "2026-01-01" }, { id: "s2", thread_id: "sona", author: "sona", body_redacted: "A different answer", created_at: "2026-01-02" });
   const result = await mineTurns(turns);
   assert.equal(result.candidates.length, 1); assert.equal(result.candidates[0].support_count, 2); assert.equal(result.candidates[0].win_rate, 1);
-  assert.ok(result.candidates[0].rule_violations_json.includes("missing_stop_footer"));
+  assert.deepEqual(result.candidates[0].rule_violations_json, []);
   assert.equal(result.candidates[0].status, "pending_review");
 });
 

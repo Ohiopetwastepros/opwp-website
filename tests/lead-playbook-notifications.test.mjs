@@ -26,6 +26,43 @@ test('nighttime owner SMS and email each send once with private draft links and 
   assert.deepEqual([sms,email],[1,1]);
   assert.deepEqual(db.sqlite.prepare('SELECT channel,status FROM lead_playbook_owner_notifications ORDER BY channel').all().map(row=>({...row})),[{channel:'email',status:'accepted'},{channel:'sms',status:'accepted'}]);
 });
+
+test('every staff alert kind has an explicit staff label and no customer opt-out footer',async()=>{
+  for(const kind of ['pending_draft','signup_ready','property_walk','lead_review']){
+    const {db,notice}=fixture();let sms=0,email=0;
+    const result=await notifyPlaybookOwner(db,config,{...notice,kind,draftId:kind==='pending_draft'?notice.draftId:null,eventKey:kind},{now:night,
+      fetcher:async(_url,request)=>{
+        sms++;const message=JSON.parse(request.body);
+        assert.match(message.content,/^\[OPWP STAFF ALERT\] A lead /);
+        assert.doesNotMatch(message.content,/Reply STOP to opt out/i);
+        return Response.json({id:'staff-sms-'+kind});
+      },emailSender:async(_env,message)=>{
+        email++;assert.match(message.subject,/^\[OPWP STAFF ALERT\] A lead /);
+        assert.match(message.text,/^\[OPWP STAFF ALERT\] A lead /);
+        assert.match(message.html,/<p>\[OPWP STAFF ALERT\] A lead /);
+        assert.doesNotMatch([message.subject,message.text,message.html].join(' '),/Reply STOP to opt out/i);
+        return 'staff-email-'+kind;
+      }});
+    assert.equal(result.acceptedCount,2);assert.deepEqual([sms,email],[1,1]);
+    db.sqlite.close();
+  }
+});
+
+test('staff alerts remain clearly labelled when the configured owner cell normalizes to the lead phone',async()=>{
+  const {db,notice}=fixture();let sms=0,email=0;
+  const env={...config,LEAD_PLAYBOOK_CRAIG_CELL:'(419) 555-0100',LEAD_AUTOMATION_CONTROLLED_TEST_ONLY:'true',META_TEST_RECIPIENTS:'+14195550100'};
+  const result=await notifyPlaybookOwner(db,env,{...notice,kind:'lead_review',draftId:null},{now:night,
+    fetcher:async(_url,request)=>{
+      sms++;const message=JSON.parse(request.body);
+      assert.deepEqual(message.to,['+14195550100']);
+      assert.match(message.content,/^\[OPWP STAFF ALERT\] A lead question needs your review\. https:\/\//);
+      assert.doesNotMatch(message.content,/Reply STOP to opt out/i);
+      return Response.json({id:'shared-owner-staff-alert'});
+    },emailSender:async(_env,message)=>{email++;assert.equal(message.to,config.OWNER_NOTIFICATION_EMAIL);return 'shared-owner-email';}});
+  assert.equal(result.acceptedCount,2);assert.deepEqual([sms,email],[1,1]);
+  assert.equal(db.sqlite.prepare("SELECT provider_message_id FROM lead_playbook_owner_notifications WHERE channel='sms'").get().provider_message_id,'shared-owner-staff-alert');
+  db.sqlite.close();
+});
 test('an uncertain SMS cannot suppress email or automatically send another SMS',async()=>{
   const {db,notice}=fixture();let sms=0,email=0;
   const options={now:night,fetcher:async()=>{sms++;throw new Error('Fabricated response loss');},emailSender:async()=>{email++;return 'email-only';}};

@@ -10,17 +10,17 @@ import { buildCustomerQuoteFollowUpSms } from "../lib/quote-funnel.mjs";
 import { buildReviewRequestSms, REVIEW_URL } from "../lib/review-request-content.mjs";
 import { leadTestDatabase } from "./helpers/lead-inbox-fixture.mjs";
 
-const closing = "\n\nReply STOP to opt out";
-function checkSpacing(body, expectedClosing = closing) {
-  assert.ok(body.endsWith(expectedClosing), body);
+function checkSpacing(body) {
+  assert.ok(body.trim().length > 0);
   assert.doesNotMatch(body, /[\u2013\u2014]/);
-  assert.equal(body.match(/(?:Reply STOP to opt out|Text STOP to unsubscribe\.)/g).length, 1);
-  assert.equal(body.trim().split("\n").at(-1), expectedClosing.trim());
+  assert.doesNotMatch(body, /Reply STOP to opt out|Text STOP to unsubscribe/i);
 }
 
-test("website, Meta confirmations, cadence, replies and lead nurture keep STOP alone after a blank line", () => {
-  checkSpacing(buildCustomerQuoteFollowUpSms(), "\n\nText STOP to unsubscribe.");
-  checkSpacing(buildMetaConfirmation({ name: "Alex Example", number_of_dogs: 2, zip: "43537", clean_up_frequency: "Weekly" }));
+test("only the initial Meta confirmation includes the footer; website, cadence, replies and lead nurture omit it", () => {
+  checkSpacing(buildCustomerQuoteFollowUpSms());
+  const lead = { name: "Alex Example", number_of_dogs: 2, zip: "43537", clean_up_frequency: "Weekly" };
+  assert.match(buildMetaConfirmation(lead), /\n\nReply STOP to opt out$/);
+  checkSpacing(buildMetaConfirmation(lead, { firstMessage: false }));
   const nurture = leadFollowUpDrafts("Alex Example");
   assert.deepEqual(nurture.map(({ step, delay }) => ({ step, delay })), [
     { step: 1, delay: "+1 day" }, { step: 2, delay: "+3 days" }, { step: 3, delay: "+7 days" },
@@ -29,26 +29,26 @@ test("website, Meta confirmations, cadence, replies and lead nurture keep STOP a
   for (const body of Object.values(META_RESPONSES)) checkSpacing(formatMetaSms(body));
 });
 
-test("the shared formatter repairs existing same-line closings and does not duplicate STOP", () => {
-  for (const legacy of ["A quote reply.", "A quote reply. Reply STOP to opt out.", "A quote reply.\n\nReply STOP to opt out", "A quote reply. Reply STOP to opt out\nReply STOP to opt out."]) {
-    assert.equal(formatCustomerSms(legacy), `A quote reply.${closing}`);
-    assert.equal(formatMetaSms(legacy), `A quote reply.${closing}`);
+test("the shared formatter strips legacy opt-out footers without changing the reply body", () => {
+  for (const legacy of ["A quote reply.", "A quote reply. Reply STOP to opt out.", "A quote reply.\n\nReply STOP to opt out", "A quote reply. Reply STOP to opt out\nReply STOP to opt out.", "A quote reply.\n\nText STOP to unsubscribe.", "A quote reply. Reply STOP to opt out.\n\nText STOP to unsubscribe."]) {
+    assert.equal(formatCustomerSms(legacy), 'A quote reply.');
+    assert.equal(formatMetaSms(legacy), 'A quote reply.');
   }
   checkSpacing(formatCustomerSms("Quote\u2014follow-up\u2013details"));
   assert.ok(formatCustomerSms("x".repeat(1100)).length <= 1000);
 });
 
-test("review requests keep the Google link inline and STOP alone as the final line", () => {
+test("review requests keep the Google link inline without opt-out footers", () => {
   const previewToken = "00000000-0000-4000-a000-000000000001";
   for (const template of ["standard", "initial-cleanup"]) {
     const body = buildReviewRequestSms({ firstName: "Alex", tech: "Tony", previewToken, template });
     checkSpacing(body);
-    assert.equal(body.split("\n").at(-1), "Reply STOP to opt out");
+    assert.doesNotMatch(body, /Reply STOP to opt out|Text STOP to unsubscribe/i);
     assert.ok(body.split("\n")[0].includes(`You can leave one here: ${REVIEW_URL}`));
     assert.equal(body.split("\n").includes(REVIEW_URL), false);
     assert.deepEqual(body.match(/https?:\/\/\S+/g), [REVIEW_URL]);
     assert.doesNotMatch(body, /ohiopetwastepros\.com\/review\//);
-    assert.equal(body.match(/Reply STOP to opt out/g).length, 1);
+    assert.doesNotMatch(body, /Reply STOP to opt out/);
     assert.doesNotMatch(body, /[\u2013\u2014]/);
   }
 });
@@ -87,14 +87,14 @@ test("lead assistant stores formatted scheduled drafts and normalizes legacy que
   try {
     const result = await assistant.processFollowUps({ DB: db, QUO_API_KEY: "fixture-key", QUO_FROM_NUMBER: "+14195550101" }, 10);
     assert.equal(result.sent, 1);
-    assert.deepEqual(sent, [`A legacy follow-up.${closing}`]);
+    assert.deepEqual(sent, ['A legacy follow-up.']);
     assert.equal(db.sqlite.prepare("SELECT message_body FROM lead_follow_up_jobs").get().message_body, sent[0]);
     assert.equal(db.sqlite.prepare("SELECT body FROM lead_messages").get().body, sent[0]);
     const again = await assistant.processFollowUps({ DB: db }, 10);
     assert.equal(again.sent, 0);
     assert.equal(sent.length, 1);
     await assistant.sendLeadMessage(db, { QUO_API_KEY: "fixture-key", QUO_FROM_NUMBER: "+14195550101" }, lead, "An automatic answer. Reply STOP to opt out.", "fixture-automation", true);
-    assert.equal(sent[1], `An automatic answer.${closing}`);
+    assert.equal(sent[1], 'An automatic answer.');
     for (const body of sent) checkSpacing(body);
   } finally { delete globalThis.__smsSpacingRequest; }
 });

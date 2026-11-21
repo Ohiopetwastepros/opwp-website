@@ -5,6 +5,8 @@ import {DatabaseSync} from 'node:sqlite';
 import {quoLearningScope,resolveQuoAuthor,ownerAfterOutbound,normalizeMetaLearningEvents} from '../lib/playbook-ownership.mjs';
 import {normalizeQuoMessageEvent} from '../lib/quo-webhook.mjs';
 import {recordPlaybookQuoEvent,recordPlaybookMetaEvent,processPlaybookInbound,runScheduledPlaybook,preparePlaybookIntros} from '../lib/lead-playbook-ingest.js';
+import {setPlaybookOwner} from '../lib/lead-playbook-service.js';
+import {playbookHash} from '../lib/lead-playbook-links.mjs';
 function database(){const sqlite=new DatabaseSync(':memory:');sqlite.exec('PRAGMA foreign_keys=ON');for(const name of readdirSync(new URL('../tmp/test-migrations/',import.meta.url)).filter(n=>n.endsWith('.sql')).sort())sqlite.exec(readFileSync(new URL('../tmp/test-migrations/'+name,import.meta.url),'utf8'));const stmt=(sql,args=[])=>({bind:(...a)=>stmt(sql,a),first:async()=>sqlite.prepare(sql).get(...args)||null,all:async()=>({results:sqlite.prepare(sql).all(...args)}),run:async()=>({meta:{changes:Number(sqlite.prepare(sql).run(...args).changes)}}),execute(){const p=sqlite.prepare(sql);return p.columns().length?{results:p.all(...args),meta:{changes:0}}:{results:[],meta:{changes:Number(p.run(...args).changes)}};}});return {sqlite,prepare:sql=>stmt(sql),batch:async statements=>{sqlite.exec('BEGIN');try{const r=statements.map(s=>s.execute());sqlite.exec('COMMIT');return r;}catch(e){sqlite.exec('ROLLBACK');throw e;}}};}
 const env={LEAD_PLAYBOOK_ENABLED:'true',LEAD_PLAYBOOK_HASH_KEY:'fabricated-key-for-tests-only-123456789',QUO_FROM_NUMBER:'+14195550100',QUO_LEARNING_NUMBERS:'+15675550100',QUO_HUMAN_USER_IDS:'human-example'};
 const event={eventId:'event-example',providerMessageId:'AC-example',direction:'outbound',from:env.QUO_FROM_NUMBER,to:'+14195550199',text:'Hello Avery Example, email avery@example.test about 123 Test Street.',createdAt:'2026-11-19T15:00:00.000Z',userId:'human-example'};
@@ -38,6 +40,35 @@ test('a backend form lead matching either customer directory escalates without a
     assert.equal(db.sqlite.prepare("SELECT stage FROM lead_playbook_state WHERE conversation_id='conv'").get().stage,'escalated');
   }
 });
+test('ordinary existing-customer threads remain outside lead automation for affirmations, support and prospective inquiries',async()=>{
+  for(const text of ['Yes that is correct','How much is weekly cleanup for a second property?','Please skip my service','I have a billing issue']){
+    const db=database();seed(db);let sends=0,modelCalls=0;
+    db.sqlite.exec("UPDATE lead_conversations SET automation_mode='approved';UPDATE lead_automation_settings SET human_review_required=0");
+    const config={...env,LEAD_PLAYBOOK_AUTO_SEND_ENABLED:'true',LEAD_CLASSIFIER_ENABLED:'true',AI:{run(){modelCalls++;assert.fail('Customer hold must happen before paid classification');}}};
+    const result=await processPlaybookInbound(db,config,{conversationId:'conv',submissionId:'lead',event:{...inbound,text}},{
+      loadCustomerDirectory:async()=>({ok:true,complete:true,rows:[{cell_phone_number:event.to}]}),
+      sender:async()=>{sends++;assert.fail('Ordinary existing customer must not receive a lead text');},
+    });
+    assert.equal(result.reason,'existing_customer',text);assert.equal(result.escalated,true,text);
+    assert.equal(db.sqlite.prepare('SELECT count(*) n FROM lead_reply_drafts').get().n,0,text);
+    assert.equal(db.sqlite.prepare("SELECT count(*) n FROM lead_messages WHERE direction='outbound'").get().n,0,text);
+    assert.deepEqual([sends,modelCalls],[0,0],text);db.sqlite.close();
+  }
+});
+test('an ownership handback does not authorize a new inquiry from an existing customer',async()=>{
+  const db=database();seed(db);
+  await setPlaybookOwner(db,env,'conv','craig');await setPlaybookOwner(db,env,'conv','backend');
+  const result=await processPlaybookInbound(db,env,{conversationId:'conv',submissionId:'lead',event:{...inbound,text:'Can I get a quote for another property?'}},{loadCustomerDirectory:async()=>({ok:true,complete:true,rows:[{cell_phone_number:event.to}]})});
+  assert.equal(result.reason,'existing_customer');assert.equal(db.sqlite.prepare('SELECT count(*) n FROM lead_reply_drafts').get().n,0);db.sqlite.close();
+});
+test('STOP, wrong-number and suppressed contacts cannot be overridden by customer-directory or test settings',async()=>{
+  for(const [text,suppressed,reason] of [['STOP',false,'stop'],['Wrong number',false,'wrong_number'],['Yes that is correct',true,'suppressed']]){
+    const db=database();seed(db);let reads=0,sends=0;
+    if(suppressed)db.sqlite.prepare("INSERT INTO lead_suppressions(organization_id,phone_hash,reason,source,created_by) VALUES('org-opwp',?,'fixture STOP','fixture','fixture')").run(await playbookHash(event.to));
+    const result=await processPlaybookInbound(db,{...env,LEAD_AUTOMATION_CONTROLLED_TEST_ONLY:'true',META_TEST_RECIPIENTS:event.to},{conversationId:'conv',submissionId:'lead',event:{...inbound,text}},{loadCustomerDirectory:async()=>{reads++;throw new Error('Must not query a directory for STOP or suppression');},sender:async()=>{sends++;assert.fail('Suppressed or STOP must not send');}});
+    assert.equal(result.reason,reason);assert.deepEqual([reads,sends],[0,0]);assert.equal(db.sqlite.prepare('SELECT count(*) n FROM lead_reply_drafts').get().n,0);db.sqlite.close();
+  }
+});
 test('incomplete or unavailable customer verification fails closed before any inbound draft',async()=>{
   for(const loadCustomerDirectory of [async()=>({ok:false,complete:false,rows:[]}),async()=>{throw new Error('fabricated unavailable directory');}]){
     const db=database();seed(db);
@@ -62,9 +93,10 @@ test('the first form intro verifies customers and defers on a match or unavailab
 test('customer-directory holds immediately notify both owner channels once without drafting or texting the customer',async()=>{
   for(const path of ['inbound','intro'])for(const matched of [true,false]){
     const db=database();if(path==='intro')seedIntro(db);else seed(db);
+    db.sqlite.exec("UPDATE lead_conversations SET automation_mode='approved';UPDATE lead_automation_settings SET human_review_required=0");
     let sms=0,email=0,customerSends=0,directoryReads=0;
-    const config={...env,LEAD_PLAYBOOK_NOTIFY_ENABLED:'true',LEAD_PLAYBOOK_CRAIG_CELL:'+14195550198',LEAD_PLAYBOOK_LINK_SECRET:'fabricated-directory-alert-secret-123456789',QUO_API_KEY:'fabricated',OWNER_NOTIFICATION_EMAIL:'owner@example.test'};
-    const options={now:new Date('2026-11-22T03:00:00Z'),loadCustomerDirectory:async()=>{directoryReads++;return matched?{ok:true,complete:true,rows:[{cell_phone_number:event.to}]}:{ok:false,complete:false,rows:[]};},sender:async()=>{customerSends++;throw new Error('Customer must stay held');},notificationOptions:{fetcher:async(_url,request)=>{sms++;const message=JSON.parse(request.body);assert.deepEqual(message.to,[config.LEAD_PLAYBOOK_CRAIG_CELL]);assert.match(message.content,/\/admin\/quote-funnel\//);return Response.json({id:'directory-owner-sms'});},emailSender:async(_env,message)=>{email++;assert.equal(message.to,config.OWNER_NOTIFICATION_EMAIL);return 'directory-owner-email';}}};
+    const config={...env,LEAD_PLAYBOOK_AUTO_SEND_ENABLED:'true',LEAD_PLAYBOOK_NOTIFY_ENABLED:'true',LEAD_PLAYBOOK_CRAIG_CELL:'+14195550198',LEAD_PLAYBOOK_LINK_SECRET:'fabricated-directory-alert-secret-123456789',QUO_API_KEY:'fabricated',OWNER_NOTIFICATION_EMAIL:'owner@example.test'};
+    const options={now:new Date('2026-11-22T03:00:00Z'),loadCustomerDirectory:async()=>{directoryReads++;return matched?{ok:true,complete:true,rows:[{cell_phone_number:event.to}]}:{ok:false,complete:false,rows:[]};},sender:async()=>{customerSends++;throw new Error('Customer must stay held');},notificationOptions:{fetcher:async(_url,request)=>{sms++;const message=JSON.parse(request.body);assert.deepEqual(message.to,[config.LEAD_PLAYBOOK_CRAIG_CELL]);assert.match(message.content,/^\[OPWP STAFF ALERT\] /);assert.doesNotMatch(message.content,/Reply STOP to opt out|Text STOP to unsubscribe/i);assert.match(message.content,/\/admin\/quote-funnel\//);return Response.json({id:'directory-owner-sms'});},emailSender:async(_env,message)=>{email++;assert.equal(message.to,config.OWNER_NOTIFICATION_EMAIL);return 'directory-owner-email';}}};
     const run=()=>path==='intro'?preparePlaybookIntros(db,config,options):processPlaybookInbound(db,config,{conversationId:'conv',submissionId:'lead',event:inbound},options);
     const result=await run();assert.equal(result.escalated,path==='intro'?1:true);
     const initialReads=directoryReads;await run();

@@ -113,3 +113,35 @@ test("new sales inquiries are admitted only after successful customer verificati
   await assert.rejects(recordInboundQuoMessage(retryDb, {}, event("How much is weekly cleanup?")), /incomplete/);
   assert.equal(retryDb.writes.length, 0);
 });
+
+test("an existing customer's fresh quote request cannot create a lead or start automation from either active directory", async t => {
+  for (const matched of ['/api/v1/clients/active', '/api/v1/clients/active_no_subscription']) {
+    const paths = [];
+    t.mock.method(globalThis, 'fetch', async url => {
+      const path = new URL(url).pathname; paths.push(path);
+      assert.ok(['/api/v1/clients/active', '/api/v1/clients/active_no_subscription'].includes(path));
+      return Response.json(path === matched ? [{cell_phone_number: '419-555-0123'}] : []);
+    });
+    const db = fakeDb();
+    const result = await recordInboundQuoMessage(db, {LEAD_PLAYBOOK_ENABLED: 'true'}, event('Can I get a quote for weekly cleanup at another property?'));
+    assert.equal(result.ignoredReason, 'existing_customer');
+    assert.equal(result.submissionId, null);
+    assert.equal(result.leadCreated, false);
+    assert.equal(result.autoReplied, false);
+    assert.equal(db.writes.length, 0, 'No submission, conversation, draft, sync job or message may be created');
+    assert.deepEqual(paths.sort(), ['/api/v1/clients/active', '/api/v1/clients/active_no_subscription']);
+    globalThis.fetch.mock.restore();
+  }
+});
+
+test("ordinary customer support and affirmative messages never create a sales lead or make provider requests", async t => {
+  t.mock.method(globalThis, 'fetch', () => assert.fail('Ordinary customer messages must not contact providers during new-lead admission'));
+  for (const text of ['Yes that is correct', 'Please skip my service this week', 'You missed my service', 'I have a billing issue', 'Please change my service. How much is weekly cleanup?']) {
+    const db = fakeDb();
+    const result = await recordInboundQuoMessage(db, {LEAD_PLAYBOOK_ENABLED: 'true'}, event(text));
+    assert.equal(result.leadCreated, false, text);
+    assert.equal(result.autoReplied, false, text);
+    assert.equal(result.submissionId, null, text);
+    assert.equal(db.writes.length, 0, text);
+  }
+});

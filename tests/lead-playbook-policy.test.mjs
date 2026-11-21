@@ -19,9 +19,9 @@ test("playbook prices are the website objects with no copied grid or divergence"
   for (const tier of YARD_TIERS) assert.equal(yardUpcharge(tier.id), tier.upcharge);
   assert.equal(monthly("Weekly", 2), 105); assert.equal(monthly("Twice Weekly", 1), 175); assert.equal(monthly("Monthly", 2), 65);
 });
-test("all exact seeds format once with no em/en dashes and a STOP footer", () => {
+test("all exact seeds format once with no em/en dashes and no opt-out footer", () => {
   const slots = { dogs_phrase: "1 dog", frequency: "weekly", yard_phrase: "small", last_cleaned_phrase: "about 2 weeks", day_intro: "", low: 27, high: 34, monthly: 95, day: "Friday", name: "Example", email: "lead@example.test" };
-  for (const [key, seed] of Object.entries(TEMPLATES)) { assert.doesNotMatch(seed, /[\u2013\u2014]/); const body = renderPlaybookTemplate(key, slots); assert.ok(body.endsWith("\n\nReply STOP to opt out")); assert.doesNotMatch(body, /[\u2013\u2014]/); }
+  for (const [key, seed] of Object.entries(TEMPLATES)) { assert.doesNotMatch(seed, /[\u2013\u2014]/); const body = renderPlaybookTemplate(key, slots); assert.doesNotMatch(body, /Reply STOP to opt out|Text STOP to unsubscribe/i); assert.doesNotMatch(body, /[\u2013\u2014]/); }
 });
 test("rule intents are closed and safety signals take precedence over interest", () => {
   for (const [text, intent] of [["STOP", "stop"], ["wrong number", "wrong_number"], ["Is this AI?", "is_this_ai"], ["How much?", "question_price"], ["too expensive", "objection_price"], ["I need to think about it", "objection_thinking"], ["comparing another quote", "objection_competitor"], ["What is included?", "question_what_included"], ["Is there a contract?", "question_contract"], ["Can dogs be outside?", "question_pets_safety"], ["gate access?", "question_gate_access"], ["payment?", "question_payment"]]) { const got = classifyPlaybookRules(text); assert.equal(got.intent, intent); assert.ok(INTENTS.includes(got.intent)); }
@@ -41,7 +41,7 @@ test("quote waits for detail confirmation and address, corrections require confi
 });
 test("golden quote uses Craig's exact template wording and current grid", () => {
   const quote = respond(afterConfirm, "[SERVICE ADDRESS]", { classification: { intent: "address_given", confidence: 1, slots: {} } });
-  assert.equal(quote.body, "Perfect, we're already in Maumee on Fridays, so we could get you started as soon as tomorrow. The initial cleanup to get the yard caught up runs $27 to $34. We provide a range which is based on how much waste is in the yard and how long it takes the technician. After that it's $95 a month for weekly service. If this all sounds good I can get your account setup and get you on the schedule for tomorrow.\n\nReply STOP to opt out");
+  assert.equal(quote.body, "Perfect, we're already in Maumee on Fridays, so we could get you started as soon as tomorrow. The initial cleanup to get the yard caught up runs $27 to $34. We provide a range which is based on how much waste is in the yard and how long it takes the technician. After that it's $95 a month for weekly service. If this all sounds good I can get your account setup and get you on the schedule for tomorrow.");
   assert.equal(quote.pricingVersion, WEBSITE_VERSION); assert.ok(quote.body.includes(RANGE_SENTENCE)); assert.doesNotMatch(quote.body, /\$15/);
   assert.equal(respond(afterConfirm, "How much?", { route: { approvedDays: ["Tuesday", "Friday"], auditedBy: "fixture" } }).reason, "route_day_requires_confirmation");
   const yes = respond(quote.state, "yes"); assert.equal(yes.templateKey, "ready_access"); assert.ok(yes.body.includes(lead.email)); assert.ok(yes.body.includes(lead.name));
@@ -89,8 +89,8 @@ test("Sona, Craig, STOP, wrong number and suppressions block every draft", () =>
   assert.equal(playbookEnabled({}), false); assert.equal(playbookEnabled({ LEAD_PLAYBOOK_ENABLED: "false" }), false);
 });
 test("candidate lint reports dashes, upfront offers, unresolved promises and stale prices", () => {
-  assert.ok(lintPlaybookText("Hi\u2014there\n\nReply STOP to opt out").includes("forbidden_dash"));
-  assert.ok(lintPlaybookText("I can come on Friday.\n\nReply STOP to opt out").includes("unverified_day_promise"));
+  assert.ok(lintPlaybookText("Hi\u2014there").includes("forbidden_dash"));
+  assert.ok(lintPlaybookText("I can come on Friday.").includes("unverified_day_promise"));
   const slots = { ...lead, frequencyId: "once_a_week", low: 25, high: 32, monthly: 90, frequency: "weekly", day_intro: "", day: "Friday" };
   assert.ok(lintPlaybookText(renderPlaybookTemplate("quote_recurring", slots), { templateKey: "quote_recurring", intent: "question_price", state: { details_confirmed: true }, slots }).includes("price_disagrees_with_grid"));
   const quoted = respond(afterConfirm, "How much?");
@@ -256,7 +256,7 @@ test("AI disclosure is truthful, immediately hands off, and all customer prose s
   const body = renderPlaybookTemplate("ready_access", { name: "Ren\u00e9e Example", email: "example@example.test" });
   assert.match(body, /Renee Example/);
   assert.doesNotMatch(body, /[^\x00-\x7f]/);
-  assert.ok(lintPlaybookText("Hi \u2603\n\nReply STOP to opt out").includes("non_ascii_sms"));
+  assert.ok(lintPlaybookText("Hi \u2603").includes("non_ascii_sms"));
 });
 
 test("prospective cancellation questions use approved answers while actual service requests remain held", () => {

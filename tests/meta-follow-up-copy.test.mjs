@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { metaFollowUpDrafts } from "../lib/meta-conversation.mjs";
 
-const closing = "\n\nReply STOP to opt out";
 const messages = [
   "Did you see my confirmation? I can send your price and help get you on the schedule. Would you like me to send it over?",
   "I can help with your quote and check for an open route day this week. Would you like to get started?",
@@ -14,14 +13,14 @@ function checkDrafts(name, opener) {
   assert.deepEqual(drafts.map(({ step, day }) => ({ step, day })), [
     { step: 1, day: 1 }, { step: 2, day: 3 }, { step: 3, day: 7 },
   ]);
-  assert.deepEqual(drafts.map(({ body }) => body), messages.map((message) => `${opener} ${message}${closing}`));
+  assert.deepEqual(drafts.map(({ body }) => body), messages.map((message) => `${opener} ${message}`));
   for (const { body } of drafts) {
     assert.match(body, /^[\x00-\x7f]+$/);
     assert.doesNotMatch(body, /[\u2013\u2014]/);
-    assert.ok(body.endsWith(closing));
-    assert.equal(body.split("Reply STOP to opt out").length, 2);
-    assert.equal(body.split("\n").length, 3);
-    assert.ok(body.slice(0, -closing.length).length < 230);
+    assert.equal(body, body.trim());
+    assert.doesNotMatch(body, /Reply STOP to opt out/);
+    assert.equal(body.split("\n").length, 1);
+    assert.ok(body.length < 230);
   }
 }
 

@@ -149,9 +149,9 @@ test("partial quote customer email identifies relief technician and invites a di
   assert.match(content.text, /\(419\) 262-2371/);
 });
 
-test("partial quote customer text stays concise and preserves the required opt-out", () => {
+test("partial quote follow-up stays concise without an opt-out footer", () => {
   const content = buildCustomerQuoteFollowUpSms();
-  assert.equal(content, "Hello, this is Craig with Ohio Pet Waste Pros. I saw that you filled out a quote form on our website. Did you have any questions about our service, or would you like help getting signed up?\n\nText STOP to unsubscribe.");
+  assert.equal(content, "Hello, this is Craig with Ohio Pet Waste Pros. I saw that you filled out a quote form on our website. Did you have any questions about our service, or would you like help getting signed up?");
 });
 
 test("no-card onboarding requires a question but still validates for account creation", () => {

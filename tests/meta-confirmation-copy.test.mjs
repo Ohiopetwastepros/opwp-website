@@ -4,25 +4,24 @@ import { buildMetaConfirmation, mapMetaAnswers } from "../lib/meta-lead-policy.m
 
 const lead = { name: "Jason Example", number_of_dogs: 2, zip: "43551", clean_up_frequency: "Weekly" };
 const opener = "Hi Jason, this is Craig with Ohio Pet Waste Pros. Thanks for filling out our Facebook form.";
-const closing = "\n\nReply STOP to opt out";
 const missingDogs = "How many dogs exactly should we plan for?";
 const missingZip = "What ZIP code is the yard in?";
 const missingFrequency = "Would you like weekly, every-other-week, twice-weekly, or one-time cleanup?";
 
 function checkCopy(message, expected) {
-  assert.equal(message, expected);
+  assert.equal(message, `${expected}\n\nReply STOP to opt out`);
   assert.doesNotMatch(message, /[\u2013\u2014]/);
   assert.doesNotMatch(message, /automated confirmation/i);
   assert.match(message, /^[\x00-\x7f]+$/);
   assert.equal(message.split("Reply STOP to opt out").length, 2);
   assert.equal(message.split("\n").length, 3);
-  assert.ok(message.endsWith(closing));
+  assert.equal(message, message.trim());
   assert.ok(message.length <= 1000, "confirmation fits the stored message limit");
 }
 
 test("Meta confirmation full data matches Craig's approved text exactly", () => {
-  checkCopy(buildMetaConfirmation(lead), `${opener} I have you down for 2 dogs in ZIP 43551 with weekly service. Did I get that right?${closing}`);
-  checkCopy(buildMetaConfirmation({ ...lead, name: "Craig Bridgman", zip: "43537" }), "Hi Craig, this is Craig with Ohio Pet Waste Pros. Thanks for filling out our Facebook form. I have you down for 2 dogs in ZIP 43537 with weekly service. Did I get that right?\n\nReply STOP to opt out");
+  checkCopy(buildMetaConfirmation(lead), `${opener} I have you down for 2 dogs in ZIP 43551 with weekly service. Did I get that right?`);
+  checkCopy(buildMetaConfirmation({ ...lead, name: "Craig Bridgman", zip: "43537" }), "Hi Craig, this is Craig with Ohio Pet Waste Pros. Thanks for filling out our Facebook form. I have you down for 2 dogs in ZIP 43537 with weekly service. Did I get that right?");
 });
 
 for (const [label, overrides, summary, questions] of [
@@ -41,7 +40,7 @@ for (const [label, overrides, summary, questions] of [
 ]) {
   test(`Meta confirmation copy: ${label}`, () => {
     const expectedBody = [opener, summary, ...questions].filter(Boolean).join(" ");
-    checkCopy(buildMetaConfirmation({ ...lead, ...overrides }), `${expectedBody}${closing}`);
+    checkCopy(buildMetaConfirmation({ ...lead, ...overrides }), `${expectedBody}`);
   });
 }
 
@@ -57,29 +56,29 @@ for (const [answer, normalized, phrase] of [
     const mapped = mapMetaAnswers({ clean_up_frequency: answer });
     assert.equal(mapped.clean_up_frequency, normalized);
     for (const clean_up_frequency of [answer, mapped.clean_up_frequency]) {
-      checkCopy(buildMetaConfirmation({ ...lead, clean_up_frequency }), `${opener} I have you down for 2 dogs in ZIP 43551 with ${phrase} service. Did I get that right?${closing}`);
+      checkCopy(buildMetaConfirmation({ ...lead, clean_up_frequency }), `${opener} I have you down for 2 dogs in ZIP 43551 with ${phrase} service. Did I get that right?`);
     }
   });
 }
 
 test("Meta confirmation unknown frequency uses lower-case service fallback and ASCII dashes", () => {
-  checkCopy(buildMetaConfirmation({ ...lead, clean_up_frequency: "Custom\u2013Seasonal\u2014Plan" }), `${opener} I have you down for 2 dogs in ZIP 43551 with custom-seasonal-plan service. Did I get that right?${closing}`);
+  checkCopy(buildMetaConfirmation({ ...lead, clean_up_frequency: "Custom\u2013Seasonal\u2014Plan" }), `${opener} I have you down for 2 dogs in ZIP 43551 with custom-seasonal-plan service. Did I get that right?`);
 });
 
 for (const name of ["", null, "123", "Jason! Example", "<script> Example", "A".repeat(41)]) {
   test(`Meta confirmation omits unusable name ${JSON.stringify(name)}`, () => {
-    checkCopy(buildMetaConfirmation({ ...lead, name }), `Hi, this is Craig with Ohio Pet Waste Pros. Thanks for filling out our Facebook form. I have you down for 2 dogs in ZIP 43551 with weekly service. Did I get that right?${closing}`);
+    checkCopy(buildMetaConfirmation({ ...lead, name }), `Hi, this is Craig with Ohio Pet Waste Pros. Thanks for filling out our Facebook form. I have you down for 2 dogs in ZIP 43551 with weekly service. Did I get that right?`);
   });
 }
 
 test("Meta confirmation no name and city-only location with every-other-week frequency", () => {
-  checkCopy(buildMetaConfirmation({ name: "", number_of_dogs: null, zip: "", city: "Maumee", clean_up_frequency: "Every Other Week" }), `Hi, this is Craig with Ohio Pet Waste Pros. Thanks for filling out our Facebook form. I have you down for every other week service in Maumee. Did I get that right? ${missingDogs} ${missingZip}${closing}`);
+  checkCopy(buildMetaConfirmation({ name: "", number_of_dogs: null, zip: "", city: "Maumee", clean_up_frequency: "Every Other Week" }), `Hi, this is Craig with Ohio Pet Waste Pros. Thanks for filling out our Facebook form. I have you down for every other week service in Maumee. Did I get that right? ${missingDogs} ${missingZip}`);
 });
 
 test("Meta confirmation no known details omits confirmation question", () => {
-  checkCopy(buildMetaConfirmation({}), `Hi, this is Craig with Ohio Pet Waste Pros. Thanks for filling out our Facebook form. ${missingDogs} ${missingZip} ${missingFrequency}${closing}`);
+  checkCopy(buildMetaConfirmation({}), `Hi, this is Craig with Ohio Pet Waste Pros. Thanks for filling out our Facebook form. ${missingDogs} ${missingZip} ${missingFrequency}`);
 });
 
 test("Meta confirmation keeps the safe-name check and renders apostrophes as ASCII", () => {
-  checkCopy(buildMetaConfirmation({ ...lead, name: "O\u2019Neil Example" }), `Hi O'Neil, this is Craig with Ohio Pet Waste Pros. Thanks for filling out our Facebook form. I have you down for 2 dogs in ZIP 43551 with weekly service. Did I get that right?${closing}`);
+  checkCopy(buildMetaConfirmation({ ...lead, name: "O\u2019Neil Example" }), `Hi O'Neil, this is Craig with Ohio Pet Waste Pros. Thanks for filling out our Facebook form. I have you down for 2 dogs in ZIP 43551 with weekly service. Did I get that right?`);
 });
