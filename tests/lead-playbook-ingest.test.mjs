@@ -1,13 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync,readdirSync} from 'node:fs';
-import {DatabaseSync} from 'node:sqlite';
+import {leadTestDatabase as database} from './helpers/lead-inbox-fixture.mjs';
 import {quoLearningScope,resolveQuoAuthor,ownerAfterOutbound,normalizeMetaLearningEvents} from '../lib/playbook-ownership.mjs';
 import {normalizeQuoMessageEvent} from '../lib/quo-webhook.mjs';
 import {recordPlaybookQuoEvent,recordPlaybookMetaEvent,processPlaybookInbound,runScheduledPlaybook,preparePlaybookIntros} from '../lib/lead-playbook-ingest.js';
 import {setPlaybookOwner} from '../lib/lead-playbook-service.js';
 import {playbookHash} from '../lib/lead-playbook-links.mjs';
-function database(){const sqlite=new DatabaseSync(':memory:');sqlite.exec('PRAGMA foreign_keys=ON');for(const name of readdirSync(new URL('../tmp/test-migrations/',import.meta.url)).filter(n=>n.endsWith('.sql')).sort())sqlite.exec(readFileSync(new URL('../tmp/test-migrations/'+name,import.meta.url),'utf8'));const stmt=(sql,args=[])=>({bind:(...a)=>stmt(sql,a),first:async()=>sqlite.prepare(sql).get(...args)||null,all:async()=>({results:sqlite.prepare(sql).all(...args)}),run:async()=>({meta:{changes:Number(sqlite.prepare(sql).run(...args).changes)}}),execute(){const p=sqlite.prepare(sql);return p.columns().length?{results:p.all(...args),meta:{changes:0}}:{results:[],meta:{changes:Number(p.run(...args).changes)}};}});return {sqlite,prepare:sql=>stmt(sql),batch:async statements=>{sqlite.exec('BEGIN');try{const r=statements.map(s=>s.execute());sqlite.exec('COMMIT');return r;}catch(e){sqlite.exec('ROLLBACK');throw e;}}};}
 const env={LEAD_PLAYBOOK_ENABLED:'true',LEAD_PLAYBOOK_HASH_KEY:'fabricated-key-for-tests-only-123456789',QUO_FROM_NUMBER:'+14195550100',QUO_LEARNING_NUMBERS:'+15675550100',QUO_HUMAN_USER_IDS:'human-example'};
 const event={eventId:'event-example',providerMessageId:'AC-example',direction:'outbound',from:env.QUO_FROM_NUMBER,to:'+14195550199',text:'Hello Avery Example, email avery@example.test about 123 Test Street.',createdAt:'2026-11-19T15:00:00.000Z',userId:'human-example'};
 function seed(db,owner='backend'){db.sqlite.prepare("INSERT INTO submissions(id,kind,source,status,name,phone,email,payload) VALUES ('lead','question','website','new','Avery Example',?,?,?)").run(event.to,'avery@example.test',JSON.stringify({follow_up_consent:true,address:'123 Test Street',quote_context:{dogs:1,frequency:'once_a_week',yard_size:'tiny',last_cleaned:'two_weeks'}}));db.sqlite.prepare("INSERT INTO lead_conversations(id,submission_id,organization_id,owner,last_outbound_at) VALUES ('conv','lead','org-opwp',?,'2026-11-19T14:00:00Z')").run(owner);db.sqlite.prepare("UPDATE lead_automation_settings SET assistant_enabled=1 WHERE organization_id='org-opwp'").run();}
