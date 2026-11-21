@@ -85,7 +85,7 @@ test("affirmatives preserve collected details and advance through cleanup, confi
   assert.equal(quoted.slots.dogs, 1);
   assert.equal(quoted.slots.yardTier, "tiny");
   assert.equal(quoted.slots.lastCleaned, "two_weeks");
-  assert.match(quoted.body, /After that it's \$95 a month for weekly service\./);
+  assert.match(quoted.body, /weekly service is \$95 per month/);
   assert.equal(turn("Yes, that\u2019s correct.").templateKey, "ready_access");
 });
 
@@ -205,6 +205,6 @@ test("an exactly scoped controlled-test Meta affirmative advances once despite a
     assert.equal(modelCalls, 0);
     assert.equal(customerSends.length, 1);
     assert.equal(customerSends[0].phone, phone);
-    assert.match(customerSends[0].body, /About how large is the area/);
+    assert.match(customerSends[0].body, /About how big is the area of the yard/);
   }
 });

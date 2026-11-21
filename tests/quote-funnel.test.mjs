@@ -14,6 +14,7 @@ import {
   validSngHowHeardValues,
 } from "../lib/sng-onboarding.mjs";
 import { validateLeadInput, validateOnboardingInput } from "../lib/public-input.js";
+import { renderCraigReply, validateCraigReply, countCraigSentences } from "../lib/craig-voice.mjs";
 
 test("funnel IDs and stages fail closed", () => {
   assert.equal(normalizeFunnelId("short"), "");
@@ -144,14 +145,21 @@ test("partial quote queue retains its ten-minute default for callers without an 
 test("partial quote customer email identifies relief technician and invites a direct reply", () => {
   const content = buildCustomerQuoteFollowUpEmail();
   assert.match(content.subject, /Ohio Pet Waste Pros quote/i);
-  assert.match(content.text, /This is Craig with Ohio Pet Waste Pros/);
+  assert.match(content.text, /this is Craig with Ohio Pet Waste Pros/i);
   assert.match(content.text, /reply directly to this email/i);
   assert.match(content.text, /\(419\) 262-2371/);
+  assert.equal(content.text, renderCraigReply("website_quote_follow_up_email", { business_phone: "(419) 262-2371" }));
+  assert.deepEqual(validateCraigReply(content.text, { step: "follow_up" }), []);
+  assert.equal(countCraigSentences(content.text), 3);
+  assert.equal(content.html, `<p>${escapeEmailHtml(content.text)}</p>`);
 });
 
 test("partial quote follow-up stays concise without an opt-out footer", () => {
   const content = buildCustomerQuoteFollowUpSms();
-  assert.equal(content, "Hello, this is Craig with Ohio Pet Waste Pros. I saw that you filled out a quote form on our website. Did you have any questions about our service, or would you like help getting signed up?");
+  assert.equal(content, renderCraigReply("intro_form"));
+  assert.deepEqual(validateCraigReply(content, { step: "first_contact" }), []);
+  assert.equal(countCraigSentences(content), 3);
+  assert.doesNotMatch(content, /Reply STOP|Text STOP|poop|[\u2013\u2014]/i);
 });
 
 test("no-card onboarding requires a question but still validates for account creation", () => {

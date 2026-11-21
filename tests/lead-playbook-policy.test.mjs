@@ -20,7 +20,7 @@ test("playbook prices are the website objects with no copied grid or divergence"
   assert.equal(monthly("Weekly", 2), 105); assert.equal(monthly("Twice Weekly", 1), 175); assert.equal(monthly("Monthly", 2), 65);
 });
 test("all exact seeds format once with no em/en dashes and no opt-out footer", () => {
-  const slots = { dogs_phrase: "1 dog", frequency: "weekly", yard_phrase: "small", last_cleaned_phrase: "about 2 weeks", day_intro: "", low: 27, high: 34, monthly: 95, day: "Friday", name: "Example", email: "lead@example.test" };
+  const slots = { dogs_phrase: "1 dog", frequency: "weekly", yard_phrase: "small", last_cleaned_phrase: "about 2 weeks", day_intro: "", low: 27, high: 34, monthly: 95, biweekly: 72, biweekly_rate: 72, haul_away: 21, haul_monthly: 21, location: "ZIP 43528", day: "Friday", name: "Example", email: "lead@example.test", business_phone: "(419) 555-0101" };
   for (const [key, seed] of Object.entries(TEMPLATES)) { assert.doesNotMatch(seed, /[\u2013\u2014]/); const body = renderPlaybookTemplate(key, slots); assert.doesNotMatch(body, /Reply STOP to opt out|Text STOP to unsubscribe/i); assert.doesNotMatch(body, /[\u2013\u2014]/); }
 });
 test("rule intents are closed and safety signals take precedence over interest", () => {
@@ -41,9 +41,13 @@ test("quote waits for detail confirmation and address, corrections require confi
 });
 test("golden quote uses Craig's exact template wording and current grid", () => {
   const quote = respond(afterConfirm, "[SERVICE ADDRESS]", { classification: { intent: "address_given", confidence: 1, slots: {} } });
-  assert.equal(quote.body, "Perfect, we're already in Maumee on Fridays, so we could get you started as soon as tomorrow. The initial cleanup to get the yard caught up runs $27 to $34. We provide a range which is based on how much waste is in the yard and how long it takes the technician. After that it's $95 a month for weekly service. If this all sounds good I can get your account setup and get you on the schedule for tomorrow.");
+  assert.equal(quote.body, "Our rate for 1 dog with weekly service is $95 per month, and the initial cleanup to get the yard caught up runs $27 to $34. The range depends on how much waste is in the yard and how long it takes. It's month to month with no contract. Want me to get you set up?");
+  assert.doesNotMatch(quote.body, /;/);
   assert.equal(quote.pricingVersion, WEBSITE_VERSION); assert.ok(quote.body.includes(RANGE_SENTENCE)); assert.doesNotMatch(quote.body, /\$15/);
   assert.equal(respond(afterConfirm, "How much?", { route: { approvedDays: ["Tuesday", "Friday"], auditedBy: "fixture" } }).reason, "route_day_requires_confirmation");
+  const serviceDay = respond(quote.state, "What day do you come?");
+  assert.equal(serviceDay.templateKey, "service_day_answer"); assert.match(serviceDay.body, /on Friday/); assert.doesNotMatch(serviceDay.body, /\$/);
+  assert.equal(respond(quote.state, "What day do you come?", {route: null}).reason, "route_day_requires_confirmation");
   const yes = respond(quote.state, "yes"); assert.equal(yes.templateKey, "ready_access"); assert.ok(yes.body.includes(lead.email)); assert.ok(yes.body.includes(lead.name));
 });
 test("dated cleanup confirmation preserves matching details and corrections remain explicit", () => {
@@ -58,7 +62,9 @@ test("affirmative prefixes never silently confirm unparsed corrections or questi
   for (const text of ["Yes, we have nine dogs", "Yes, our yard is one acre", "Yes, we have no dogs", "yes, how does it work?", "Yes, except the cleanup is for a school campus", "Yes, the yard is two thirds of an acre"]) {
     const classification = classifyPlaybookRules(text, { ...state, details: lead, now: "2026-11-19T14:03:00Z" });
     assert.notEqual(classification.intent, "confirm_yes", text);
-    const result = respond(state, text, { classification }); assert.notEqual(result.templateKey, "quote_recurring", text); assert.equal(result.escalate, true, text); assert.doesNotMatch(result.body, /\$/, text);
+    const result = respond(state, text, { classification }); assert.notEqual(result.templateKey, "quote_recurring", text); assert.doesNotMatch(result.body, /\$/, text);
+    if (text.includes("two thirds")) {assert.equal(classification.slots.yardTier, "large"); assert.equal(result.templateKey, "confirm_details"); assert.equal(result.escalate, false);}
+    else assert.equal(result.escalate, true, text);
   }
   assert.equal(classifyPlaybookRules("Yes, we have nine dogs").slots.dogs, 9);
   assert.equal(classifyPlaybookRules("Yes, we have no dogs").slots.dogs, 0);
@@ -67,12 +73,19 @@ test("affirmative prefixes never silently confirm unparsed corrections or questi
   const result = await classifyPlaybookIntent("Yes, except the cleanup is for a school campus", { ...state, details: lead }, { env: { LEAD_CLASSIFIER_ENABLED: "true" }, usageStore: { claim() { calls++; return true; } }, provider: async () => { calls++; return { response: '{"intent":"confirm_yes","confidence":1,"slots":{}}' }; } });
   assert.equal(result.reason, "confirmation_requires_review"); assert.equal(calls, 0);
 });
-test("discount is an objection handler once after the quote and never upfront", () => {
-  for (const intent of ["objection_price", "objection_thinking", "objection_competitor"]) {
-    const classification = { intent, confidence: 1, slots: {} };
-    assert.equal(respond({ stage: "intro_sent" }, "", { classification }).body, "");
-    const offered = respond({ ...afterConfirm, stage: "quote_sent" }, "", { classification }); assert.equal(offered.templateKey, "objection_discount"); assert.match(offered.body, /\$15/);
-    const second = respond(offered.state, "", { classification }); assert.equal(second.body, ""); assert.equal(second.escalate, true);
+test("price objections offer the current biweekly rate once and thinking replies never invent a discount", () => {
+  const classification = { intent: "objection_price", confidence: 1, slots: {} };
+  assert.doesNotMatch(respond({stage: "intro_sent"}, "", {classification}).body, /\$/);
+  const offered = respond({...afterConfirm, stage: "quote_sent"}, "too expensive", {classification});
+  assert.equal(offered.templateKey, "objection_biweekly");
+  assert.match(offered.body, new RegExp(`\\$${monthly("every_other_week", 1)} per month`));
+  assert.equal(offered.state.biweekly_offered, true);
+  assert.doesNotMatch(offered.body, /\$15/);
+  const second = respond(offered.state, "too expensive", {classification});
+  assert.equal(second.templateKey, "spouse_thinking"); assert.doesNotMatch(second.body, /\$/);
+  for (const intent of ["objection_thinking", "objection_competitor"]) {
+    const result = respond({...afterConfirm, stage: "quote_sent"}, "", {classification: {intent, confidence: 1, slots: {}}});
+    assert.equal(result.templateKey, "spouse_thinking"); assert.equal(result.escalate, false); assert.doesNotMatch(result.body, /\$/);
   }
   assert.ok(lintPlaybookText(renderPlaybookTemplate("objection_discount"), { intent: "confirm_yes" }).includes("discount_outside_objection"));
 });
@@ -145,7 +158,7 @@ test("Meta confirmation gathers missing yard and cleanup answers then resumes an
   assert.equal(quote.templateKey, "quote_recurring");
   assert.equal(quote.slots.monthly, 105);
   assert.deepEqual([quote.slots.low, quote.slots.high], initialRange(2, "two_weeks"));
-  assert.match(quote.body, /After that it's \$105 a month for weekly service\./);
+  assert.match(quote.body, /2 dogs with weekly service is \$105 per month/);
   assert.ok(quote.body.includes(RANGE_SENTENCE));
   assert.doesNotMatch(quote.body, /\$15|[^\x00-\x7f]/);
 });
@@ -173,7 +186,7 @@ test("optional Meta form answers share deterministic parsing and never invent om
   assert.equal(leadPlaybookDetails({ yard_size_answer: "B", last_cleaned_answer: "F" }).yardTier, "small");
   assert.equal(leadPlaybookDetails({ yard_size_answer: "B", last_cleaned_answer: "F" }).lastCleaned, "3_4_months");
   assert.equal(leadPlaybookDetails({}).dogs, null);
-  assert.equal(leadPlaybookDetails({}).lastCleaned, undefined);
+  assert.equal(leadPlaybookDetails({}).lastCleaned == null, true);
   assert.equal(leadPlaybookDetails({ dogs: 0 }).dogs, 0);
   const corrected = leadPlaybookDetails({ yard_size_answer: "0.75 acre" }, { details: { yardTier: "small", yardAcres: null } });
   assert.equal(corrected.yardTier, "small");
@@ -197,10 +210,9 @@ test("signup confirms contact and both access facts before a Craig-only SNG hand
   const turn = text => { const decision = respond(state, text); state = decision.state; return decision; };
   const access = turn("Yes");
   assert.equal(access.templateKey, "ready_access");
-  assert.match(access.body, /confirm the account name/);
-  assert.match(access.body, /facing the house/);
-  assert.match(access.body, /double bag/);
-  assert.equal(turn("Yes").templateKey, "ask_gate_side");
+  assert.match(access.body, /Example Lead and lead@example\.test/);
+  assert.match(access.body, /both right/);
+  const gate = turn("Yes"); assert.equal(gate.templateKey, "ask_gate_side"); assert.match(gate.body, /facing the house/);
   assert.equal(turn("right").templateKey, "ask_trash_location");
   const handoff = turn("by the garage");
   assert.equal(handoff.reason, "signup_ready");
@@ -210,7 +222,7 @@ test("signup confirms contact and both access facts before a Craig-only SNG hand
   assert.equal(handoff.state.details.gateSide, "right");
   assert.equal(handoff.state.details.trashLocation, "by the garage");
   assert.equal(handoff.escalate, true);
-  assert.match(handoff.body, /Craig to complete your Sweep & Go setup/);
+  assert.equal(handoff.body, "Got it, thank you! I'll finish your account setup and confirm your first cleanup with you. You'll just need to accept the terms before service starts.");
   assert.equal(turn("Yes").body, "");
 });
 
@@ -249,8 +261,8 @@ test("AI disclosure is truthful, immediately hands off, and all customer prose s
   const identity = respond(afterConfirm, "Is this AI?");
   assert.equal(identity.reason, "identity_question");
   assert.equal(identity.escalate, true);
-  assert.match(identity.body, /use AI and Craig's approved replies/);
-  assert.match(identity.body, /hand this conversation to Craig/);
+  assert.match(identity.body, /use AI with my approved replies/);
+  assert.match(identity.body, /pause the automated messages and follow up myself/);
   assert.doesNotMatch(identity.body, /I'm a real person|[^\x00-\x7f]/);
   assert.equal(respond(identity.state, "Yes please").body, "");
   const body = renderPlaybookTemplate("ready_access", { name: "Ren\u00e9e Example", email: "example@example.test" });
@@ -262,12 +274,32 @@ test("AI disclosure is truthful, immediately hands off, and all customer prose s
 test("prospective cancellation questions use approved answers while actual service requests remain held", () => {
   const approvedAnswers = [{ answer_key: "fixture-contract", intent: "question_contract", approval_status: "approved", version: 1, answer_template: "Service is month to month, so you can cancel anytime." }];
   const answer = respond(afterConfirm, "Can I cancel anytime?", { approvedAnswers });
-  assert.equal(answer.reason, "approved_library");
+  assert.equal(answer.reason, "approved_contract_answer");
   assert.equal(answer.escalate, false);
   assert.match(answer.body, /month to month/);
   for (const text of ["Cancel my service", "You missed my yard", "My gate was left open last visit"]) {
     const decision = respond(afterConfirm, text, { approvedAnswers });
     assert.equal(decision.escalate, true);
-    assert.notEqual(decision.reason, "approved_library");
+    assert.notEqual(decision.reason, "approved_contract_answer");
+  }
+});
+
+test("cleanup recaps preserve customer duration ranges while only pricing uses the conservative band", () => {
+  for (const [text, band, phrase] of [["2-3 weeks", "three_weeks", "2 to 3 weeks"], ["2 to 3 weeks", "three_weeks", "2 to 3 weeks"], ["6-8 weeks", "two_months", "6 to 8 weeks"], ["about a month", "one_month", "a month"]]) {
+    const state = {stage: "collect_details", expected: "lastCleaned", details_confirmed: false, details: {...lead, lastCleaned: null}};
+    const recap = respond(state, text);
+    assert.equal(recap.templateKey, "confirm_details", text);
+    assert.equal(recap.state.details.lastCleaned, band, text);
+    assert.equal(recap.state.details.lastCleanedAnswer, text, text);
+    assert.ok(recap.body.endsWith(`and it's been about ${phrase} since the last cleanup. Did I get that right?`), recap.body);
+    assert.doesNotMatch(recap.body, /last thoroughly cleaned about|\$/);
+    const confirmed = respond(recap.state, "yes");
+    assert.equal(confirmed.templateKey, "ask_address");
+    assert.equal(confirmed.state.details.lastCleanedAnswer, text);
+    const quoted = respond(confirmed.state, "123 Example Road");
+    assert.equal(quoted.templateKey, "quote_recurring");
+    assert.deepEqual([quoted.slots.low, quoted.slots.high], initialRange(1, band));
+    assert.equal(quoted.slots.monthly, 95);
+    assert.equal(quoted.state.details.lastCleanedAnswer, text);
   }
 });

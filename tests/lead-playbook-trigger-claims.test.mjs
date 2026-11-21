@@ -64,7 +64,7 @@ test('a fresh inbound supersedes an old pending reply and completes the D1-aware
   let providerCalls = 0;
   const options = {loadCustomerDirectory: emptyCustomerDirectory, sender: async (_db, _env, _lead, body) => {
     providerCalls++;
-    assert.match(body, /^About how large is the area/);
+    assert.match(body, /^About how big is the area of the yard/);
     return {provider_message_id: 'ACfabricated-fresh-yard-question'};
   }};
   const result = await processPlaybookInbound(f.db, configured, {conversationId: f.conversationId, submissionId: f.submissionId, event}, options);

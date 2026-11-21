@@ -3,6 +3,7 @@ import {createHmac} from 'node:crypto';
 import test from 'node:test';
 import {build} from 'esbuild';
 import {leadTestDatabase} from './helpers/lead-inbox-fixture.mjs';
+import {CRAIG_TEMPLATES} from '../lib/craig-voice.mjs';
 
 const CUSTOMER = '+14195550100';
 const OTHER = '+14195550101';
@@ -83,7 +84,8 @@ async function fixture(t, {confirmationUncertain = false, ownerPhone = OWNER_PHO
       assert.equal(payload.to.length, 1);
       if (payload.to[0] === ownerPhone && /^\[OPWP STAFF ALERT\] /.test(payload.content)) {
         assert.match(payload.content, /A lead .*https:\/\/opwp\.example\/admin\//);
-        assert.doesNotMatch(payload.content, /Casey|customer@example\.test|123 Fictional/);
+        assert.doesNotMatch(payload.content, /Casey|customer@example\.test/);
+        assert.match(payload.content, /Reason:/);
         ownerSms.push(payload); return Response.json({data: {id: `fixture-owner-${ownerSms.length}`}});
       }
       assert.deepEqual(payload.to, [CUSTOMER], 'Customer sends are restricted to the controlled recipient');
@@ -125,7 +127,7 @@ async function fixture(t, {confirmationUncertain = false, ownerPhone = OWNER_PHO
   return {db, env, customerSms, ownerSms, ownerEmails, directoryReads, meta, inbound, state};
 }
 
-test('signed Meta and Quo handlers drive the approved playbook once through owner route review, quote, discount and signup handoff', async t => {
+test('signed Meta and Quo handlers drive the approved playbook once through owner route review, quote, biweekly step-down and signup handoff', async t => {
   const f = await fixture(t);
   assert.ok(f.db.sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='lead_playbook_owner_notifications'").get(), 'The actual 0069 schema must be present');
   const saved = await f.meta();
@@ -138,10 +140,10 @@ test('signed Meta and Quo handlers drive the approved playbook once through owne
   assert.equal(conversation.owner, 'backend');
   assert.equal(conversation.automation_mode, 'approved');
   for (const [text, id, pattern] of [
-    ['yes', 'yes-missing-yard', /About how large/],
+    ['yes', 'yes-missing-yard', /About how big/],
     ['A', 'yard-answer', /last thoroughly cleaned/],
     ['about 1 month', 'cleanup-answer', /Just to make sure.*about 1 month/],
-    ['how much?', 'price-before-confirmation', /Is that all correct\?/],
+    ['how much?', 'price-before-confirmation', /Did I get that right\?/],
     ['yes', 'confirmed-details', /address for the service/],
   ]) {
     const before = f.customerSms.length;
@@ -162,6 +164,8 @@ test('signed Meta and Quo handlers drive the approved playbook once through owne
   assert.ok(f.ownerSms.length > 0 && f.ownerEmails.length > 0);
   const notice = f.ownerSms.find(row => row.content.includes('/admin/playbook/d/'));
   assert.ok(notice, 'The owner receives a real bounded draft-review link');
+  assert.match(notice.content, /route_day_requires_confirmation/);
+  assert.match(notice.content, /Customer said: "123 Fictional Avenue, Toledo"/);
   const token = notice.content.match(/\/admin\/playbook\/d\/([^/\s]+)\//)[1];
   assert.equal((await api.readPlaybookLink(f.db, f.env, token)).draft_id, hold.id);
   assert.equal(f.db.sqlite.prepare('SELECT used_at FROM lead_playbook_links WHERE draft_id=?').get(hold.id).used_at, null);
@@ -178,20 +182,34 @@ test('signed Meta and Quo handlers drive the approved playbook once through owne
     {routeAudit: {actor: OWNER_EMAIL, handoffKey: workspace.handoffKey, day: 'Tuesday', at: new Date().toISOString()}});
   await api.setLeadAutomation(f.db, await api.getLeadRecord(f.db, saved.id), 'approved', OWNER_EMAIL);
   await f.inbound(address, 'address-after-exact-owner-audit');
-  assert.match(f.customerSms.at(-1).content, /\$58 to \$70.*\$105 a month.*Tuesday/);
+  assert.match(f.customerSms.at(-1).content, /2 dogs with weekly service is \$105 per month.*\$58 to \$70/);
   assert.equal(f.state(saved.id).stage, 'quote_sent');
+  assert.equal(f.state(saved.id).quote.day, 'Tuesday');
   assert.doesNotMatch(f.customerSms.at(-1).content, /\$15/);
   await f.inbound('too expensive', 'price-objection');
-  assert.match(f.customerSms.at(-1).content, /\$15 off your first full month/);
-  assert.equal(f.state(saved.id).discount_offered, true);
+  assert.match(f.customerSms.at(-1).content, /every-other-week option.*\$80 per month/);
+  assert.equal(f.state(saved.id).biweekly_offered, true);
+  assert.notEqual(f.state(saved.id).discount_offered, true);
+  assert.doesNotMatch(f.customerSms.at(-1).content, /\$15/);
+  await f.inbound('yes', 'accept-biweekly-option');
+  assert.equal(f.state(saved.id).details.frequency, 'every_other_week');
+  assert.equal(f.state(saved.id).details_confirmed, false);
+  assert.match(f.customerSms.at(-1).content, /want bi-weekly service.*Did I get that right\?/);
+  assert.doesNotMatch(f.customerSms.at(-1).content, /\$/);
+  await f.inbound('yes', 'confirm-biweekly-details');
+  assert.match(f.customerSms.at(-1).content, /2 dogs with bi-weekly service is \$80 per month.*\$58 to \$70/);
+  assert.equal(f.state(saved.id).stage, 'quote_sent');
+  assert.equal(f.state(saved.id).quote.monthly, 80);
+  assert.equal(f.state(saved.id).quote.day, 'Tuesday');
   await f.inbound('yes', 'accept-quote');
-  assert.match(f.customerSms.at(-1).content, /confirm the account name is Casey Example.*customer@example\.test.*facing the house/);
+  assert.match(f.customerSms.at(-1).content, /I have Casey Example and customer@example\.test for the account.*both right/);
   await f.inbound('yes', 'confirm-signup-identity');
   assert.match(f.customerSms.at(-1).content, /which side is the gate/);
   await f.inbound('left', 'gate-side');
-  assert.match(f.customerSms.at(-1).content, /Where is the trash can/);
+  assert.match(f.customerSms.at(-1).content, /Where is the outdoor trash can/);
   await f.inbound('trash can is by the garage', 'trash-location');
-  assert.match(f.customerSms.at(-1).content, /pass the confirmed account and access details to Craig/);
+  assert.equal(f.customerSms.at(-1).content,CRAIG_TEMPLATES.signup_handoff);
+  assert.doesNotMatch(f.customerSms.at(-1).content,/\bCraig\b/);
   const done = f.state(saved.id);
   assert.equal(done.stage, 'handoff_signup');
   assert.equal(done.signup_identity_confirmed, true);
@@ -231,7 +249,8 @@ test('a signed large-yard answer uses approved wording and notifies the owner wi
   const saved = await f.meta();
   await f.inbound('yes', 'large-yes');
   await f.inbound('E', 'large-yard');
-  assert.match(f.customerSms.at(-1).content, /3\/4 of an acre or larger.*property walk/);
+  assert.equal(f.customerSms.at(-1).content,CRAIG_TEMPLATES.property_walk);
+  assert.doesNotMatch(f.customerSms.at(-1).content,/\bCraig\b/);
   assert.doesNotMatch(f.customerSms.at(-1).content, /\$/);
   assert.equal(f.state(saved.id).stage, 'escalated');
   assert.equal(f.db.sqlite.prepare("SELECT COUNT(*) n FROM lead_playbook_owner_notifications WHERE kind='property_walk' AND status='accepted'").get().n, 2);
@@ -244,7 +263,8 @@ test('signed AI disclosure is truthful and stops further automatic answers', asy
   const f = await fixture(t);
   const saved = await f.meta();
   await f.inbound('Is this AI?', 'identity-question');
-  assert.match(f.customerSms.at(-1).content, /use AI and Craig's approved replies.*hand this conversation to Craig/);
+  assert.equal(f.customerSms.at(-1).content,CRAIG_TEMPLATES.is_this_ai);
+  assert.doesNotMatch(f.customerSms.at(-1).content,/\bCraig\b/);
   assert.equal(f.state(saved.id).stage, 'escalated');
   assert.ok(f.ownerEmails.some(row => /needs your review/.test(row.subject)));
   const count = f.customerSms.length;
@@ -284,12 +304,14 @@ test('using the owner cell as the controlled lead keeps signed replies active an
   const f = await fixture(t, {ownerPhone: CUSTOMER});
   const saved = await f.meta();
   await f.inbound('yes', 'shared-owner-yes');
-  assert.match(f.customerSms.at(-1).content, /About how large/);
-  await f.inbound('I have an unusual question about this.', 'shared-owner-review');
+  assert.match(f.customerSms.at(-1).content, /About how big/);
+  await f.inbound('I have a payment question.', 'shared-owner-review');
   const notice = f.db.sqlite.prepare("SELECT * FROM lead_playbook_owner_notifications WHERE channel='sms' AND status='accepted' ORDER BY rowid DESC LIMIT 1").get();
-  assert.ok(notice, 'An uncertain reply produces a real owner notice at the same phone');
+  assert.ok(notice, 'A genuine payment exception produces a real owner notice at the same phone');
   assert.deepEqual(f.ownerSms.at(-1).to, [CUSTOMER]);
   assert.match(f.ownerSms.at(-1).content, /^\[OPWP STAFF ALERT\] /);
+  assert.match(f.ownerSms.at(-1).content, /service_billing_or_anger/);
+  assert.match(f.ownerSms.at(-1).content, /Customer said: "I have a payment question\."/);
   assert.doesNotMatch(f.ownerSms.at(-1).content, /Reply STOP to opt out|Text STOP to unsubscribe/i);
   const before = f.db.sqlite.prepare('SELECT owner,owner_event_id FROM lead_conversations WHERE submission_id=?').get(saved.id);
   const outboundCount = f.db.sqlite.prepare("SELECT COUNT(*) n FROM lead_messages WHERE direction='outbound'").get().n;

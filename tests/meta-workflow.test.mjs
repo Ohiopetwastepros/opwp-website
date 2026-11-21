@@ -69,7 +69,7 @@ test("Meta mapping preserves ambiguity, conflicts and separate consent", () => {
   assert.equal(mapMetaAnswers({ dog_count: "2", number_of_dogs: "3" }).number_of_dogs, null);
   assert.equal(metaConsentEvidence({ meta_form_id: "f", original_fields: { contact_preference: "text" } }, { f: { consentField: "contact_preference" } }).valid, false);
   const message = buildMetaConfirmation({ name: "ExampleLead", number_of_dogs: null, zip: "", clean_up_frequency: "" });
-  assert.match(message, /How many dogs exactly/); assert.doesNotMatch(message, /I have 0|I have 4|undefined/); assert.match(message, /\n\nReply STOP to opt out$/);
+  assert.match(message, /how many dogs total/); assert.doesNotMatch(message, /I have 0|I have 4|undefined/); assert.match(message, /\n\nReply STOP to opt out$/);
 });
 
 test("storage is transactional and retries resolve to one lead, one Airtable record key and one confirmation", async () => {
@@ -132,7 +132,7 @@ test("pending confirmation copy refresh never sends, releases, or rewrites attem
     assert.equal(job.sent_at, prior.sent_at);
     assert.equal(job.provider_message_id, prior.provider_message_id);
     if (["queued", "blocked"].includes(job.status) && !job.attempted_at) {
-      assert.match(job.message_body, /^Hi ExampleLead, this is Craig with Ohio Pet Waste Pros\. Thanks for filling out our Facebook form\./);
+      assert.match(job.message_body, /^Hi ExampleLead, this is Craig with Ohio Pet Waste Pros\. Just to make sure I have it right,/);
       assert.match(job.message_body, /\n\nReply STOP to opt out$/);
       assert.doesNotMatch(job.message_body, /automated confirmation|[\u2013\u2014]/);
     } else assert.equal(job.message_body, prior.message_body);
@@ -177,7 +177,7 @@ test("complete first confirmations send overnight in winter and summer regardles
       content.push(JSON.parse(request.body).content); return Response.json({ data: { id: "overnight-first" } });
     } });
     assert.equal(result.sent, 1, timestamp); assert.deepEqual(content, [queued.message_body]);
-    assert.match(content[0], /I have you down for 2 dogs in ZIP 43615 with weekly service\. Did I get that right\?\n\nReply STOP to opt out$/);
+    assert.match(content[0], /Just to make sure I have it right, you have 2 dogs in ZIP 43615 and are looking for weekly service\. Did I get that right\?\n\nReply STOP to opt out$/);
     assert.equal(select(db, "lead_messages")[0].body, queued.message_body);
     assert.equal(select(db, "meta_sms_jobs").filter((job) => job.purpose === "follow_up").length, 0);
   }
@@ -271,7 +271,7 @@ test("disabled cadence neither queues new touches nor sends existing queued touc
   await processMetaConfirmations(disabled, { now: noon, fetcher: async (_url, request) => {
     content.push(JSON.parse(request.body).content); return Response.json({ data: { id: "second-initial" } });
   } });
-  assert.equal(content.length, 1); assert.match(content[0], /Thanks for filling out our Facebook form/);
+  assert.equal(content.length, 1); assert.match(content[0], /Just to make sure I have it right,/);
   assert.equal(select(db, "meta_sms_jobs").filter((job) => job.submission_id === second.id && job.purpose === "follow_up").length, 0);
   assert.equal(select(db, "meta_sms_jobs").filter((job) => job.purpose === "follow_up" && job.status === "queued").length, 3);
   assert.equal((await markMetaNoResponse(disabled)).marked, 0);
@@ -329,7 +329,7 @@ test("release and consent gates stay closed while incomplete confirmations can s
   await storeMetaLead(db, env, form("lead-1", { number_of_dogs: "4 or more", zip_code: "", service_frequency: "" }), event());
   let calls = 0;
   await processMetaConfirmations(env, { now: new Date("2026-09-17T05:00:00Z"), fetcher: async () => { calls++; return Response.json({ data: { id: "night-confirmation" } }); } });
-  assert.equal(calls, 1); assert.match(select(db, "meta_sms_jobs")[0].message_body, /How many dogs exactly/);
+  assert.equal(calls, 1); assert.match(select(db, "meta_sms_jobs")[0].message_body, /how many dogs total/);
   db.sqlite.exec("UPDATE meta_automation_releases SET revoked_at=CURRENT_TIMESTAMP");
   assert.equal(await metaReleaseApproved(db, env), false);
   assert.equal(metaCadenceQuietHours(new Date(NaN)), true);
@@ -386,7 +386,7 @@ test("Meta personal-text requests queue one owner email and pause the thread wit
   try {
     await recordMetaReply(db, saved.id, { providerMessageId: "identity-question", text: "are you a real person?", from: "+14195550100" }, { env });
     const disclosure = select(db, "meta_sms_jobs").find((job) => job.purpose === "reply");
-    assert.equal(disclosure.message_body, "Good question! These first texts are automated to help me get your info quickly, but I'm a real person and I read every conversation. Want me to text you personally?");
+    assert.equal(disclosure.message_body, "These texts use AI with my approved replies. If you'd prefer a personal reply, I'll pause the automated messages and follow up myself.");
     assert.equal((disclosure.message_body.match(/Reply STOP/g) || []).length, 0);
     assert.equal(select(db, "submission_notifications").length, 0);
     const yes = { providerMessageId: "identity-yes", text: "yes please", from: "+14195550100" };
@@ -472,7 +472,7 @@ test("reply branches and exact website pricing progress to audited signup withou
   }
   const correction = nextMetaResponse({ lead, text: "actually 3 dogs", confirmationSent: true });
   assert.equal(correction.state.details.number_of_dogs, 3); assert.equal(correction.state.expected, "confirm");
-  assert.equal(correction.response, "Hi ExampleLead, this is Craig with Ohio Pet Waste Pros. Thanks for clarifying. I have you down for 3 dogs in ZIP 43615 with weekly service. Did I get that right?");
+  assert.equal(correction.response, "Thanks for clarifying. Just to make sure I have it right, you have 3 dogs in ZIP 43615 and are looking for weekly service. Did I get that right?");
   assert.doesNotMatch(correction.response, /automated confirmation|[\u2013\u2014]/i);
 });
 
@@ -526,12 +526,12 @@ test("signed Meta → YardOps → Airtable → Quo → reply integration, retrie
     assert.equal((await api.quoPost(signedQuo("yes"))).status, 200);
     assert.equal((await api.quoPost(signedQuo("yes"))).status, 200);
     await processMetaConfirmations(env, { now: noon });
-    assert.equal(sends.length, 2); assert.match(sends[1].content, /How large/);
+    assert.equal(sends.length, 2); assert.match(sends[1].content, /About how big/);
     assert.equal(select(db, "meta_reply_decisions").length, 1);
     assert.equal(select(db, "meta_sms_jobs").filter((job) => job.purpose === "follow_up" && job.status === "queued").length, 0);
     const snapshotAt = new Date().toISOString();
     db.sqlite.prepare(`INSERT INTO airtable_cockpit_snapshots(snapshot_key,payload,status,captured_at) VALUES ('business_cockpit',?,'success',?)`).run(JSON.stringify({ opwp: { customers: [{ fields: { Status: "Active", ZIP: "43615", "Service Day": "Tuesday" } }] } }), snapshotAt);
-    for (const [text, id, pattern] of [["A", "yard", /last thoroughly cleared/], ["about 1 month", "cleaned", /\$105\.00 per month/], ["yes", "accept", /street address/], ["123 Maple Street, Toledo", "address", /audit the current route/]]) {
+    for (const [text, id, pattern] of [["A", "yard", /last thoroughly cleaned up/], ["about 1 month", "cleaned", /\$105\.00 per month/], ["yes", "accept", /address for the service/], ["123 Maple Street, Toledo", "address", /check the route and confirm/]]) {
       assert.equal((await api.quoPost(signedQuo(text, id))).status, 200);
       await processMetaConfirmations(env, { now: noon });
       assert.match(sends.at(-1).content, pattern);
