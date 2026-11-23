@@ -1,3 +1,4 @@
+import {verifiedTextSafety} from "./helpers/airtable-text-safety-fixture.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { build } from "esbuild";
@@ -93,7 +94,7 @@ test("lead assistant stores formatted scheduled drafts and normalizes legacy que
     const again = await assistant.processFollowUps({ DB: db }, 10);
     assert.equal(again.sent, 0);
     assert.equal(sent.length, 1);
-    await assistant.sendLeadMessage(db, { QUO_API_KEY: "fixture-key", QUO_FROM_NUMBER: "+14195550101" }, lead, "An automatic answer. Reply STOP to opt out.", "fixture-automation", true);
+    await assistant.sendLeadMessage(db, { QUO_API_KEY: "fixture-key", QUO_FROM_NUMBER: "+14195550101" }, lead, "An automatic answer. Reply STOP to opt out.", "fixture-automation", true, {textSafety: verifiedTextSafety});
     assert.equal(sent[1], 'An automatic answer.');
     for (const body of sent) checkSpacing(body);
   } finally { delete globalThis.__smsSpacingRequest; }
@@ -122,7 +123,7 @@ for (const action of ["trash", "pause"]) {
     globalThis.__smsSpacingRequest = async () => { calls++; return Response.json({ data: { id: "must-not-send" } }); };
     try {
       await assert.rejects(() => assistant.sendLeadMessage(db, { QUO_API_KEY: "fixture-key", QUO_FROM_NUMBER: "+14195550101" }, lead,
-        "A pending automatic answer.", "fixture-automation", true), /automated reply was cancelled/);
+        "A pending automatic answer.", "fixture-automation", true, {textSafety: verifiedTextSafety}), /automated reply was cancelled/);
       assert.equal(changed, true);
       assert.equal(calls, 0);
       assert.equal(db.sqlite.prepare("SELECT COUNT(*) count FROM lead_messages").get().count, 0);

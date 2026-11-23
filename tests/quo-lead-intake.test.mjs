@@ -92,7 +92,9 @@ test("rejected new senders create no lead, sync task or reply; unknown STOP stil
     assert.equal(result.leadCreated, false); assert.equal(result.autoReplied, false); assert.equal(db.writes.length, 0);
   }
   const db = fakeDb(); await recordInboundQuoMessage(db, {}, event("STOP"));
-  assert.equal(db.writes.length, 1); assert.match(db.writes[0].sql, /INSERT INTO lead_suppressions/);
+  assert.match(db.writes[0].sql, /INSERT INTO lead_suppressions/);
+  assert.ok(db.writes.some(row => /INSERT INTO airtable_cockpit_snapshots/.test(row.sql)), 'Unknown STOP has a durable status-sync outbox');
+  assert.ok(!db.writes.some(row => /INSERT(?: OR IGNORE)? INTO (?:submissions|lead_messages|lead_airtable_sync)\b/.test(row.sql)), 'STOP does not fabricate a sales lead, reply, or lead mirror task');
 });
 
 test("short replies stay attached to established leads without creating another lead", async () => {

@@ -1,8 +1,9 @@
+import {verifiedTextSafety} from "./helpers/airtable-text-safety-fixture.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {classifyPlaybookRules, leadPlaybookDetails, nextPlaybookResponse} from "../lib/lead-playbook.mjs";
 import {classifyPlaybookIntent} from "../lib/lead-playbook-classifier.mjs";
-import {processPlaybookInbound} from "../lib/lead-playbook-ingest.js";
+import {processPlaybookInbound as processPlaybookInboundWithSafety} from "../lib/lead-playbook-ingest.js";
 import {leadTestDatabase} from "./helpers/lead-inbox-fixture.mjs";
 
 const replies = [
@@ -47,7 +48,7 @@ test("every bounded affirmative after the minimal Meta confirmation asks for the
   }
 });
 
-test("known-customer flags hold affirmative replies instead of starting the sales playbook", () => {
+test("known-customer flags keep affirmatives silent and a lead reporting a service or billing problem gets a staff handoff", () => {
   for (const flags of [{existing_customer: true}, {is_existing_customer: true}, {existing_customer: true, is_existing_customer: true}]) {
     const lead = {...form, ...flags};
     const affirmed = nextPlaybookResponse({conversation, lead, state: initial, text: "Yes that is correct"});
@@ -56,11 +57,16 @@ test("known-customer flags hold affirmative replies instead of starting the sale
     assert.equal(affirmed.reason, "existing_customer");
     assert.equal(affirmed.body, "");
   }
-  for (const text of ["You missed my service", "I have a billing issue"]) {
+  for (const [text, reason, acknowledgement] of [
+    ["You missed my service", "complaint", /sorry.*(?:looked at|follow up)/i],
+    ["I have a billing issue", "account_billing", /office.*(?:bill|invoice)/i],
+  ]) {
     const service = nextPlaybookResponse({conversation, lead: form, state: initial, text});
     assert.equal(service.escalate, true, text);
-    assert.equal(service.reason, "service_billing_or_anger", text);
-    assert.equal(service.body, "", text);
+    assert.equal(service.reason, reason, text);
+    assert.equal(service.state.stage, "escalated", text);
+    assert.match(service.body, acknowledgement, text);
+    assert.doesNotMatch(service.body, /get you set up|on the schedule|\$|Reply STOP|\bpoop\b|[\u2013\u2014]/i, text);
   }
 });
 
@@ -85,7 +91,7 @@ test("affirmatives preserve collected details and advance through cleanup, confi
   assert.equal(quoted.slots.dogs, 1);
   assert.equal(quoted.slots.yardTier, "tiny");
   assert.equal(quoted.slots.lastCleaned, "two_weeks");
-  assert.match(quoted.body, /After that it's \$95 a month for weekly service\./);
+  assert.match(quoted.body, /weekly service is \$95 per month/);
   assert.equal(turn("Yes, that\u2019s correct.").templateKey, "ready_access");
 });
 
@@ -119,20 +125,22 @@ test("affirmative wording does not swallow questions, corrections or negative an
 });
 
 test("bounded affirmative variants also confirm signup identity without dropping explicit access details", () => {
+  const quotedDetails = {...leadPlaybookDetails(form), yardTier: 'tiny', lastCleaned: 'one_month', address: '123 Fictional Avenue'};
+  const quote = {monthly: 95, low: 48, high: 58, frequencyId: 'once_a_week', day: 'Friday'};
   for (const text of replies) {
-    const state = {stage: "access_questions_sent", expected: "signupIdentity", details_confirmed: true,
-      details: {...leadPlaybookDetails(form), gateSide: "left", trashLocation: "by the garage"}};
+    const state = {stage: "access_questions_sent", expected: "signupIdentity", details_confirmed: true, quote,
+      details: {...quotedDetails, gateSide: "left", trashLocation: "by the garage"}};
     const decision = nextPlaybookResponse({conversation, lead: form, state, text});
     assert.equal(decision.templateKey, "signup_handoff", text);
     assert.equal(decision.state.signup_identity_confirmed, true, text);
     assert.equal(decision.state.details.gateSide, "left", text);
     assert.equal(decision.state.details.trashLocation, "by the garage", text);
     const missingName = nextPlaybookResponse({conversation, lead: {...form, name: ""},
-      state: {stage: "access_questions_sent", expected: "signupName", details_confirmed: true}, text});
+      state: {stage: "access_questions_sent", expected: "signupName", details_confirmed: true, quote, details: {...quotedDetails, name: ''}}, text});
     assert.equal(missingName.templateKey, "ask_signup_name", text);
     assert.equal(missingName.state.details.name, "", text);
   }
-  const state = {stage: "access_questions_sent", expected: "signupAccess", details_confirmed: true};
+  const state = {stage: "access_questions_sent", expected: "signupAccess", details_confirmed: true, quote, details: quotedDetails};
   const decision = nextPlaybookResponse({conversation, lead: form, state, text: "Yes that is correct, the gate is on the left. Trash is by the garage."});
   assert.equal(decision.templateKey, "signup_handoff");
   assert.equal(decision.state.signup_identity_confirmed, true);
@@ -205,6 +213,10 @@ test("an exactly scoped controlled-test Meta affirmative advances once despite a
     assert.equal(modelCalls, 0);
     assert.equal(customerSends.length, 1);
     assert.equal(customerSends[0].phone, phone);
-    assert.match(customerSends[0].body, /About how large is the area/);
+    assert.match(customerSends[0].body, /About how big is the area of the yard/);
   }
 });
+
+function processPlaybookInbound(db, env, input, options = {}) {
+  return processPlaybookInboundWithSafety(db, env, input, {textSafety: verifiedTextSafety, ...options});
+}
