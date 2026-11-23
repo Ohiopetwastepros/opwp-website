@@ -9,12 +9,14 @@ const manifestPath=path.join(root,'tmp/private-build-inputs-manifest.json');
 const digest=file=>createHash('sha256').update(fs.readFileSync(path.join(root,file))).digest('hex');
 const privatePaths=['data/meta-ads-audit-2026-10-06.json','data/route-density-audit-2026-10-06.json','scripts/dog-food-inventory-rollback.sql','lib/dog-food-reconciliation.json','migrations/0056_dog_food_inventory_costs.sql','lib/financial-defaults.json','lib/routing-private.json','lib/staff-private.json','private/production-migrations.json','lib/operational-private.json','scripts/create-meta-audit-report.py','scripts/prepare-meta-audit.py','lib/bank-private.json'];
 const write=(file,value)=>{const target=path.join(root,file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,JSON.stringify(value,null,2)+'\n');};
+// GitHub Actions sets CI=true. Vercel sets CI=1. Both are continuous-integration builds.
+export function allowsSyntheticCi(value=process.env.CI){return value==='true'||value==='1';}
 export function validateBuildInputs({production=false}={}) {
   if(!fs.existsSync(manifestPath))throw Error('Private build inputs are required. CI must explicitly prepare synthetic inputs.');
   const manifest=JSON.parse(fs.readFileSync(manifestPath,'utf8'));
   if(production && manifest.mode!=='private')throw Error('Production deployment refuses synthetic build inputs.');
   if(!['private','synthetic'].includes(manifest.mode))throw Error('Unknown build-input mode.');
-  if(manifest.mode==='synthetic' && process.env.CI!=='true')throw Error('Synthetic build inputs are restricted to CI.');
+  if(manifest.mode==='synthetic' && !allowsSyntheticCi())throw Error('Synthetic build inputs are restricted to CI.');
   const expected=manifest.mode==='private'?privatePaths:['data/meta-ads-audit-2026-10-06.json','data/route-density-audit-2026-10-06.json','lib/dog-food-reconciliation.json','lib/financial-defaults.json','lib/routing-private.json','lib/staff-private.json','lib/operational-private.json','lib/bank-private.json'];
   if(!Array.isArray(manifest.files)||manifest.files.length!==expected.length||!expected.every(file=>manifest.files.filter(item=>item.path===file).length===1))throw Error('Build-input manifest is incomplete.');
   for(const item of manifest.files)if(!expected.includes(item.path)||digest(item.path)!==item.sha256)throw Error('Private build input changed; review the source before release.');
@@ -37,7 +39,7 @@ export function validateBuildInputs({production=false}={}) {
 }
 export function prepareBuildInputs({synthetic=false}={}) {
   if(synthetic){
-    if(process.env.CI!=='true')throw Error('Synthetic preparation requires the explicit CI environment.');
+    if(!allowsSyntheticCi())throw Error('Synthetic preparation requires the explicit CI environment.');
     if(fs.existsSync(manifestPath)&&JSON.parse(fs.readFileSync(manifestPath,'utf8')).mode==='private')throw Error('Refusing to overwrite existing private production inputs.');
     const pairs=[['tests/fixtures/meta-ads.json','data/meta-ads-audit-2026-10-06.json'],['tests/fixtures/route-density.json','data/route-density-audit-2026-10-06.json'],['tests/fixtures/dog-food-reconciliation.json','lib/dog-food-reconciliation.json'],['tests/fixtures/financial-defaults.json','lib/financial-defaults.json'],['tests/fixtures/routing-private.json','lib/routing-private.json'],['tests/fixtures/staff-private.json','lib/staff-private.json'],['tests/fixtures/operational-private.json','lib/operational-private.json'],['tests/fixtures/bank-example.json','lib/bank-private.json']];
     for(const [source,target] of pairs){fs.mkdirSync(path.dirname(path.join(root,target)),{recursive:true});fs.copyFileSync(path.join(root,source),path.join(root,target));}

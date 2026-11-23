@@ -26,6 +26,7 @@ test('synthetic inputs are explicit, deterministic and refused by production dep
   const f=fixture(t);
   assert.notEqual(f.run().status,0);
   assert.notEqual(f.run(['--synthetic'],null,'false').status,0);
+  {const vercel=f.run(['--synthetic'],null,'1');assert.equal(vercel.status,0,vercel.stderr);}
   {const prepared=f.run(['--synthetic']);assert.equal(prepared.status,0,prepared.stderr);}
   const release=fs.readFileSync(path.join(f.root,'lib/deployment-release.json'),'utf8');
   assert.equal(f.run().status,0);

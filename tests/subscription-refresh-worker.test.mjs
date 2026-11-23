@@ -175,6 +175,109 @@ test("daily reconciliation fills customer profile and active subscription fields
   }
 });
 
+test("service schedule sync fills Phone and Email when a Sweep & Go client is created or updated", async () => {
+  const originalFetch = globalThis.fetch;
+  const writes = [];
+  globalThis.fetch = async (_url, options = {}) => {
+    if (!options.method) {
+      return Response.json({
+        records: [
+          {
+            id: "recExisting",
+            fields: {
+              "Client Name": "Existing Example",
+              Status: "Active",
+              Type: "Residential",
+              "SNG Client ID": "rcl_existing",
+              Frequency: "Weekly",
+              "Service Day": "Monday",
+              Email: "old@example.com",
+              Phone: "4195550001",
+            },
+          },
+          {
+            id: "recKeep",
+            fields: {
+              "Client Name": "Keep Example",
+              Status: "Active",
+              Type: "Residential",
+              "SNG Client ID": "rcl_keep",
+              Frequency: "Weekly",
+              "Service Day": "Monday",
+              Email: "keep@example.com",
+              Phone: "4195550002",
+            },
+          },
+        ],
+      });
+    }
+    writes.push({ method: options.method, body: JSON.parse(options.body) });
+    return Response.json({ records: [] });
+  };
+
+  try {
+    const result = await syncAirtableServiceSchedules(
+      { AIRTABLE_API_KEY: "test-key" },
+      [
+        { client: "rcl_existing", client_name: "Existing Example", email: "updated@example.com", cell_phone: "4195550101", cleanup_frequency: "weekly", service_days: ["Monday"] },
+        { client: "rcl_keep", client_name: "Keep Example", email: "   ", cell_phone: "", home_phone: null, cleanup_frequency: "weekly", service_days: ["Monday"] },
+        { client: "rcl_created", client_name: "Created Example", email: "created@example.com", cell_phone: "(419) 555-0104", cleanup_frequency: "weekly", service_days: ["Tuesday"], address: "9 Oak St", city: "Toledo", zip: "43604" },
+        { client: "rcl_invalid", client_name: "Invalid Example", email: "not-an-email", cell_phone: "555", cleanup_frequency: "weekly", service_days: ["Wednesday"], address: "10 Oak St", city: "Toledo", zip: "43605" },
+      ],
+    );
+
+    assert.equal(result.updated, 1);
+    assert.equal(result.created, 2);
+    const patch = writes.find((write) => write.method === "PATCH").body.records;
+    assert.deepEqual(patch, [{ id: "recExisting", fields: { Email: "updated@example.com", Phone: "4195550101" } }]);
+    const created = writes.find((write) => write.method === "POST").body.records.map((record) => record.fields);
+    const createdExample = created.find((fields) => fields["Client Name"] === "Created Example");
+    assert.equal(createdExample.Email, "created@example.com");
+    assert.equal(createdExample.Phone, "(419) 555-0104");
+    const invalidExample = created.find((fields) => fields["Client Name"] === "Invalid Example");
+    assert.equal("Email" in invalidExample, false);
+    assert.equal("Phone" in invalidExample, false);
+    assert.equal(invalidExample.Address, "10 Oak St");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("subscription client_email fills Email when the active client email is blank", async () => {
+  const originalFetch = globalThis.fetch;
+  const writes = [];
+  globalThis.fetch = async (_url, options = {}) => {
+    if (!options.method) {
+      return Response.json({
+        records: [{
+          id: "recSub",
+          fields: {
+            "Client Name": "Subscription Example",
+            Status: "Active",
+            Type: "Residential",
+            "SNG Client ID": "rcl_sub",
+            Frequency: "Weekly",
+            "Service Day": "Monday",
+          },
+        }],
+      });
+    }
+    writes.push(JSON.parse(options.body));
+    return Response.json({ records: [] });
+  };
+  const active = [{ client: "rcl_sub", client_name: "Subscription Example", email: "", cleanup_frequency: "weekly", service_days: ["Monday"] }];
+  const subscriptions = [{ client: "rcl_sub", client_name: "Subscription Example", client_email: "billing@example.com", status: "active", service_plan: "1d-1xW", billing_interval: "monthly", price: 80, start_date: "2020-01-01" }];
+
+  try {
+    await syncAirtableServiceSchedules({ AIRTABLE_API_KEY: "test-key" }, active, subscriptions);
+    const fields = writes[0].records[0].fields;
+    assert.equal(fields.Email, "billing@example.com");
+    assert.equal(fields.Address, undefined);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("complete subscription reconciliation deactivates Airtable customers without a current core plan", async () => {
   const originalFetch = globalThis.fetch;
   const writes = [];
