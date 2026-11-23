@@ -89,6 +89,8 @@ test("cancellation processing persists Never Started, zero lost MRR and inactive
       upsertSngSubscriptionCanceled: async (_body, value) => { calls.push(["airtable", value]); return { lostMrr: 0 }; },
       updateSubscriptionCancellationLostMrr: async (id, value) => calls.push(["mrr", id, value]),
       updateSngCustomerLifecycle: async (_body, value) => calls.push(["lifecycle", value]),
+      getRuntimeEnv: () => ({}),
+      captureSeasonalPauseWebhook: async () => ({ skipped: true, reason: "migration_pending" }),
       markSngEventProcessed: async (...args) => calls.push(["processed", ...args]),
     });
     const result = await processEvent({ id: "event", eventType: "client:subscription_canceled", body: { data: { subscription_id: "sub", termination_reason: "Other" } } });

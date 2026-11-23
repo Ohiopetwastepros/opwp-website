@@ -7,6 +7,7 @@ const PUBLIC_ADMIN_PATHS = new Set(["/admin/login", "/admin/login/", "/api/admin
 // The offline shell contains no customer data. Every data/proof API remains authenticated.
 const PUBLIC_FIELD_PATHS = new Set(["/field/sw.js", "/field/app", "/field/app/", "/field/login", "/field/login/", "/api/field/session", "/api/field/session/"]);
 const PUBLIC_OFFICE_PATHS = new Set(["/office/login", "/office/login/", "/api/office/session", "/api/office/session/"]);
+const SEASONAL_PAUSE_PATHS = new Set(["/office/seasonal-pauses", "/office/seasonal-pauses/", "/api/office/seasonal-pauses", "/api/office/seasonal-pauses/"]);
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const GOOGLE_MAP_ADMIN_PATHS = new Set(["/admin/call-guide", "/admin/call-guide/"]);
 const DENSITY_MAP_ADMIN_PATHS = new Set(["/admin/acquisition", "/admin/acquisition/"]);
@@ -38,7 +39,14 @@ async function routeMiddleware(request, adminRequestHeaders) {
   if (PUBLIC_OFFICE_PATHS.has(pathname)) return NextResponse.next();
   if (pathname === "/office" || pathname.startsWith("/office/") || pathname.startsWith("/api/office/")) {
     const auth = await verifyOfficeRequest(request.headers, getDb());
-    if (auth.authorized) return NextResponse.next();
+    const officeAuthorized = auth.authorized && (!SEASONAL_PAUSE_PATHS.has(pathname) || auth.member?.organizationId === "org-opwp");
+    const seasonalAdmin = !officeAuthorized && SAFE_METHODS.has(request.method) && SEASONAL_PAUSE_PATHS.has(pathname)
+      ? await verifyAdminRequest(request.headers) : null;
+    if (officeAuthorized || seasonalAdmin?.authorized) {
+      const response = NextResponse.next();
+      if (SEASONAL_PAUSE_PATHS.has(pathname)) response.headers.set("Cache-Control", "private, no-store");
+      return response;
+    }
     if (pathname.startsWith("/api/office/")) return NextResponse.json({ ok: false, code: "OFFICE_SESSION_REQUIRED", error: "Your office session has expired." }, { status: 401, headers: { "Cache-Control": "no-store" } });
     const login = new URL("/office/login/", request.url);
     login.searchParams.set("next", `${pathname}${search}`);

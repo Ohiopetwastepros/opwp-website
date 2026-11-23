@@ -14,5 +14,5 @@ export default async function OfficePage() {
   const auth = await verifyOfficeRequest(await headers(), getDb());
   if (!auth.authorized) redirect("/office/login/");
   const googleMapsKey = String(getRuntimeEnv().GOOGLE_MAPS_BROWSER_KEY || "").trim();
-  return <main className={`opwp-admin-shell ${styles.shell}`}><header className={styles.header}><a className={styles.brand} href="/office/"><span>O</span><div><strong>OPWP</strong><small>Office operations</small></div></a><div className={styles.identity}>Signed in as<strong>{auth.member.name}</strong><OfficeSignOut/></div></header><NewClientCallGuide googleMapsKey={googleMapsKey}/></main>;
+  return <main className={`opwp-admin-shell ${styles.shell}`}><header className={styles.header}><a className={styles.brand} href="/office/"><span>O</span><div><strong>OPWP</strong><small>Office operations</small></div></a><div className={styles.identity}><a href="/office/seasonal-pauses/">Seasonal pauses</a>Signed in as<strong>{auth.member.name}</strong><OfficeSignOut/></div></header><NewClientCallGuide googleMapsKey={googleMapsKey}/></main>;
 }
