@@ -1,3 +1,4 @@
+import {verifiedTextSafety} from "./helpers/airtable-text-safety-fixture.mjs";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {leadTestDatabase} from './helpers/lead-inbox-fixture.mjs';
@@ -30,7 +31,7 @@ function fixture(t) {
       {leadId: id, formId: 'footer-form', pageId: 'footer-page'});
   }
   async function flush() {
-    return processMetaConfirmations(env, {now: daytime, fetcher: async (_url, request) => {
+    return processMetaConfirmations(env, {textSafety: verifiedTextSafety, now: daytime, fetcher: async (_url, request) => {
       const payload = JSON.parse(request.body);
       assert.deepEqual(payload.to, [PHONE]);
       sent.push(payload.content);

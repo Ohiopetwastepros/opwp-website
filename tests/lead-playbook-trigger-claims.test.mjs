@@ -1,16 +1,17 @@
+import {verifiedTextSafety, withVerifiedTextSafety} from "./helpers/airtable-text-safety-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 import {leadTestDatabase} from './helpers/lead-inbox-fixture.mjs';
 import {nextPlaybookResponse} from '../lib/lead-playbook.mjs';
 import {createPlaybookLink, readPlaybookLink} from '../lib/lead-playbook-links.mjs';
-import {processPlaybookInbound, runScheduledPlaybook} from '../lib/lead-playbook-ingest.js';
+import {processPlaybookInbound as processPlaybookInboundWithSafety, runScheduledPlaybook} from '../lib/lead-playbook-ingest.js';
 
 const bundle = await build({stdin: {contents: "export * from './lib/lead-playbook-service.js';", resolveDir: process.cwd()}, bundle: true, platform: 'node', format: 'esm', write: false, plugins: [{name: 'no-real-provider', setup(builder) {
   builder.onResolve({filter: /^\.\/lead-assistant$/}, () => ({path: 'provider', namespace: 'fixture'}));
   builder.onLoad({filter: /.*/, namespace: 'fixture'}, () => ({contents: "export async function sendLeadMessage(){throw new Error('Real sends forbidden in tests');}", loader: 'js'}));
 }}]});
-const api = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const api = withVerifiedTextSafety(await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64')));
 const env = {LEAD_PLAYBOOK_ENABLED: 'true', LEAD_PLAYBOOK_AUTO_SEND_ENABLED: 'true', LEAD_PLAYBOOK_LINK_SECRET: 'fabricated-trigger-test-secret-not-production-123456'};
 const emptyCustomerDirectory = async () => ({ok: true, complete: true, rows: []});
 const totalChanges = db => Number(db.sqlite.prepare('SELECT total_changes() AS count').get().count);
@@ -181,3 +182,7 @@ test('a superseded stranded draft remains terminal through automatic, direct rev
   assert.equal(persisted.provider_message_id, null);
   assert.equal(f.db.sqlite.prepare('SELECT state_json FROM lead_playbook_state WHERE conversation_id=?').get(f.conversationId).state_json, originalState);
 });
+
+function processPlaybookInbound(db, env, input, options = {}) {
+  return processPlaybookInboundWithSafety(db, env, input, {textSafety: verifiedTextSafety, ...options});
+}

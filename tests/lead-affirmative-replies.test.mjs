@@ -1,8 +1,9 @@
+import {verifiedTextSafety} from "./helpers/airtable-text-safety-fixture.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {classifyPlaybookRules, leadPlaybookDetails, nextPlaybookResponse} from "../lib/lead-playbook.mjs";
 import {classifyPlaybookIntent} from "../lib/lead-playbook-classifier.mjs";
-import {processPlaybookInbound} from "../lib/lead-playbook-ingest.js";
+import {processPlaybookInbound as processPlaybookInboundWithSafety} from "../lib/lead-playbook-ingest.js";
 import {leadTestDatabase} from "./helpers/lead-inbox-fixture.mjs";
 
 const replies = [
@@ -215,3 +216,7 @@ test("an exactly scoped controlled-test Meta affirmative advances once despite a
     assert.match(customerSends[0].body, /About how big is the area of the yard/);
   }
 });
+
+function processPlaybookInbound(db, env, input, options = {}) {
+  return processPlaybookInboundWithSafety(db, env, input, {textSafety: verifiedTextSafety, ...options});
+}

@@ -1,9 +1,10 @@
+import {verifiedTextSafety} from "./helpers/airtable-text-safety-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {leadTestDatabase as database} from './helpers/lead-inbox-fixture.mjs';
 import {quoLearningScope,resolveQuoAuthor,ownerAfterOutbound,normalizeMetaLearningEvents} from '../lib/playbook-ownership.mjs';
 import {normalizeQuoMessageEvent} from '../lib/quo-webhook.mjs';
-import {recordPlaybookQuoEvent,recordPlaybookMetaEvent,processPlaybookInbound,runScheduledPlaybook,preparePlaybookIntros} from '../lib/lead-playbook-ingest.js';
+import {recordPlaybookQuoEvent,recordPlaybookMetaEvent,processPlaybookInbound as processPlaybookInboundWithSafety,runScheduledPlaybook,preparePlaybookIntros} from '../lib/lead-playbook-ingest.js';
 import {setPlaybookOwner} from '../lib/lead-playbook-service.js';
 import {playbookHash} from '../lib/lead-playbook-links.mjs';
 const env={LEAD_PLAYBOOK_ENABLED:'true',LEAD_PLAYBOOK_HASH_KEY:'fabricated-key-for-tests-only-123456789',QUO_FROM_NUMBER:'+14195550100',QUO_LEARNING_NUMBERS:'+15675550100',QUO_HUMAN_USER_IDS:'human-example'};
@@ -228,3 +229,7 @@ test('raw Quo Sona metadata wins over any human or known backend signal',()=>{
     assert.equal(resolveQuoAuthor(normalized,{...env,QUO_SONA_USER_IDS:'sona-fixture'},{knownBackend:true,approvedDraft:true}),'sona');
   }
 });
+
+function processPlaybookInbound(db, env, input, options = {}) {
+  return processPlaybookInboundWithSafety(db, env, input, {textSafety: verifiedTextSafety, ...options});
+}

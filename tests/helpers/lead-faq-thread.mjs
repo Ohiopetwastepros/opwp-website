@@ -1,3 +1,4 @@
+import {mockAirtableSafetyRead} from "./airtable-text-safety-fixture.mjs";
 import assert from 'node:assert/strict';
 import {registerHooks} from 'node:module';
 import {leadTestDatabase} from './lead-inbox-fixture.mjs';
@@ -102,7 +103,7 @@ export async function faqThread(t, {details = {}, stage = 'details_confirmed', e
   const env = {LEAD_PLAYBOOK_ENABLED: 'true', LEAD_PLAYBOOK_AUTO_SEND_ENABLED: 'true', LEAD_PLAYBOOK_NOTIFY_ENABLED: 'true',
     LEAD_AUTOMATION_CONTROLLED_TEST_ONLY: 'true', META_TEST_RECIPIENTS: customerPhone,
     LEAD_PLAYBOOK_ADMIN_ORIGIN: 'https://admin.example.test', LEAD_PLAYBOOK_LINK_SECRET: 'fictional-faq-signing-key-never-used-externally',
-    LEAD_PLAYBOOK_CRAIG_CELL: staff, QUO_FROM_NUMBER: business, QUO_API_KEY: 'fixture-only',
+    LEAD_PLAYBOOK_CRAIG_CELL: staff, QUO_FROM_NUMBER: business, QUO_API_KEY: 'fixture-only', AIRTABLE_API_KEY: 'fixture-only',
     OWNER_NOTIFICATION_EMAIL: staffEmail, EMAIL_SENDING_ENABLED: 'true', EMAIL_FROM: 'sender@example.test',
     EMAIL: {async send(message) {
       assert.equal(message.to, staffEmail);
@@ -112,6 +113,8 @@ export async function faqThread(t, {details = {}, stage = 'details_confirmed', e
     }}};
   t.mock.method(globalThis, 'fetch', async (url, options = {}) => {
     const target = new URL(url);
+    const safety = mockAirtableSafetyRead(url, options);
+    if (safety) return safety;
     if (target.origin === 'https://openapi.sweepandgo.com' && options.method === 'GET' &&
         ['/api/v1/clients/active', '/api/v1/clients/active_no_subscription'].includes(target.pathname)) {
       return Response.json(existing ? [{cell_phone_number: customerPhone}] : []);

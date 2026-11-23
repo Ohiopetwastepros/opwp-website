@@ -1,3 +1,4 @@
+import {createAirtableContactFixture} from "./helpers/airtable-text-safety-fixture.mjs";
 import assert from 'node:assert/strict';
 import {createHmac} from 'node:crypto';
 import test from 'node:test';
@@ -62,14 +63,25 @@ async function fixture(t, {confirmationUncertain = false, ownerPhone = OWNER_PHO
     LEAD_AUTOMATION_CONTROLLED_TEST_ONLY: 'true', META_TEST_RECIPIENTS: CUSTOMER, LEAD_CLASSIFIER_ENABLED: 'false', LEAD_CLASSIFIER_KILL_SWITCH: 'true',
     LEAD_PLAYBOOK_LINK_SECRET: 'fixture-review-link-secret-never-production', LEAD_PLAYBOOK_HASH_KEY: 'fixture-learning-hash-key-never-production',
     LEAD_PLAYBOOK_CRAIG_CELL: ownerPhone, SITE_ORIGIN: 'https://opwp.example', LEAD_PLAYBOOK_ADMIN_ORIGIN: 'https://opwp.example',
-    QUO_WEBHOOK_SIGNING_KEY: Buffer.from(QUO_SECRET).toString('base64'), QUO_API_KEY: 'fixture-quo-key', QUO_FROM_NUMBER: BUSINESS,
+    QUO_WEBHOOK_SIGNING_KEY: Buffer.from(QUO_SECRET).toString('base64'), QUO_API_KEY: 'fixture-quo-key', AIRTABLE_API_KEY: 'fixture-only', QUO_FROM_NUMBER: BUSINESS,
     SNG_API_KEY: 'fixture-sng-key', EMAIL_PROVIDER: 'resend', EMAIL_SENDING_ENABLED: 'true', EMAIL_FROM: OWNER_EMAIL, OWNER_NOTIFICATION_EMAIL: OWNER_EMAIL, RESEND_API_KEY: 'fixture-resend-key',
     META_APPROVED_SMS_FORMS: JSON.stringify({'fixture-form': {pageId: 'fixture-page', consentField: 'sms_consent', version: 'fixture-disclosure', disclosure: 'Fixture automated quote texts. Reply STOP to opt out.'}})};
   const forms = new Map(), customerSms = [], ownerSms = [], ownerEmails = [], directoryReads = [], background = [], unexpectedRequests = [];
+  const airtable = createAirtableContactFixture();
+  let mirrorFields = {};
   const previousFetch = globalThis.fetch;
   globalThis.__metaPlaybookE2E = {env, background};
   globalThis.fetch = async (input, options = {}) => {
     const url = new URL(String(input)), method = options.method || 'GET';
+    const safety = airtable.fetcher(input, options);
+    if (safety) return safety;
+    if (url.origin === 'https://api.airtable.com' && url.pathname === '/v0/appcAWPBQB8GmOrcT/tblCrdvGKkGobRWxL' && method === 'PATCH') {
+      mirrorFields = JSON.parse(options.body).records[0].fields;
+      return Response.json({records: [{id: 'recFixtureMirror', fields: mirrorFields}]});
+    }
+    if (url.origin === 'https://api.airtable.com' && url.pathname.endsWith('/recFixtureMirror') && method === 'GET') {
+      return Response.json({id: 'recFixtureMirror', fields: mirrorFields});
+    }
     if (url.origin === 'https://graph.facebook.com' && method === 'GET') {
       const form = forms.get(url.pathname.split('/').at(-1));
       assert.ok(form, 'Only an explicitly seeded fake Meta lead may be fetched');

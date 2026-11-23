@@ -1,8 +1,9 @@
+import {verifiedTextSafety} from "./helpers/airtable-text-safety-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdirSync, writeFileSync} from 'node:fs';
 import {leadTestDatabase} from './helpers/lead-inbox-fixture.mjs';
-import {processPlaybookInbound} from '../lib/lead-playbook-ingest.js';
+import {processPlaybookInbound as processPlaybookInboundWithSafety} from '../lib/lead-playbook-ingest.js';
 import {buildMetaConfirmation} from '../lib/meta-lead-policy.mjs';
 import {isFirstLeadMessage} from '../lib/lead-first-contact.mjs';
 import {monthly, initialRange, PRICING} from '../lib/lead-pricing.mjs';
@@ -247,3 +248,7 @@ test('malformed envelopes, STOP, wrong number and suppression cannot become deta
     assert.equal(f.staff.length, 0);
   });
 });
+
+function processPlaybookInbound(db, env, input, options = {}) {
+  return processPlaybookInboundWithSafety(db, env, input, {textSafety: verifiedTextSafety, ...options});
+}

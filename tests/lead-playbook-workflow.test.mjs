@@ -1,3 +1,4 @@
+import {withVerifiedTextSafety} from "./helpers/airtable-text-safety-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -11,7 +12,7 @@ import {createPlaybookLink, readPlaybookLink, playbookHash} from '../lib/lead-pl
 import {processPlaybookMirror, queuePlaybookMirrorStatement} from '../lib/lead-playbook-mirror.mjs';
 import {controlledLeadRecipientAllowed} from '../lib/lead-rollout-policy.mjs';
 const bundle = await build({stdin: {contents: "export * from './lib/lead-playbook-service.js';", resolveDir: process.cwd()}, bundle: true, platform: 'node', format: 'esm', write: false, plugins: [{name: 'fake-provider', setup(builder) { builder.onResolve({filter: /^\.\/lead-assistant$/}, () => ({path: 'provider', namespace: 'fixture'})); builder.onLoad({filter: /.*/, namespace: 'fixture'}, () => ({contents: "export async function sendLeadMessage(){throw new Error('Real sends forbidden in tests');}", loader: 'js'})); }}]});
-const api = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const api = withVerifiedTextSafety(await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64')));
 const adminBundle = await build({stdin: {contents: "export * from './lib/lead-playbook-admin.js';", resolveDir: process.cwd()}, bundle: true, platform: 'node', format: 'esm', write: false, plugins: [{name: 'admin-boundary', setup(builder) {
   builder.onResolve({filter: /^(next\/headers|\.\/(?:admin-auth|cloudflare|db|rate-limit))$/}, args => ({path: args.path, namespace: 'boundary'}));
   builder.onLoad({filter: /.*/, namespace: 'boundary'}, args => ({contents: args.path === 'next/headers' ? 'export const headers=async()=>new Headers();' : args.path === './admin-auth' ? 'export const verifyAdminRequest=async()=>({authorized:globalThis.__playbookBoundary.authorized,email:"owner@example.test"});' : args.path === './cloudflare' ? 'export const getRuntimeEnv=()=>globalThis.__playbookBoundary.env;' : args.path === './db' ? 'export const getDb=()=>globalThis.__playbookBoundary.db;' : 'export const checkRateLimit=async()=>({allowed:true});export const rateLimitResponse=()=>Response.json({}, {status:429});', loader: 'js'}));

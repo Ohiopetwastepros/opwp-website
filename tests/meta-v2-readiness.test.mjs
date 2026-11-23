@@ -1,3 +1,4 @@
+import {verifiedTextSafety} from "./helpers/airtable-text-safety-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { leadTestDatabase } from './helpers/lead-inbox-fixture.mjs';
@@ -11,7 +12,7 @@ const approvedPhone = '+14195550100';
 const otherPhone = '+14195550102';
 const overnight = new Date('2026-11-21T06:00:00Z');
 const emptyCustomerDirectory = async () => ({ok: true, complete: true, rows: []});
-const processMetaConfirmations = (env, options = {}) => processMetaConfirmationsWithDirectory(env, {loadCustomerDirectory: emptyCustomerDirectory, ...options});
+const processMetaConfirmations = (env, options = {}) => processMetaConfirmationsWithDirectory(env, {textSafety: verifiedTextSafety, loadCustomerDirectory: emptyCustomerDirectory, ...options});
 function fixture() {
   const db = leadTestDatabase();
   db.sqlite.exec(`INSERT INTO meta_automation_releases VALUES ('fixture-live','org-opwp','meta-confirmation-v2','fixture-owner','fixture-only approval',datetime('now','-1 minute'),NULL);

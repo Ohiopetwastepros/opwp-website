@@ -62,6 +62,12 @@ worker-configuration.d.ts
 
 /lib/bank-private.json
 
+# Owner-only operational go-live evidence; never publish recipients or queue IDs.
+/docs/golive/cancel-stale-queue-*.sql
+/docs/golive/*dry-run*.md
+/docs/golive/*transcript*.md
+/docs/golive/golive-report-*.md
+
 # Local secrets, caches and private operational reports
 .env.*
 !.env.example

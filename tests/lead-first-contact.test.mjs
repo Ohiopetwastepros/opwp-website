@@ -1,9 +1,11 @@
+import {verifiedTextSafety} from "./helpers/airtable-text-safety-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 import {leadTestDatabase} from './helpers/lead-inbox-fixture.mjs';
 import {renderPlaybookTemplate} from '../lib/lead-playbook.mjs';
 import {isFirstLeadMessage} from '../lib/lead-first-contact.mjs';
+import {playbookHash} from '../lib/lead-playbook-links.mjs';
 
 const built = await build({stdin: {contents: "export {sendLeadMessage} from './lib/lead-assistant.js';", resolveDir: process.cwd()},
   bundle: true, platform: 'node', format: 'esm', write: false, alias: {'@': process.cwd()},
@@ -38,7 +40,7 @@ function fixture(t) {
     db.sqlite.prepare("UPDATE lead_automation_settings SET assistant_enabled=1,human_review_required=0 WHERE organization_id='org-opwp'").run();
     return {id, conversation_id: conversationId, name: 'Casey Example', phone, payload, unread_count: 0};
   }
-  const send = (lead, body, options) => sendLeadMessage(db, env, lead, body, 'playbook-approved:fixture-owner', true, options);
+  const send = (lead, body, options) => sendLeadMessage(db, env, lead, body, 'playbook-approved:fixture-owner', true, {textSafety: verifiedTextSafety, ...options});
   return {db, sent, seed, send};
 }
 
@@ -89,4 +91,28 @@ test('actual send transport accepts only the approved four-sentence quote contex
   assert.equal(quote.body, body);
   assert.equal(countFooters(quote.body), 0);
   assert.equal(f.sent.length, 2);
+});
+
+test('Airtable Do Not Text and unavailable permission block both manual and automatic core sends', async t => {
+  const f = fixture(t), lead = f.seed();
+  for (const automated of [false, true]) {
+    for (const permission of [{verified: true, doNotText: true}, {verified: false, doNotText: true}, {verified: false, doNotText: false}]) {
+      await assert.rejects(sendLeadMessage(f.db, env, lead, 'Thanks for your message.', 'fixture-owner', automated, {
+        textSafety: async (_env, phone) => {assert.equal(phone, PHONE); return permission;},
+      }), error => error.code === 'text_safety_blocked');
+    }
+  }
+  assert.deepEqual(f.sent, []);
+  assert.equal(f.db.sqlite.prepare('SELECT COUNT(*) n FROM lead_messages').get().n, 0);
+});
+
+test('a STOP committed during the Airtable lookup prevents the core provider call', async t => {
+  const f = fixture(t), lead = f.seed();
+  await assert.rejects(sendLeadMessage(f.db, env, lead, 'Thanks for your message.', 'fixture-owner', true, {
+    textSafety: async () => {
+      f.db.sqlite.prepare("INSERT INTO lead_suppressions(organization_id,phone_hash,reason,source,created_by) VALUES ('org-opwp',?,'stop','fixture','fixture')").run(await playbookHash(PHONE));
+      return verifiedTextSafety();
+    },
+  }), error => error.code === 'text_safety_blocked');
+  assert.deepEqual(f.sent, []);
 });
