@@ -2,7 +2,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
   activeService,
-  applyWorkdayEvent,
   BREAK_TYPES,
   ETA_OPTIONS,
   PRECHECKS,
@@ -21,6 +20,7 @@ import {
 } from "@/lib/field-workday-device.mjs";
 import { jobTimer, clockText } from "@/lib/field-timer.mjs";
 import { operatingDate } from "@/lib/field-policy.mjs";
+import { layoutRouteMarkers } from "./route-map-layout.mjs";
 import PacingView from "../../field-demo/PacingView";
 import s from "./workday.module.css";
 const liveEnvironment = { API: "/api/field/workday/", sessionAPI: "/api/field/session/", workerUrl: "/field/sw.js", workerScope: "/field/", testMode: false };
@@ -70,6 +70,60 @@ const time = (value) =>
     : "--";
 const hours = (seconds) =>
   `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+const taskUnits = (task) => task.quantity + " " + (task.quantity === 1 ? task.unitLabel : task.unitLabel === "box" ? "boxes" : task.unitLabel === "delivery" ? "deliveries" : task.unitLabel.endsWith("s") ? task.unitLabel : task.unitLabel + "s");
+const serviceName = (task) => task.serviceId === "scoop" ? "Yard cleanup" : task.serviceId === "food" ? "Dog food delivery" : task.serviceId === "litter" ? "Kitty litter service" : task.title;
+function FieldIcon({ name, size = 20 }) {
+  const paths = {
+    route: "M5 6a2 2 0 1 0 0 .01M19 18a2 2 0 1 0 0 .01M7 6h8a4 4 0 0 1 0 8H9a4 4 0 0 0 0 8h8",
+    today: "M8 3v4m8-4v4M4 10h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1M8 14h3m-3 3h6",
+    activity: "M4 5h16M4 12h16M4 19h16M8 3v4m8 3v4M9 17v4",
+    more: "M5 12h.01M12 12h.01M19 12h.01",
+    check: "m5 12 4 4L19 6",
+    back: "m14 6-6 6 6 6",
+    clock: "M12 8v5l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0",
+    pin: "M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0ZM15 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0",
+    camera: "M3 7h4l2-3h6l2 3h4v13H3V7Zm13 6a4 4 0 1 1-8 0 4 4 0 0 1 8 0",
+    bag: "M5 7h14l2 14H3L5 7Zm3 0V5a4 4 0 0 1 8 0v2",
+    alert: "m12 3 10 18H2L12 3Zm0 6v5m0 3h.01",
+    shield: "m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Zm-4 9 3 3 5-6",
+  };
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name] || paths.route} /></svg>;
+}
+
+function FoodWorkSummary({ stop, inventory }) {
+  const items = stop.tasks.filter((task) => task.serviceId === "food").flatMap((task) => task.deliveryItems.map((item) => ({ ...item, key: `${task.id}:${item.productId}`, name: inventory.find((product) => product.productId === item.productId)?.name || "Scheduled dog food" })));
+  return items.length ? <div className={s.foodWorkSummary}><FieldIcon name="bag" size={18} /><div>{items.map((item) => <span key={item.key}>{item.quantity} x {item.name}</span>)}</div></div> : null;
+}
+
+function RouteOverview({ day, summary, onSelect, mode = "all" }) {
+  const mapHeight = mode === "map" ? 410 : 250;
+  const located = layoutRouteMarkers(day.stops, mapHeight);
+  const next = day.stops.find((stop) => !stop.tasks.every(taskDone));
+  const percent = summary.stops ? Math.round(summary.stopsFinished / summary.stops * 100) : 0;
+  return <section className={`${s.routeOverview} ${mode === "map" ? s.mapView : ""}`}>
+    {mode !== "list" ? <div className={s.mapCard}>
+      <div className={s.mapHeading}><span><FieldIcon name="route" size={17} /> Assigned stop map</span><span>{day.stops.length} stops</span></div>
+      {located.length ? <svg className={s.routeMap} viewBox={`0 0 560 ${mapHeight}`} role="img" aria-label="Assigned stop coordinates in route order. Lines connect stops directly and do not represent roads.">
+        <defs><pattern id="field-map-grid" width="36" height="36" patternUnits="userSpaceOnUse"><path d="M36 0H0V36" fill="none" stroke="#e4e5e7" strokeWidth="1" /></pattern></defs>
+        <rect width="560" height={mapHeight} fill="#f5f5f4" /><rect width="560" height={mapHeight} fill="url(#field-map-grid)" />
+        <text x="20" y="28" className={s.mapRegion}>NORTHWEST OHIO</text><text x="529" y="28" className={s.mapNorth}>N</text>
+        <polyline points={located.map(({ x, y }) => `${x},${y}`).join(" ")} fill="none" stroke="#6d727a" strokeWidth="2.5" strokeDasharray="5 4" strokeLinejoin="round" />
+        {located.map(({ stop, index, x, y }) => { const done = stop.tasks.every(taskDone); return <g key={stop.id} className={s.mapPin} tabIndex="0" role="button" aria-label={`Open stop ${index + 1}, ${stop.name}`} onClick={() => onSelect(stop)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(stop); } }}><title>{index + 1}. {stop.name}: {stop.address}</title><circle cx={x} cy={y} r="38" fill="transparent" pointerEvents="all" /><circle cx={x} cy={y} r="16" fill={done ? "#747981" : stop.id === next?.id ? "#BB0000" : "#25282e"} stroke="white" strokeWidth="3" /><text x={x} y={y + 4.5} textAnchor="middle" fill="white" fontSize="12" fontWeight="700">{done ? "✓" : index + 1}</text></g>; })}
+      </svg> : <div className={s.mapUnavailable}>Stop map unavailable. The office has not supplied coordinates.</div>}
+      <div className={s.mapCaption}>Straight-line overview. Use Directions for road navigation.</div>
+    </div> : null}
+    <div className={s.routeProgress}><div><b>{summary.stopsFinished} of {summary.stops} stops finished</b><span>{percent}%</span></div><progress max="100" value={percent} aria-label="Route progress" /></div>
+    {mode !== "map" ? <><div className={s.listHeading}><h2>Today's stops</h2><span>Assigned order</span></div>
+    <div className={s.stopList}>{day.stops.map((stop, index) => {
+      const done = stop.tasks.every(taskDone), current = stop.id === next?.id, unsafe = ["unsafe", "unknown"].includes(stop.safety);
+      return <button className={`${s.routeRow} ${current ? s.nextStop : ""} ${done ? s.finishedStop : ""}`} key={stop.id} onClick={() => onSelect(stop)}>
+        <span className={s.stopNumber}>{done ? <FieldIcon name="check" size={17} /> : index + 1}</span>
+        <div className={s.stopSummary}><div className={s.stopName}><b>{stop.name}</b><span className={`${s.statusBadge} ${unsafe ? s.unsafeBadge : ""}`}>{done ? "Finished" : unsafe ? "Safety review" : stop.arrivedAt ? "Arrived" : current ? "Next stop" : "Scheduled"}</span></div><small>{stop.address}</small><div className={s.workTags}>{stop.tasks.map((task) => <span key={task.id} className={task.serviceId === "food" ? s.foodTag : ""}>{task.serviceId === "food" ? <FieldIcon name="bag" size={13} /> : null}{serviceName(task)}{task.quantity > 1 ? ` (${task.quantity})` : ""}</span>)}</div><FoodWorkSummary stop={stop} inventory={day.inventory} /><small className={s.stopMeta}>{stop.dogCount != null ? `${stop.dogCount} ${stop.dogCount === 1 ? "dog" : "dogs"}` : "Dog count not supplied"}{stop.travelMinutes != null ? ` · ${Math.round(stop.travelMinutes)} min drive` : ""}{stop.recleanOf ? " · Return visit" : ""}</small></div>
+        <span className={s.rowChevron} aria-hidden="true">›</span>
+      </button>;
+    })}</div></> : null}
+  </section>;
+}
 export default function WorkdayApp({ sandbox = false }) {
   return <Environment.Provider value={sandbox ? sandboxEnvironment : liveEnvironment}><WorkdayScreen /></Environment.Provider>;
 }
@@ -88,6 +142,9 @@ function WorkdayScreen() {
     [tab, setTab] = useState("today"),
     [selected, setSelected] = useState(""),
     [selectedTask, setSelectedTask] = useState(""),
+    [detailTab, setDetailTab] = useState("overview"),
+    [detailView, setDetailView] = useState("overview"),
+    [preparing, setPreparing] = useState(false),
     [date, setDate] = useState(operatingDate()),
     [modal, setModal] = useState(null),
     [pacing, setPacing] = useState(false),
@@ -96,7 +153,8 @@ function WorkdayScreen() {
     syncLock = useRef(false),
     mutationLock = useRef(false),
     recordRef = useRef(null),
-    syncFn = useRef(null);
+    syncFn = useRef(null),
+    initialView = useRef(false);
   function accept(value) {
     // A slow backup/draft response must not roll back a newer local action on screen.
     if (
@@ -287,6 +345,11 @@ function WorkdayScreen() {
     setBusy(true);
     setError("");
     try {
+      if (["start_wrap", "finish_day"].includes(type)) {
+        const current = recordRef.current?.day;
+        const incompleteProof = current?.stops.some((item) => item.tasks.some((task) => task.status === "completed" && !proofReady(item, task)));
+        if (safetyBlocked(current) || incompleteProof) throw new Error("Resolve safety items and required photos before closing this route.");
+      }
       const changes =
         type === "accept_changes" ? recordRef.current.changes : [];
       if (
@@ -314,7 +377,7 @@ function WorkdayScreen() {
   async function addPhoto(task, file, purpose) {
     try {
       const blob = await photoBlob(file);
-      await dispatch(
+      return await dispatch(
         "add_photo",
         { taskId: task.id, photoId: crypto.randomUUID(), purpose },
         blob,
@@ -387,730 +450,138 @@ function WorkdayScreen() {
   const day = record?.day,
     summary = day ? workdaySummary(day, now) : null,
     active = day && activeService(day),
-    activeStop = day?.stops.find((s) =>
-      s.tasks.some((t) => t.id === active?.id),
-    ),
-    stop =
-      day?.stops.find((s) => s.id === selected) ||
-      activeStop ||
-      day?.stops.find((s) => !s.tasks.every(taskDone)) ||
-      day?.stops.at(-1),
-    leaseExpired =
-      record &&
-      (!Number.isFinite(Date.parse(record.offlineUntil)) ||
-        Date.parse(record.offlineUntil) <= now),
+    activeStop = day?.stops.find((item) => item.tasks.some((task) => task.id === active?.id)),
+    stop = day?.stops.find((item) => item.id === selected) || activeStop || day?.stops.find((item) => !item.tasks.every(taskDone)) || day?.stops.at(-1),
+    leaseExpired = record && (!Number.isFinite(Date.parse(record.offlineUntil)) || Date.parse(record.offlineUntil) <= now),
     pending = record?.pending.length || 0,
-    disabled =
-      busy ||
-      leaseExpired ||
-      locked ||
-      record?.sourceChanged ||
-      day?.date > operatingDate();
-  return (
-    <div className={`opwp-field-shell ${s.shell}`}>
-      <header className={s.header}>
-        <img src="/assets/opwp-logo.webp" alt="Ohio Pet Waste Pros" />
-        <div>
-          <b>OPWP FIELD</b>
-          <span>One route. Every service.</span>
-        </div>
-        <button onClick={logout} disabled={!record || pending > 0}>
-          Sign out
-        </button>
-      </header>
-      <div
-        className={`${s.connection} ${!online || syncError ? s.warning : ""}`}
-        role="status"
-      >
-        <b>
-          {!online
-            ? "Offline - saved on this device"
-            : syncing
-              ? "Backing up"
-              : syncError
-                ? "Sync needs attention"
-                : pending
-                  ? `${pending} waiting to back up`
-                  : "Server copy up to date"}
-        </b>
-        <span>{ready ? "Offline ready" : "Preparing offline shell"}</span>
-      </div>
-      <main className={s.main}>
-        {error ? (
-          <p className={s.error} role="alert">
-            {error}
-          </p>
-        ) : null}
-        {syncError ? (
-          <p className={s.tip}>
-            {syncError}{" "}
-            {record ? (
-              <button onClick={() => void synchronize()}>Retry backup</button>
-            ) : null}
-          </p>
-        ) : null}
-        {loading ? (
-          <div className={s.card}>Opening your assigned workday...</div>
-        ) : locked ? (
-          <Login
-            onLogin={async () => {
-              try {
-                await refresh();
-                void synchronize();
-              } catch (e) {
-                setError(e.message);
-              }
-            }}
-          />
-        ) : leaseExpired ? (
-          <div className={s.card}>
-            <h1>Sign in online again</h1>
-            <p>
-              The offline access window ended. Pending work stays on this
-              device.
-            </p>
-            <button onClick={() => void synchronize()}>
-              Verify session online
-            </button>
-            <button onClick={exportDay}>Export private recovery copy</button>
-          </div>
-        ) : !day ? (
-          <div className={s.card}>
-            <h1>No released route</h1>
-            <p>
-              The office must release an assigned route before work can start.
-            </p>
-            <label>
-              Service date
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => {
-                  setDate(e.target.value);
-                  void refresh(e.target.value).catch((e) =>
-                    setError(e.message),
-                  );
-                }}
-              />
-            </label>
-            <button
-              onClick={() => void refresh().catch((e) => setError(e.message))}
-            >
-              Refresh
-            </button>
-            <a href="/field/pilot/">Finish an earlier pilot shift</a>
-          </div>
-        ) : (
-          <>
-            <div className={s.title}>
-              <div>
-                <span>
-                  {day.memberName} · {day.date}
-                </span>
-                <h1>
-                  {tab === "today"
-                    ? "Today’s workday"
-                    : tab === "route"
-                      ? "Your route"
-                      : tab === "activity"
-                        ? "Day record"
-                        : "Workday tools"}
-                </h1>
-              </div>
-              <button
-                disabled={
-                  pending > 0 || (!!day.shift.clockIn && !day.shift.clockOut)
-                }
-                onClick={() => {
-                  const next = new Date(`${operatingDate()}T12:00:00Z`);
-                  if (day.date === operatingDate())
-                    next.setUTCDate(next.getUTCDate() + 1);
-                  const d = next.toISOString().slice(0, 10);
-                  setDate(d);
-                  void refresh(d).catch((e) => setError(e.message));
-                }}
-              >
-                {day.date === operatingDate() ? "Tomorrow" : "Today"}
-              </button>
-            </div>
-            <div className={s.stats}>
-              <span>
-                <b>
-                  {summary.stopsFinished}/{summary.stops}
-                </b>
-                Properties
-              </span>
-              <span>
-                <b>
-                  {summary.accounted}/{summary.services}
-                </b>
-                Services accounted
-              </span>
-              <span>
-                <b>{hours(summary.paidSeconds)}</b>Recorded paid time
-              </span>
-            </div>
-            {record.sourceChanged ? (
-              <section className={`${s.card} ${s.attention}`} role="alert">
-                <h2>Dispatch source changed</h2>
-                <p>
-                  Contact the office before continuing. Saved work is retained
-                  for reconciliation.
-                </p>
-                <button onClick={exportDay}>
-                  Export private recovery copy
-                </button>
-              </section>
-            ) : null}
-            {record.changes?.length ? (
-              <section className={`${s.card} ${s.attention}`}>
-                <h2>Office changes to review</h2>
-                {record.changes.map((c) => (
-                  <p key={c.id}>
-                    <b>{pretty(c.kind)}</b>:{" "}
-                    {c.payload.reason || c.payload.text}
-                  </p>
-                ))}
-                <button
-                  disabled={disabled || !!active || pending > 0 || !online}
-                  onClick={() =>
-                    dispatch("accept_changes", {
-                      changeIds: record.changes.map((c) => c.id),
-                    })
-                  }
-                >
-                  Accept reviewed changes
-                </button>
-                <small>
-                  Existing work is retained. Stop order changes only after
-                  acceptance.
-                </small>
-              </section>
-            ) : null}
-            {tab === "today" ? (
-              <>
-                {day.shift.status === "ready" ? (
-                  <ClockForm
-                    disabled={disabled}
-                    onSubmit={(body) => dispatch("clock_in", body)}
-                  />
-                ) : null}
-                {day.shift.status === "loading" ? (
-                  <section className={s.card}>
-                    <h2>Departure check</h2>
-                    <p>Food payment: {pretty(day.paymentStatus)}</p>
-                    {PRECHECKS.map(([id, label]) => (
-                      <label className={s.check} key={id}>
-                        <input
-                          type="checkbox"
-                          disabled={disabled}
-                          checked={!!day.shift.prechecks[id]}
-                          onChange={(e) =>
-                            dispatch("check_item", {
-                              key: id,
-                              checked: e.target.checked,
-                            })
-                          }
-                        />
-                        {label}
-                      </label>
-                    ))}
-                    <InventoryForm
-                      items={day.inventory}
-                      mode="load"
-                      disabled={disabled}
-                      onSubmit={(items) => dispatch("confirm_load", { items })}
-                    />
-                  </section>
-                ) : null}
-                {day.shift.status === "loaded" ? (
-                  <section className={s.card}>
-                    <h2>Ready to depart</h2>
-                    <button
-                      disabled={disabled}
-                      onClick={() => dispatch("start_route")}
-                    >
-                      Start route
-                    </button>
-                  </section>
-                ) : null}
-                {day.shift.activeBreak ? (
-                  <section className={s.card}>
-                    <h2>
-                      {day.shift.breaks.at(-1).paid
-                        ? "Paid break"
-                        : "Unpaid break"}
-                    </h2>
-                    <button
-                      disabled={disabled}
-                      onClick={() => setModal({ type: "end_break" })}
-                    >
-                      End break
-                    </button>
-                  </section>
-                ) : null}
-                {day.shift.status === "on_route" && stop ? (
-                  <section className={s.property}>
-                    <div className={s.propertyBar}>
-                      <span>
-                        PROPERTY {day.stops.indexOf(stop) + 1} /{" "}
-                        {day.stops.length}
-                      </span>
-                      <b>{stop.arrivedAt ? "Arrival saved" : "Not arrived"}</b>
-                    </div>
-                    <div className={s.propertyBody}>
-                      <h2>{stop.name}</h2>
-                      <p>{stop.address}</p>
-                      <div className={s.actions}>
-                        {!testMode ? <a
-                          className={s.secondary}
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(stop.latitude != null && stop.longitude != null ? `${stop.latitude},${stop.longitude}` : stop.address)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Directions
-                        </a> : <span>Fictional address</span>}
-                        <button
-                          className={s.secondary}
-                          disabled={
-                            disabled ||
-                            !!active ||
-                            !!day.shift.activeBreak ||
-                            stop.tasks.every(taskDone)
-                          }
-                          onClick={() => setModal({ type: "on_way", stop })}
-                        >
-                          On my way
-                        </button>
-                      </div>
-                      <div className={s.access}>
-                        <b>Access & safety</b>
-                        <p>
-                          Gate: {stop.gateCode || "Confirm at property"}
-                          {stop.communityCode
-                            ? ` · Community: ${stop.communityCode}`
-                            : ""}
-                        </p>
-                        <p>
-                          Pets: {stop.dogCount ?? "Not supplied"} ·{" "}
-                          {stop.safety === "clear"
-                            ? "Recorded safe information"
-                            : stop.safety === "confirmed"
-                              ? "Office clearance recorded"
-                              : stop.safety === "unsafe"
-                                ? "UNSAFE - do not enter"
-                                : "Office clearance required before entry"}
-                        </p>
-                        <p>
-                          {stop.instructions ||
-                            "Review service instructions before starting."}
-                        </p>
-                      </div>
-                      {stop.arrivedAt ? (
-                        <p className={s.tip}>
-                          Arrived {time(stop.arrivedAt)}. One arrival covers
-                          every service here.
-                        </p>
-                      ) : (
-                        <button
-                          disabled={
-                            disabled || !!active || !!day.shift.activeBreak
-                          }
-                          onClick={() =>
-                            dispatch("arrive", { stopId: stop.id })
-                          }
-                        >
-                          I’ve arrived
-                        </button>
-                      )}
-                      <h3>Services at this property</h3>
-                      {stop.tasks.map((task) => (
-                        <ServiceCard
-                          key={`${day.id}:${task.id}`}
-                          task={task}
-                          stop={stop}
-                          now={now}
-                          disabled={
-                            disabled ||
-                            !!day.shift.activeBreak ||
-                            (!!active && active.id !== task.id)
-                          }
-                          expanded={
-                            (selectedTask ||
-                              active?.id ||
-                              stop.tasks.find((t) => !taskDone(t))?.id) ===
-                            task.id
-                          }
-                          onExpand={() => setSelectedTask(task.id)}
-                          draft={record.drafts?.[task.id]}
-                          onDraft={(value) => draft(task.id, value)}
-                          onAction={dispatch}
-                          onPhoto={addPhoto}
-                          photos={record.photos}
-                          onPacing={() => setPacing(true)}
-                          onSkip={() => setModal({ type: "skip_task", task })}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-                {day.shift.status === "on_route" && !day.shift.activeBreak ? (
-                  <div className={s.actions}>
-                    <button
-                      className={s.secondary}
-                      disabled={disabled || !!active}
-                      onClick={() => setModal({ type: "start_break" })}
-                    >
-                      Take a break
-                    </button>
-                    {summary.accounted === summary.services ? (
-                      <button
-                        disabled={disabled}
-                        onClick={() => dispatch("start_wrap")}
-                      >
-                        Start wrap-up
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
-                {day.shift.status === "wrapping" ? (
-                  <section className={s.card}>
-                    <h2>Wrap-up</h2>
-                    <p>
-                      {clockText(
-                        Math.max(
-                          0,
-                          (now - Date.parse(day.shift.wrapStartedAt)) / 1000,
-                        ),
-                      )}{" "}
-                      elapsed. All time remains recorded.
-                    </p>
-                    {WRAPCHECKS.map(([id, label]) => (
-                      <label className={s.check} key={id}>
-                        <input
-                          type="checkbox"
-                          disabled={disabled}
-                          checked={!!day.shift.wrapchecks[id]}
-                          onChange={(e) =>
-                            dispatch("check_item", {
-                              key: id,
-                              checked: e.target.checked,
-                            })
-                          }
-                        />
-                        {label}
-                      </label>
-                    ))}
-                    <InventoryForm
-                      items={day.inventory}
-                      mode="returns"
-                      disabled={disabled}
-                      onSubmit={(items) =>
-                        setModal({ type: "finish_day", items })
-                      }
-                    />
-                  </section>
-                ) : null}
-                {day.shift.status === "finished" ? (
-                  <section className={s.card}>
-                    <h2>Your workday is saved</h2>
-                    <p>
-                      {summary.completed} completed · {summary.skipped} skipped
-                      · {summary.workMiles} work miles
-                    </p>
-                    <p>
-                      {pending
-                        ? `${pending} actions await server backup.`
-                        : "All captured actions are backed up."}
-                    </p>
-                    <p>
-                      SNG service/payroll upload is blocked until its supported
-                      contract is verified. Office reconciliation remains
-                      required.
-                    </p>
-                    <button onClick={() => setTab("activity")}>
-                      Review day record
-                    </button>
-                  </section>
-                ) : null}
-              </>
-            ) : null}
-            {tab === "route" ? (
-              <>
-                <section className={s.card}>
-                  <label>
-                    Assigned service date
-                    <input
-                      type="date"
-                      value={date}
-                      onChange={(e) => {
-                        setDate(e.target.value);
-                        void refresh(e.target.value).catch((e) =>
-                          setError(e.message),
-                        );
-                      }}
-                    />
-                  </label>
-                  <p>
-                    Future routes are previews. Work stays locked to the
-                    assigned service day.
-                  </p>
-                </section>
-                {day.stops.map((item, i) => (
-                  <button
-                    className={s.routeRow}
-                    key={item.id}
-                    onClick={() => {
-                      setSelected(item.id);
-                      setSelectedTask("");
-                      setTab("today");
-                    }}
-                  >
-                    <span>{i + 1}</span>
-                    <div>
-                      <b>{item.name}</b>
-                      <small>{item.address}</small>
-                      <small>
-                        {item.tasks.filter(taskDone).length}/{item.tasks.length}{" "}
-                        services accounted
-                        {item.recleanOf ? " · Separate return visit" : ""}
-                      </small>
-                    </div>
-                  </button>
-                ))}
-              </>
-            ) : null}
-            {tab === "activity" ? (
-              <>
-                <section className={s.card}>
-                  <h2>
-                    {pending
-                      ? `${pending} actions saved locally`
-                      : "Server backup current"}
-                  </h2>
-                  <p>
-                    Clock in: {time(day.shift.clockIn)} · Out:{" "}
-                    {time(day.shift.clockOut)}
-                  </p>
-                  <p>
-                    Paid: {hours(summary.paidSeconds)} · Unpaid:{" "}
-                    {hours(summary.unpaidSeconds)}
-                  </p>
-                  <button
-                    disabled={!online || syncing}
-                    onClick={() => void synchronize()}
-                  >
-                    Back up now
-                  </button>
-                  <button className={s.secondary} onClick={exportDay}>
-                    Export private recovery copy with photos
-                  </button>
-                  <small>
-                    Contains private customer information. Keep it secure.
-                  </small>
-                </section>
-                {day.issues.map((issue) => (
-                  <section className={s.card} key={issue.id}>
-                    <h3>{issue.reason}</h3>
-                    <p>{issue.notes}</p>
-                    <p>{issue.response || "Office review pending"}</p>
-                    {issue.response && !issue.acknowledgedAt ? (
-                      <button
-                        onClick={() =>
-                          dispatch("acknowledge", { issueId: issue.id })
-                        }
-                      >
-                        Acknowledge office response
-                      </button>
-                    ) : null}
-                  </section>
-                ))}
-                {record.messages?.map((message) => (
-                  <section className={s.card} key={message.id}>
-                    <b>
-                      {pretty(message.kind)} · {pretty(message.status)}
-                    </b>
-                    <p>{message.detail}</p>
-                  </section>
-                ))}
-                {day.stops.map((item) => (
-                  <section className={s.card} key={item.id}>
-                    <h2>{item.name}</h2>
-                    {item.tasks.map((t) => (
-                      <div key={t.id}>
-                        <b>
-                          {t.title} · {pretty(t.status)}
-                        </b>
-                        <p>
-                          {t.quantity} {t.unitLabel} ·{" "}
-                          {t.notes || "No private note"}
-                          {t.startedAt
-                            ? ` · ${clockText(jobTimer(t.startedAt, t.completedAt, t.estimatedMinutes, now).elapsedSeconds)}`
-                            : ""}
-                        </p>
-                        <ProofPhotos photos={t.photos} local={record.photos} />
-                      </div>
-                    ))}
-                  </section>
-                ))}
-              </>
-            ) : null}
-            {tab === "more" ? (
-              <>
-                <section className={s.card}>
-                  <h2>Choose a workday</h2>
-                  <label>
-                    Service date
-                    <input
-                      type="date"
-                      value={date}
-                      disabled={
-                        pending > 0 ||
-                        (!!day.shift.clockIn && !day.shift.clockOut)
-                      }
-                      onChange={(e) => {
-                        setDate(e.target.value);
-                        void refresh(e.target.value).catch((error) =>
-                          setError(error.message),
-                        );
-                      }}
-                    />
-                  </label>
-                  <small>
-                    Finish the current shift and back up pending work before
-                    switching dates. Future workdays are previews.
-                  </small>
-                </section>
-                <section className={s.card}>
-                  <h2>Device & backup</h2>
-                  <p>
-                    To install: in Android Chrome, open the menu and choose
-                    Install app or Add to Home screen. On iPhone, open this page
-                    in Safari, choose Share, then Add to Home Screen.
-                  </p>
-                  <p>
-                    Open online once and wait for Offline ready. Reconnect and
-                    leave the app open to back up. Background uploads while
-                    closed are not guaranteed.
-                  </p>
-                  <p>
-                    Device storage can be lost if site data is cleared or the
-                    phone is lost. Offline access expires after 12 hours without
-                    session verification.
-                  </p>
-                  <p>
-                    GPS navigation opens your preferred maps app. Service timing
-                    uses original timestamps and survives screen lock.
-                  </p>
-                  <button
-                    onClick={() =>
-                      navigator.storage
-                        ?.persist?.()
-                        .then((ok) =>
-                          setError(
-                            ok
-                              ? "Persistent storage granted."
-                              : "Your browser did not grant persistent storage. Keep server backups current.",
-                          ),
-                        )
-                    }
-                  >
-                    Request persistent device storage
-                  </button>
-                </section>
-                <section className={s.card}>
-                  <h2>Integration status</h2>
-                  <p>
-                    SNG dispatch imports and completion readback are available
-                    through the office. SNG writes and payroll uploads remain
-                    blocked. Customer notices require configured Quo transport,
-                    current verified recipient preferences and delivery
-                    receipts.
-                  </p>
-                  <a href="/field/pilot/">Finish an earlier pilot shift</a>
-                </section>
-                {day.shift.clockIn && !day.shift.clockOut ? (
-                  <section className={s.card}>
-                    <h2>End work with unresolved items</h2>
-                    <p>
-                      Clock-out records actual paid time and flags incomplete
-                      service/inventory for office follow-up.
-                    </p>
-                    <button
-                      className={s.danger}
-                      disabled={disabled || !!active || !!day.shift.activeBreak}
-                      onClick={() => setModal({ type: "clock_out" })}
-                    >
-                      Early clock-out / office follow-up
-                    </button>
-                  </section>
-                ) : null}
-              </>
-            ) : null}
-            {active?.timed ? (
-              <button
-                className={`${s.running} ${jobTimer(active.startedAt, null, active.estimatedMinutes, now).over ? s.over : ""}`}
-                onClick={() => setPacing(true)}
-              >
-                <span>{active.title}</span>
-                <b>
-                  {clockText(
-                    jobTimer(
-                      active.startedAt,
-                      null,
-                      active.estimatedMinutes,
-                      now,
-                    ).elapsedSeconds,
-                  )}
-                </b>
-              </button>
-            ) : null}
-          </>
-        )}
-      </main>
-      {day && !locked ? (
-        <nav className={s.nav} aria-label="Technician navigation">
-          {[
-            ["today", "Today"],
-            ["route", "Route"],
-            ["activity", "Activity"],
-            ["more", "More"],
-          ].map(([id, label]) => (
-            <button
-              key={id}
-              aria-current={tab === id ? "page" : undefined}
-              onClick={() => {
-                setTab(id);
-                window.scrollTo({ top: 0, behavior: "instant" });
-              }}
-            >
-              {label}
-              {id === "activity" && pending ? ` (${pending})` : ""}
-            </button>
-          ))}
-        </nav>
-      ) : null}
-      {modal ? (
-        <ActionDialog
-          modal={modal}
-          customerTextsEnabled={record?.customerTextsEnabled === true}
-          disabled={disabled}
-          onClose={() => setModal(null)}
-          onSubmit={async (body) => {
-            if (await dispatch(modal.type, body)) setModal(null);
-          }}
-        />
-      ) : null}
-      {pacing && active?.timed ? (
-        <PacingView
-          task={active}
-          stop={activeStop}
-          timer={jobTimer(active.startedAt, null, active.estimatedMinutes, now)}
-          onClose={() => setPacing(false)}
-        />
-      ) : null}
+    privacyHeld = record?.privacyHolds?.length || 0,
+    safetyHold = safetyBlocked(day),
+    disabled = busy || privacyHeld > 0 || leaseExpired || locked || record?.sourceChanged || day?.date > operatingDate(),
+    chosenTask = stop?.tasks.find((task) => task.id === selectedTask) || stop?.tasks.find((task) => task.id === active?.id) || stop?.tasks.find((task) => !taskDone(task)) || stop?.tasks.at(-1),
+    routeLocked = disabled || day?.shift.status !== "on_route" || !!day?.shift.activeBreak,
+    proofCount = day?.stops.reduce((count, item) => count + item.tasks.reduce((n, task) => n + task.photos.length, 0), 0) || 0,
+    missingProof = day?.stops.flatMap((item) => item.tasks.filter((task) => task.status === "completed" && !proofReady(item, task))).length || 0,
+    safetyStop = day?.stops.find((item) => item.id === modal?.stop?.id),
+    safetyTask = safetyStop?.tasks.find((item) => item.id === modal?.task?.id);
+  useEffect(() => {
+    if (!record?.day || initialView.current) return;
+    initialView.current = true;
+    const query = new URLSearchParams(window.location.search), view = query.get("view");
+    const item = record.day.stops.find((entry) => entry.id === query.get("stopId")) || record.day.stops.find((entry) => !entry.tasks.every(taskDone)) || record.day.stops[0];
+    if (view === "map") setTab("route");
+    else if (["closeout", "activity", "more"].includes(view)) setTab(view);
+    else if (["stop", "proof", "complete", "safety"].includes(view) && item) {
+      const task = item.tasks.find((entry) => entry.id === query.get("taskId")) || item.tasks.find((entry) => !taskDone(entry)) || item.tasks[0];
+      setSelected(item.id); setSelectedTask(task?.id || "");
+      setDetailView(view === "proof" || view === "complete" ? view : "overview");
+      if (view === "safety" && task) setModal({ type: "skip_task", safety: true, stop: item, task });
+    }
+  }, [record?.day?.id]);
+  function openStop(item, view = "overview") {
+    setSelected(item.id); setSelectedTask(""); setDetailTab("overview"); setDetailView(view); setTab("today");
+    window.history.replaceState(null, "", "?" + new URLSearchParams({ view: view === "overview" ? "stop" : view, stopId: item.id }));
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+  function openTab(value) {
+    setTab(value); setSelected(""); setDetailTab("overview"); setDetailView("overview");
+    window.history.replaceState(null, "", "?view=" + (value === "today" ? "route" : value === "route" ? "map" : value));
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+  function nextStop() {
+    const current = recordRef.current?.day?.stops.find((item) => item.id === selected);
+    const next = current && !current.tasks.every(taskDone) ? current : recordRef.current?.day?.stops.find((item) => !item.tasks.every(taskDone));
+    if (next) openStop(next); else openTab("closeout");
+  }
+  function reportSafety() {
+    if (stop && chosenTask && !taskDone(chosenTask)) setModal({ type: "skip_task", safety: true, stop, task: chosenTask });
+  }
+  async function startRoute() {
+    if (day.shift.status === "loaded") {
+      if (await dispatch("start_route")) { setPreparing(false); openTab("route"); }
+    } else setPreparing(true);
+  }
+  async function startCloseout() {
+    if (!navigator.onLine) { setError("Reconnect to sync and close your route. Completed work and photos stay saved on this device."); return; }
+    await synchronize();
+    if (recordRef.current?.pending.length) { setError("Sync the remaining actions before closing the route."); return; }
+    if (await dispatch("start_wrap")) openTab("closeout");
+  }
+  const safetyScreen = modal?.safety === true;
+  const easternHour = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", hourCycle: "h23" }).format(new Date(now)));
+  const greeting = easternHour < 12 ? "Good morning" : easternHour < 17 ? "Good afternoon" : "Good evening";
+  const next = day?.stops.find((item) => !item.tasks.every(taskDone));
+  return <div className={`opwp-field-shell ${s.shell}`}>
+    <header className={s.header}><img src="/assets/opwp-logo.webp" alt="" /><div><b>Ohio Pet Waste Pros</b><span>Route OS · Field</span></div>{day ? <span className={s.techAvatar}>{day.memberName?.slice(0, 1)}</span> : null}<button onClick={logout} disabled={!record || pending > 0}>Sign out</button></header>
+    <div className={`${s.connection} ${!online || syncError ? s.warning : ""}`} role="status"><b><i className={!online || syncError ? s.connectionHold : ""} />{!online ? "Offline · work saved here" : syncing ? "Syncing your work" : syncError ? "Sync needs attention" : pending ? pending + " changes queued" : "All changes synced"}</b><span>{ready ? "Offline ready" : "Preparing offline access"}</span></div>
+    <main className={s.main}>
+      {error ? <p className={s.error} role="alert">{error}</p> : null}
+      {syncError ? <p className={s.tip}>{syncError} <button onClick={() => void synchronize()}>Retry sync</button></p> : null}
+      {privacyHeld ? <div className={s.error} role="alert">{privacyHeld} saved actions need office review after a privacy update. Your service records and photos are retained. <button onClick={exportDay}>Export recovery copy</button></div> : null}
+      {loading ? <section className={s.card}><h1>Opening your route</h1><p>Checking your assigned workday.</p></section> : locked ? <Login onLogin={async () => { try { await refresh(); void synchronize(); } catch (problem) { setError(problem.message); } }} /> : leaseExpired ? <section className={s.card}><h1>Sign in online again</h1><p>Your offline access window has ended. Pending work is still saved on this device.</p><button onClick={() => void synchronize()}>Verify session</button><button className={s.secondary} onClick={exportDay}>Export recovery copy</button></section> : !day ? <section className={s.card}><h1>No released route</h1><p>The office must release an assigned route before work can start.</p><label>Service date<input type="date" value={date} onChange={(event) => { setDate(event.target.value); void refresh(event.target.value).catch((problem) => setError(problem.message)); }} /></label><button onClick={() => void refresh().catch((problem) => setError(problem.message))}>Refresh assignment</button><a href="/field/pilot/">Earlier pilot shift</a></section> : <>
+        {record.sourceChanged ? <section className={`${s.card} ${s.attention}`}><h2>Office review required</h2><p>Your dispatch assignment has changed. Contact the office before continuing. Saved work is retained.</p><button onClick={exportDay}>Export recovery copy</button></section> : null}
+        {record.changes?.length ? <details className={s.officeUpdates}><summary><span className={s.updateMark} aria-hidden="true">!</span><span>{record.changes.length} office update{record.changes.length === 1 ? "" : "s"} to review</span><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m6 8 4 4 4-4" /></svg></summary><div className={s.officeUpdateBody}>{record.changes.map((change) => <p key={change.id}><b>{pretty(change.kind)}</b>: {change.payload.reason || change.payload.text}</p>)}<button disabled={disabled || !!active || pending > 0 || !online} onClick={() => dispatch("accept_changes", { changeIds: record.changes.map((change) => change.id) })}>Accept reviewed changes</button><small>Stop order changes only after you accept the update.</small></div></details> : null}
+        {safetyScreen ? safetyStop && safetyTask ? <SafetyReport stop={safetyStop} task={safetyTask} disabled={routeLocked || !!active && active.id !== safetyTask.id || taskDone(safetyTask)} onClose={() => setModal(null)} onSubmit={async (body) => { if (await dispatch("skip_task", { ...body, taskId: safetyTask.id, reason: "Unsafe animal", confirm: true })) { setModal(null); setDetailTab("history"); } }} /> : <section className={s.card}><h2>This service is no longer assigned</h2><p>Return to your current route to review available work.</p><button onClick={() => { setModal(null); openTab("today"); }}>Return to route</button></section> : tab === "today" && selected && stop ? <>
+          <button className={s.backLink} onClick={() => openTab("today")}><FieldIcon name="back" size={17} /> Today's stops</button>
+          {!["proof", "complete"].includes(detailView) ? <><div className={s.stopPageHeading}><span className={s.eyebrow}>STOP {day.stops.indexOf(stop) + 1} OF {day.stops.length}</span><span className={`${s.statusBadge} ${["unsafe", "unknown"].includes(stop.safety) ? s.unsafeBadge : ""}`}>{stop.tasks.every(taskDone) ? "Finished" : stop.arrivedAt ? "Arrived" : "Scheduled"}</span><h1>{stop.name}</h1><p>{stop.address}</p></div>
+          <div className={s.detailTabs} role="tablist" aria-label="Stop information">{["overview", "notes", "history"].map((value) => <button key={value} role="tab" aria-selected={detailTab === value} onClick={() => { setDetailTab(value); setDetailView("overview"); }}>{pretty(value)}</button>)}</div>
+          {stop.tasks.length > 1 ? <div className={s.serviceChooser} aria-label="Scheduled services">{stop.tasks.map((task) => <button key={task.id} className={chosenTask?.id === task.id ? s.chosenService : ""} onClick={() => { setSelectedTask(task.id); setDetailView("overview"); }}>{taskDone(task) ? <FieldIcon name="check" size={15} /> : null}{serviceName(task)}</button>)}</div> : null}
+          </> : <div className={s.workflowContext}><b>{stop.name}</b><span>Stop {day.stops.indexOf(stop) + 1} of {day.stops.length}</span></div>}
+          {chosenTask ? <ServiceWorkflow key={day.id + ":" + chosenTask.id} task={chosenTask} stop={stop} day={day} section={detailTab} initialStage={detailView} onStageChange={setDetailView} now={now} disabled={routeLocked || !!active && active.id !== chosenTask.id} draft={record.drafts?.[chosenTask.id]} photos={record.photos} onDraft={(value) => draft(chosenTask.id, value)} onAction={dispatch} onPhoto={addPhoto} onPacing={() => setPacing(true)} onSkip={() => setModal({ type: "skip_task", task: chosenTask, stop })} onEta={() => setModal({ type: "on_way", stop })} onSafety={reportSafety} onNext={nextStop} /> : null}
+        </> : tab === "today" ? <>
+          <div className={s.todayHeading}><p>{new Date(day.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p><h1>{greeting}, {day.memberName?.split(" ")[0]}.</h1></div>
+          <div className={s.heroStats}><div><FieldIcon name="pin" /><b>{day.stops.length}</b><span>Stops today</span></div><div><FieldIcon name="check" /><b>{summary.stopsFinished}</b><span>Completed</span></div><div><FieldIcon name="clock" /><b>{Math.round(day.stops.reduce((count, item) => count + (item.travelMinutes || 0) + item.tasks.reduce((n, task) => n + (task.estimatedMinutes || 0), 0), 0))}<small> min</small></b><span>Planned time</span></div></div>
+          <div className={s.routeStatusCard}><div><span className={s.eyebrow}>{day.shift.status === "finished" ? "ROUTE FINISHED" : day.shift.status === "on_route" ? "YOUR ROUTE IS IN PROGRESS" : "READY WHEN YOU ARE"}</span><h2>{day.shift.status === "finished" ? "Every visit accounted for." : day.shift.status === "on_route" ? summary.stops - summary.stopsFinished + " stops to go" : "A clear plan for the day."}</h2><p>{day.shift.clockIn ? "Clocked in at " + time(day.shift.clockIn) + " · " + hours(summary.paidSeconds) + " recorded" : "Clock in and complete your load check before heading out."}</p></div><FieldIcon name="route" size={34} /></div>
+          {["ready", "loading", "loaded"].includes(day.shift.status) ? <button className={s.bigPrimary} disabled={disabled} onClick={startRoute}>Start route <FieldIcon name="route" size={19} /></button> : <div className={s.todayActions}><button className={s.bigPrimary} onClick={() => activeStop ? openStop(activeStop) : next ? openStop(next) : openTab("closeout")}>{activeStop ? "Resume current service" : next ? "Open next stop" : day.shift.status === "wrapping" ? "Finish route" : "Review route closeout"}</button></div>}
+          {day.shift.activeBreak ? <section className={s.card}><h2>You're on a break</h2><p>{day.shift.breaks.at(-1).paid ? "Paid break" : "Unpaid break"} started at {time(day.shift.breaks.at(-1).startedAt)}.</p><button disabled={disabled} onClick={() => setModal({ type: "end_break" })}>End break</button></section> : null}
+          <RouteOverview day={day} summary={summary} onSelect={openStop} mode="list" />
+        </> : tab === "route" ? <>
+          <div className={s.pageHeading}><span className={s.eyebrow}>TODAY'S ROUTE</span><h1>On the move.</h1><p>{summary.stopsFinished} of {summary.stops} stops finished · {summary.services - summary.accounted} services remaining</p></div>
+          <RouteOverview day={day} summary={summary} onSelect={openStop} mode="map" />
+          {next ? <section className={s.nextStopCard}><span className={s.eyebrow}>UP NEXT</span><h2>{next.name}</h2><p>{next.address}</p><FoodWorkSummary stop={next} inventory={day.inventory} /><div className={s.mapActions}><button onClick={() => openStop(next)}>Open stop</button><MapLink stop={next} testMode={testMode} /></div></section> : <button className={s.bigPrimary} onClick={() => openTab("closeout")}>Review route closeout</button>}
+          {["ready", "loading", "loaded"].includes(day.shift.status) ? <button className={s.bigPrimary} disabled={disabled} onClick={startRoute}>Start route</button> : null}
+          <p className={s.tip}>GPS technician tracking: Not built yet. Stop positions and service progress are saved for offline use.</p>
+        </> : tab === "closeout" ? <CloseoutReview day={day} summary={summary} pending={pending} proofCount={proofCount} missingProof={missingProof} safetyHold={safetyHold} online={online} disabled={disabled || !!active || !!day.shift.activeBreak} onStart={startCloseout} onCheck={(key, checked) => dispatch("check_item", { key, checked })} onFinish={(items) => setModal({ type: "finish_day", items })} onSync={synchronize} onViewStop={openStop} onBack={() => openTab("today")} /> : tab === "activity" ? <>
+          <div className={s.pageHeading}><span className={s.eyebrow}>YOUR WORKDAY</span><h1>Activity and updates</h1><p>Visit records, saved photos and office responses.</p></div>
+          <div className={s.heroStats}><div><b>{summary.completed}</b><span>Services complete</span></div><div><b>{proofCount}</b><span>Photos saved</span></div><div><b>{pending}</b><span>Queued changes</span></div></div>
+          {day.issues.map((issue) => <section className={`${s.card} ${!issue.response ? s.attention : ""}`} key={issue.id}><span className={s.eyebrow}>{issue.response ? "OFFICE RESPONSE" : "AWAITING OFFICE REVIEW"}</span><h2>{issue.reason === "Unsafe animal" ? "Safety report" : issue.reason}</h2><p>{issue.notes}</p><p>{issue.response || "Your report is saved. The office has not responded yet."}</p>{issue.response && !issue.acknowledgedAt ? <button disabled={disabled} onClick={() => dispatch("acknowledge", { issueId: issue.id })}>Acknowledge response</button> : null}</section>)}
+          {day.stops.map((item) => <section className={s.card} key={item.id}><h2>{item.name}</h2>{item.tasks.map((task) => <div className={s.activityTask} key={task.id}><b>{serviceName(task)}</b><span className={s.statusBadge}>{pretty(task.status)}</span><p>{task.completedAt ? "Recorded at " + time(task.completedAt) : task.startedAt ? "Started at " + time(task.startedAt) : "Not started"}{task.notes ? " · " + task.notes : ""}</p><ProofPhotos photos={task.photos} local={record.photos} /></div>)}</section>)}
+          {record.messages?.map((message) => <section className={s.card} key={message.id}><b>{pretty(message.kind)} · {pretty(message.status)}</b><p>{message.detail}</p></section>)}
+        </> : <>
+          <div className={s.pageHeading}><span className={s.eyebrow}>FIELD TOOLS</span><h1>Your workday</h1><p>Breaks, sync, dates and device settings.</p></div>
+          <section className={s.card}><h2>Route controls</h2><button className={s.bigPrimary} onClick={() => openTab("closeout")}>Review end of route</button>{day.shift.status === "on_route" ? <button className={s.secondary} disabled={disabled || !!active} onClick={() => setModal({ type: day.shift.activeBreak ? "end_break" : "start_break" })}>{day.shift.activeBreak ? "End break" : "Take a break"}</button> : null}</section>
+          <section className={s.card}><h2>Sync and device</h2><p>{pending ? pending + " actions are waiting to sync." : "Your saved work is up to date."}</p><button disabled={!online || syncing} onClick={() => void synchronize()}>Sync now</button><button className={s.secondary} onClick={exportDay}>Export private recovery copy</button><small>Recovery files contain private service information. Keep them secure.</small><p>Open the app online and wait for Offline ready before leaving coverage. Photos and service actions queue on this device until you reconnect.</p><button className={s.textButton} onClick={() => navigator.storage?.persist?.().then((ok) => setError(ok ? "Persistent storage granted." : "Your browser did not grant persistent storage. Keep synced copies current."))}>Request persistent storage</button></section>
+          <section className={s.card}><h2>Choose a workday</h2><label>Service date<input type="date" value={date} disabled={pending > 0 || !!day.shift.clockIn && !day.shift.clockOut} onChange={(event) => { setDate(event.target.value); void refresh(event.target.value).catch((problem) => setError(problem.message)); }} /></label><small>Finish and sync this shift before choosing another date. Future routes are read-only.</small><a href="/field/pilot/">Finish an earlier pilot shift</a></section>
+          <section className={s.card}><h2>Your account</h2><button className={s.secondary} onClick={logout} disabled={!record || pending > 0}>Sign out</button></section>
+          <section className={s.card}><h2>Install the field app</h2><p>On Android, use the browser menu and choose Install app. On iPhone, use Safari Share, then Add to Home Screen.</p><small>Offline access expires after 12 hours without session verification. Keep the app open while syncing.</small></section>
+          <section className={s.card}><h2>Office connection</h2><p>Service reports and safety issues appear in the office after sync.</p><p>External service and payroll upload: Not built yet.</p></section>
+          {day.shift.clockIn && !day.shift.clockOut ? <section className={s.card}><h2>Need to finish early?</h2><p>Record your actual finish time and leave a note for office follow-up. Incomplete work remains flagged.</p><button className={s.danger} disabled={disabled || !!active || !!day.shift.activeBreak} onClick={() => setModal({ type: "clock_out" })}>Early clock-out</button></section> : null}
+        </>}
+      </>}
+    </main>
+    {day && !locked && !safetyScreen && !(tab === "today" && selected && detailTab === "overview" && chosenTask?.status === "working") && !(tab === "closeout" && day.shift.status === "wrapping") ? <nav className={s.nav} aria-label="Technician navigation">{[["today", "Today"], ["route", "Map"], ["activity", "Activity"], ["more", "More"]].map(([id, label]) => <button key={id} aria-current={tab === id ? "page" : undefined} onClick={() => openTab(id)}><FieldIcon name={id} size={21} /><span>{label}{id === "activity" && pending ? " (" + pending + ")" : ""}</span></button>)}</nav> : null}
+    {preparing && day ? <PreparationSheet day={day} disabled={disabled} onClose={() => setPreparing(false)} onClock={(body) => dispatch("clock_in", body)} onCheck={(key, checked) => dispatch("check_item", { key, checked })} onLoad={(items) => dispatch("confirm_load", { items })} onStart={startRoute} /> : null}
+    {modal && !modal.safety ? <ActionDialog modal={modal} customerTextsEnabled={record?.customerTextsEnabled === true} disabled={disabled || modal.type === "finish_day" && (safetyHold || missingProof > 0)} onClose={() => setModal(null)} onSubmit={async (body) => { if (await dispatch(modal.type, body)) { setModal(null); if (["finish_day", "clock_out"].includes(modal.type)) { openTab("closeout"); void synchronize(); } } }} /> : null}
+    {pacing && active?.timed ? <PacingView task={active} stop={activeStop} timer={jobTimer(active.startedAt, null, active.estimatedMinutes, now)} onClose={() => setPacing(false)} /> : null}
+  </div>;
+}
+
+function StopAccess({ stop, disabled, onSafety }) {
+  const instructions = stop.instructions || "";
+  const dogNames = instructions.match(/Dogs:\s*([^\.\n]+)/i)?.[1];
+  const persistent = instructions.match(/Persistent:\s*([\s\S]*?)(?:Today:|$)/i)?.[1]?.trim() || instructions.replace(/Dogs:\s*[^\.\n]+\.?\s*/i, "").trim();
+  const today = instructions.match(/Today:\s*([\s\S]*)/i)?.[1]?.trim();
+  const unsafe = stop.safety === "unsafe" || stop.safety === "unknown" && /unsafe dog|unsecured dog/i.test(instructions);
+  return <>
+    <div className={`${s.access} ${unsafe ? s.unsafeAccess : ""}`}>
+      <div className={s.accessHeading}><b><FieldIcon name="shield" size={17} /> Access and safety</b><span className={`${s.statusBadge} ${unsafe ? s.unsafeBadge : ""}`}>{unsafe ? "Unsafe dog" : stop.safety === "unknown" ? "Needs clearance" : "Check before entry"}</span></div>
+      <div className={s.gateCode}><span>Gate code</span><strong className={!stop.gateCode ? s.noGateCode : undefined}>{stop.gateCode || "No code on file"}</strong></div>
+      {stop.communityCode ? <p>Community code: <b>{stop.communityCode}</b></p> : null}
+      <p><b>{stop.dogCount != null ? `${stop.dogCount} ${stop.dogCount === 1 ? "dog" : "dogs"}` : "Dog count not supplied"}</b>{dogNames ? ` · ${dogNames}` : ""}</p>
+      {unsafe || stop.safety === "unknown" ? <p className={s.safetyWarning}>Do not enter. Office clearance is required before service.</p> : stop.safety === "confirmed" ? <p>Office clearance recorded. Check the property before entry.</p> : <p>Dogs must be secured before entering the yard.</p>}
+      {!stop.tasks.every(taskDone) ? <button className={s.safetyButton} disabled={disabled} onClick={onSafety}>Report unsafe or unsecured dog</button> : null}
     </div>
-  );
+    <div className={s.noteGrid}><section><h3>Persistent property notes</h3><p>{persistent || "No permanent access notes recorded."}</p></section><section className={s.todayNote}><h3>Today's visit notes</h3><p>{today || "No additional office instructions for this visit."}</p></section></div>
+  </>;
 }
 function Login({ onLogin }) {
   const { sessionAPI, testMode } = useContext(Environment);
@@ -1208,12 +679,14 @@ function ClockForm({ disabled, onSubmit }) {
     </form>
   );
 }
-function InventoryForm({ items, mode, disabled, onSubmit }) {
+function InventoryForm({ items, mode, disabled, onSubmit, id, hideSubmit = false }) {
   const [counts, setCounts] = useState({});
   return (
     <form
+      id={id}
       onSubmit={(e) => {
         e.preventDefault();
+        if (disabled) return;
         onSubmit(
           items.map((i) =>
             mode === "load"
@@ -1276,220 +749,102 @@ function InventoryForm({ items, mode, disabled, onSubmit }) {
           ))}
         </fieldset>
       ))}
-      <button disabled={disabled}>
+      <button disabled={disabled} hidden={hideSubmit}>
         {mode === "load" ? "Confirm load" : "Continue to clock-out"}
       </button>
     </form>
   );
 }
-function ServiceCard({
-  task,
-  stop,
-  now,
-  disabled,
-  expanded,
-  onExpand,
-  draft,
-  onDraft,
-  onAction,
-  onPhoto,
-  photos,
-  onPacing,
-  onSkip,
-}) {
-  const { testMode } = useContext(Environment);
-  const [safe, setSafe] = useState(false),
-    [secured, setSecured] = useState(false),
-    [units, setUnits] = useState(false),
-    [notes, setNotes] = useState(draft ?? task.notes),
-    [purpose, setPurpose] = useState(
-      task.proofKind === "none" ? "observation" : task.proofKind,
-    );
-  const timer = jobTimer(
-      task.startedAt,
-      task.completedAt,
-      task.estimatedMinutes,
-      now,
-    ),
-    done = taskDone(task);
-  function updateNote(value) {
-    setNotes(value);
-    onDraft(value);
-  }
-  return (
-    <article
-      className={`${s.service} ${done ? s.done : task.status === "working" ? s.working : ""}`}
-    >
-      <button
-        className={s.serviceTitle}
-        aria-expanded={expanded}
-        onClick={onExpand}
-      >
-        <b>{task.title}</b>
-        <span>
-          {pretty(task.status).toUpperCase()} · {task.quantity} {task.unitLabel}
-          {task.timed ? ` · ${task.estimatedMinutes} min` : ""}
-        </span>
-      </button>
-      {expanded ? (
-        <div className={s.serviceBody}>
-          {task.instructions ? <p>{task.instructions}</p> : null}
-          {task.placementNote ? (
-            <p>
-              <b>Placement:</b> {task.placementNote}
-            </p>
-          ) : null}
-          {done ? (
-            <>
-              <p>
-                {task.notes || task.reason || "Recorded"}
-                {task.startedAt ? ` · ${clockText(timer.elapsedSeconds)}` : ""}
-              </p>
-              <ProofPhotos photos={task.photos} local={photos} />
-            </>
-          ) : task.status === "working" ? (
-            <>
-              {task.timed ? (
-                <button
-                  className={`${s.timer} ${timer.over ? s.over : ""}`}
-                  onClick={onPacing}
-                >
-                  <b>{clockText(timer.elapsedSeconds)}</b>
-                  <span>
-                    {timer.over
-                      ? `+${clockText(timer.overtimeSeconds)} over allowance`
-                      : `${clockText(Math.max(0, timer.allottedSeconds - timer.elapsedSeconds))} remaining`}
-                  </span>
-                </button>
-              ) : null}
-              <label>
-                Private office note
-                <textarea
-                  maxLength={2000}
-                  value={notes}
-                  onChange={(e) => updateNote(e.target.value)}
-                />
-              </label>
-              <button
-                className={s.textButton}
-                disabled={disabled}
-                onClick={() =>
-                  onAction("save_note", { taskId: task.id, notes })
-                }
-              >
-                Save private note
-              </button>
-              <VoiceNote value={notes} onChange={updateNote} />
-              <ProofPhotos photos={task.photos} local={photos} />
-              <label>
-                Photo purpose
-                <select
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                >
-                  <option value="observation">Office observation</option>
-                  <option value="gate">Latched gate</option>
-                  <option value="service">Service proof</option>
-                  {task.serviceId === "food" ? (
-                    <option value="delivery">Delivery proof</option>
-                  ) : null}
-                </select>
-              </label>
-              <label className={s.photoButton}>
-                Add camera / gallery photo
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  disabled={disabled || task.photos.length >= 8}
-                  onChange={(e) => {
-                    if (e.target.files?.[0])
-                      onPhoto(task, e.target.files[0], purpose);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-              {testMode ? <button disabled={disabled || task.photos.length >= 8} onClick={async () => {
-                const canvas = document.createElement("canvas"); canvas.width=640; canvas.height=360;
-                const ctx=canvas.getContext("2d"); ctx.fillStyle="#123d32";ctx.fillRect(0,0,640,360);
-                ctx.fillStyle="#fff";ctx.font="bold 30px sans-serif";ctx.fillText("TRAINING PHOTO",35,80);
-                ctx.font="20px sans-serif";ctx.fillText("Fictional service - " + purpose,35,145);ctx.fillText("Not customer evidence",35,195);
-                const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",0.75));
-                if(blob) await onPhoto(task,new File([blob],"training-proof.jpg",{type:"image/jpeg"}),purpose);
-              }}>Use sample proof</button> : null}
-              <label className={s.check}>
-                <input
-                  type="checkbox"
-                  checked={units}
-                  onChange={(e) => setUnits(e.target.checked)}
-                />
-                All {task.quantity} {task.unitLabel} serviced
-              </label>
-              <label className={s.check}>
-                <input
-                  type="checkbox"
-                  checked={secured}
-                  onChange={(e) => setSecured(e.target.checked)}
-                />
-                {task.serviceId === "food"
-                  ? "Delivery placed as instructed"
-                  : "Property and gate secured"}
-              </label>
-              <button
-                disabled={disabled || !secured || !units}
-                onClick={() =>
-                  onAction("complete_task", {
-                    taskId: task.id,
-                    secured: true,
-                    units: task.quantity,
-                    notes,
-                  })
-                }
-              >
-                Complete service
-              </button>
-            </>
-          ) : (
-            <>
-              {task.entryRequired ? (
-                <label className={s.check}>
-                  <input
-                    type="checkbox"
-                    checked={safe}
-                    onChange={(e) => setSafe(e.target.checked)}
-                  />
-                  I checked access and it is safe to enter
-                </label>
-              ) : null}
-              <button
-                disabled={
-                  disabled ||
-                  !stop.arrivedAt ||
-                  (task.entryRequired &&
-                    (!safe || ["unsafe", "unknown"].includes(stop.safety)))
-                }
-                onClick={() =>
-                  onAction("start_task", { taskId: task.id, safe })
-                }
-              >
-                Start service
-              </button>
-            </>
-          )}
-          {!done ? (
-            <button
-              className={s.textButton}
-              disabled={disabled}
-              onClick={onSkip}
-            >
-              Can’t service? Skip / report issue
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-    </article>
-  );
+function safetyBlocked(day) {
+  return !!day && (day.issues.some((issue) => issue.reason === "Unsafe animal" && !issue.response) || day.stops.some((stop) => stop.safety === "unsafe" || stop.safety === "unknown" && /unsafe dog|unsecured dog/i.test(stop.instructions)));
 }
+function proofReady(stop, task) {
+  if (task.proofKind === "none" || task.proofKind === "gate" && stop.hasGate === false) return true;
+  const start = Date.parse(task.startedAt || stop.arrivedAt);
+  return (task.proofKind === "gate" ? stop.tasks.flatMap((item) => item.photos) : task.photos).some((photo) => photo.purpose === task.proofKind && Date.parse(photo.at) >= start);
+}
+function propertyNotes(stop) {
+  const text = stop.instructions || "";
+  return { dogs: text.match(/Dogs:\s*([^\.\n]+)/i)?.[1] || "Names not recorded", persistent: text.match(/Persistent:\s*([\s\S]*?)(?:Today:|$)/i)?.[1]?.trim() || text.replace(/Dogs:\s*[^\.\n]+\.?\s*/i, "").trim() || "No permanent access notes recorded.", today: text.match(/Today:\s*([\s\S]*)/i)?.[1]?.trim() || "No additional office instructions for this visit." };
+}
+function MapLink({ stop, testMode = false }) {
+  if (testMode) return <span className={s.mapDisabled}>Maps disabled for training</span>;
+  return <a className={s.secondary} href={"https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(stop.latitude != null && stop.longitude != null ? stop.latitude + "," + stop.longitude : stop.address)} target="_blank" rel="noreferrer"><FieldIcon name="pin" size={17} /> Open in Maps</a>;
+}
+function PreparationSheet({ day, disabled, onClose, onClock, onCheck, onLoad, onStart }) {
+  const ref = useRef(null), [problem, setProblem] = useState("");
+  useEffect(() => { ref.current?.showModal(); }, []);
+  return <dialog ref={ref} className={`${s.dialog} ${s.preparationDialog}`} onCancel={(event) => { event.preventDefault(); onClose(); }}><button className={s.textButton} onClick={onClose}>Close preparation</button><span className={s.eyebrow}>BEFORE YOU HEAD OUT</span><h2>Let's get ready.</h2><p className={s.tip}>Clock in, check your supplies and confirm the load.</p>{problem ? <p className={s.error}>{problem}</p> : null}
+    {day.shift.status === "ready" ? <ClockForm disabled={disabled} onSubmit={async (body) => { if (!await onClock(body)) setProblem("Clock-in could not be saved. Review the odometer and try again."); }} /> : day.shift.status === "loading" ? <><div className={s.precheckList}>{PRECHECKS.map(([id, label]) => <label className={s.check} key={id}><input type="checkbox" checked={!!day.shift.prechecks[id]} disabled={disabled} onChange={(event) => onCheck(id, event.target.checked)} />{label}</label>)}</div><h3>Load check</h3><p className={s.tip}>{day.departureReady ? "Your assigned route is cleared for departure." : "The office must clear this route before departure."}</p><InventoryForm items={day.inventory} mode="load" disabled={disabled || !PRECHECKS.every(([id]) => day.shift.prechecks[id]) || !day.departureReady} onSubmit={async (items) => { if (!await onLoad(items)) setProblem("Load confirmation needs review. Check product counts and office clearance."); }} /></> : <section className={s.readyToGo}><span className={s.successGlyph}><FieldIcon name="check" size={27} /></span><h3>You're ready to go.</h3><p>Checklist complete. {day.stops.length} stops are assigned to you.</p><button className={s.bigPrimary} disabled={disabled} onClick={onStart}>Start route</button></section>}
+  </dialog>;
+}
+function ServiceWorkflow({ task, stop, day, section, initialStage, onStageChange, now, disabled, draft, photos, onDraft, onAction, onPhoto, onPacing, onSkip, onSafety, onNext, onEta }) {
+  const { testMode } = useContext(Environment);
+  const [stage, setStage] = useState(taskDone(task) ? "done" : task.status === "working" ? ["proof", "complete"].includes(initialStage) ? initialStage : "service" : "overview"),
+    [safe, setSafe] = useState(false), [dogsSecured, setDogsSecured] = useState(false), [secured, setSecured] = useState(false), [units, setUnits] = useState(false), [noIssues, setNoIssues] = useState(false), [notes, setNotes] = useState(draft ?? task.notes ?? ""), [savingPhoto, setSavingPhoto] = useState(false);
+  const done = taskDone(task), proof = proofReady(stop, task), timer = jobTimer(task.startedAt, task.completedAt, task.estimatedMinutes, now), property = propertyNotes(stop);
+  const completesStop = stop.tasks.filter((item) => !taskDone(item)).length === 1;
+  const anotherStop = day.stops.some((item) => item.id !== stop.id && !item.tasks.every(taskDone));
+  useEffect(() => { if (task.status === "working" && ["proof", "complete"].includes(initialStage)) setStage(initialStage); }, [initialStage, task.status]);
+  function updateNote(value) { setNotes(value); onDraft(value); }
+  function changeStage(value) { setStage(value); onStageChange?.(value); const query = new URLSearchParams(window.location.search); query.set("view", value === "proof" || value === "complete" ? value : "stop"); query.set("taskId", task.id); window.history.replaceState(null, "", "?" + query); window.scrollTo({ top: 0, behavior: "instant" }); }
+  const delivery = task.deliveryItems.map((item) => ({ ...item, name: day.inventory.find((row) => row.productId === item.productId)?.name || "Scheduled dog food" }));
+  async function capturePhoto(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setSavingPhoto(true);
+    try { await onPhoto(task, file, task.proofKind === "none" ? "observation" : task.proofKind); }
+    finally { setSavingPhoto(false); }
+  }
+  const sticky = (label, onClick, blocked, capture = false) => {
+    const arriveFirst = !stop.arrivedAt && task.status === "pending";
+    const captureDisabled = disabled || savingPhoto || task.photos.length >= 8;
+    return <div className={`${s.stopActions} ${task.status === "working" ? s.focusActions : ""}`} aria-label="Next stop action"><button className={s.skipAction} disabled={disabled || done} onClick={onSkip}>Skip</button>{capture ? <label className={`${s.completeAction} ${s.stickyCapture} ${captureDisabled ? s.captureDisabled : ""}`}><FieldIcon name="camera" size={19} />{savingPhoto ? "Saving photo..." : "Take photo"}<input type="file" accept="image/*" capture="environment" aria-label="Take or choose the required proof photo" disabled={captureDisabled} onChange={capturePhoto} /></label> : <button className={s.completeAction} disabled={disabled || done || !arriveFirst && blocked} onClick={arriveFirst ? () => onAction("arrive", { stopId: stop.id }) : onClick}>{arriveFirst ? "Arrive at stop" : label}</button>}</div>;
+  };
+  if (section === "notes") return <><section className={s.card}><span className={s.eyebrow}>PROPERTY INSTRUCTIONS</span><h2>Persistent notes</h2><p>{property.persistent}</p><h3>Today's office notes</h3><p>{property.today}</p></section><section className={s.card}><h2>Private service note</h2><p className={s.tip}>Saved for the office with this service.</p><label>Visit notes<textarea value={notes} maxLength={2000} disabled={disabled || done} onChange={(event) => updateNote(event.target.value)} /></label>{!done ? <VoiceNote value={notes} onChange={updateNote} /> : null}<button disabled={disabled || done} onClick={() => onAction("save_note", { taskId: task.id, notes })}>Save private note</button>{done ? <p className={s.tip}>This service is finished. The saved note is read-only.</p> : null}</section></>;
+  if (section === "history") return <><section className={s.card}><span className={s.eyebrow}>THIS VISIT</span><h2>Service history</h2><div className={s.visitTimeline}>{[{ label: "Arrival recorded", at: stop.arrivedAt }, { label: "Service started", at: task.startedAt }, ...task.photos.map((photo) => ({ label: pretty(photo.purpose) + " photo saved", at: photo.at })), { label: task.status === "skipped" ? "Service skipped" : "Service completed", at: task.completedAt }].filter((entry) => entry.at).map((entry, index) => <div key={index}><i /><span>{entry.label}</span><b>{time(entry.at)}</b></div>)}</div>{!stop.arrivedAt && !task.startedAt && !task.photos.length && !task.completedAt ? <p>This visit has not started.</p> : null}{task.notes || task.reason ? <p>{task.notes || task.reason}</p> : null}<ProofPhotos photos={task.photos} local={photos} /></section><section className={s.card}><h3>Earlier property visits</h3><p className={s.tip}>Not built yet. This view shows the current assigned visit.</p></section></>;
+  if (done) return <section className={`${s.card} ${s.serviceResult}`}><span className={s.successGlyph}><FieldIcon name="check" size={27} /></span><span className={s.eyebrow}>{task.status === "completed" ? "SERVICE SAVED" : "EXCEPTION SAVED"}</span><h2>{task.status === "completed" ? stop.tasks.every(taskDone) ? "Stop complete." : "Service complete." : "Office follow-up requested."}</h2><p>{serviceName(task)} · {time(task.completedAt)}</p>{task.notes || task.reason ? <p>{task.notes || task.reason}</p> : null}<div className={s.resultFacts}><span><FieldIcon name="shield" size={17} />{task.status === "completed" ? "Required checks recorded" : "Reason recorded"}</span><span><FieldIcon name="camera" size={17} />{task.photos.length} photos saved</span></div><ProofPhotos photos={task.photos} local={photos} /><button className={s.bigPrimary} onClick={onNext}>{stop.tasks.every(taskDone) ? anotherStop ? "Next stop" : "Review route closeout" : "Next service at this stop"}</button></section>;
+  if (stage === "proof" && task.status === "working") return <>
+    <div className={s.stepHeading}><span>STEP 2 OF 3</span><h2>{task.proofKind === "gate" ? "Gate photo" : task.proofKind === "delivery" ? "Delivery photo" : "Service photo"}</h2><p>{task.proofKind === "gate" ? "Show the closed gate and latched lock before leaving." : task.proofKind === "delivery" ? "Show every bag placed in the requested delivery location." : "Show the finished work for this service."}</p></div>
+    <section className={`${s.card} ${s.proofCard}`}><span className={s.requiredTag}>REQUIRED PHOTO</span><div className={task.photos.length ? s.proofGallery : s.photoCapture}><ProofPhotos photos={task.photos} local={photos} />{!task.photos.length ? <><span className={s.cameraGlyph}><FieldIcon name="camera" size={40} /></span><h3>{task.proofKind === "gate" ? "Capture the latched gate" : "Capture completed work"}</h3><p>A clear photo protects the customer, the technician and the visit record.</p></> : null}</div>{task.photos.length ? <label className={s.captureButton}><FieldIcon name="camera" size={19} />{savingPhoto ? "Saving photo..." : "Add another photo"}<input type="file" accept="image/*" capture="environment" aria-label="Add another proof photo" disabled={disabled || savingPhoto || task.photos.length >= 8} onChange={capturePhoto} /></label> : null}<p className={`${s.proofStatus} ${proof ? s.proofReady : ""}`}><FieldIcon name={proof ? "check" : "shield"} size={17} />{proof ? "Required proof is saved on this device." : "Required proof must be saved before completion."}</p>{testMode ? <button className={s.secondary} disabled={disabled || savingPhoto} onClick={async () => { const canvas = document.createElement("canvas"); canvas.width = 640; canvas.height = 360; const context = canvas.getContext("2d"); context.fillStyle = "#34383f"; context.fillRect(0, 0, 640, 360); context.fillStyle = "white"; context.font = "28px Arial"; context.fillText("TRAINING PHOTO", 35, 70); context.font = "20px Arial"; context.fillText("No customer evidence", 35, 130); const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", .75)); if (blob) await onPhoto(task, new File([blob], "training-proof.jpg", { type: "image/jpeg" }), task.proofKind); }}>Use training proof</button> : null}</section><button className={s.textButton} onClick={() => changeStage("service")}>Back to service</button>{sticky("Use photo", () => changeStage("complete"), !proof || savingPhoto, !proof)}
+  </>;
+  if (stage === "complete" && task.status === "working") return <>
+    <div className={s.stepHeading}><span>STEP 3 OF 3</span><h2>{completesStop ? "Complete stop" : task.serviceId === "food" ? "Complete delivery" : "Complete service"}</h2><p>Review the details before moving to your next stop.</p></div><section className={s.card}><div className={s.completionService}><FieldIcon name={task.serviceId === "food" ? "bag" : "shield"} size={24} /><div><h3>{serviceName(task)}</h3><p>{taskUnits(task)} · {clockText(timer.elapsedSeconds)}</p>{task.serviceId === "food" ? <>{delivery.map((item) => <p key={item.productId} style={{ marginTop: 6, fontSize: 14, lineHeight: 1.5 }}><strong>{item.quantity} x {item.name}</strong></p>)}{task.placementNote ? <p style={{ marginTop: 6, fontSize: 14, lineHeight: 1.5 }}>Placement: {task.placementNote}</p> : null}</> : null}</div></div><label className={s.toggleCheck}><span><b>{task.serviceId === "food" ? "Delivery placed as instructed" : stop.hasGate !== false ? "Gate closed and latched" : "Property secured"}</b><small>{task.serviceId === "food" ? "All bags are in the assigned location." : "Leave the property secure before departure."}</small></span><input type="checkbox" checked={secured} onChange={(event) => setSecured(event.target.checked)} /></label><label className={s.toggleCheck}><span><b>All scheduled work is complete</b><small>{taskUnits(task)} accounted for.</small></span><input type="checkbox" checked={units} onChange={(event) => setUnits(event.target.checked)} /></label><label className={s.toggleCheck}><span><b>No unresolved safety issues</b><small>Use the safety report if access is unsafe.</small></span><input type="checkbox" checked={noIssues} onChange={(event) => setNoIssues(event.target.checked)} /></label><button className={s.safetyButton} disabled={disabled} onClick={onSafety}>Report a safety issue</button><label>Visit note <span className={s.optionalLabel}>Optional</span><textarea maxLength={2000} value={notes} onChange={(event) => updateNote(event.target.value)} placeholder="Add a note for the office" /></label><div className={s.proofInline}><FieldIcon name={proof ? "check" : "camera"} size={18} /><span>{proof ? task.photos.length + " photos saved" : "Required photo missing"}</span><button className={s.textButton} onClick={() => changeStage("proof")}>Review photos</button></div><ProofPhotos photos={task.photos} local={photos} /></section>{sticky(completesStop ? "Complete stop" : "Complete service", async () => { if (await onAction("complete_task", { taskId: task.id, secured: true, units: task.quantity, notes })) changeStage("done"); }, !secured || !units || !noIssues || !proof)}
+  </>;
+  if (task.status === "working") return <><div className={s.stepHeading}><span>STEP 1 OF 3</span><h2>Service in progress</h2><p>{serviceName(task)} · {taskUnits(task)}</p></div><section className={s.card}><button className={`${s.timer} ${timer.over ? s.over : ""}`} onClick={onPacing}><FieldIcon name="clock" size={23} /><b>{clockText(timer.elapsedSeconds)}</b><span>{timer.over ? "+" + clockText(timer.overtimeSeconds) + " over plan" : clockText(Math.max(0, timer.allottedSeconds - timer.elapsedSeconds)) + " of planned time left"}</span></button>{task.instructions ? <p>{task.instructions}</p> : null}{task.placementNote ? <p><b>Delivery location:</b> {task.placementNote}</p> : null}{delivery.length ? <div className={s.deliveryList}>{delivery.map((item) => <div key={item.productId}><FieldIcon name="bag" size={22} /><span>{item.name}</span><b>{item.quantity} bag{item.quantity === 1 ? "" : "s"}</b></div>)}</div> : null}<p className={s.tip}>{task.proofKind === "gate" ? "A latched gate photo is required after the work is finished." : task.proofKind === "delivery" ? "A delivery photo is required before completing this stop." : task.proofKind === "service" ? "A service photo is required before completion." : "Confirm the assigned units and property security before completion."}</p><button className={s.safetyButton} disabled={disabled} onClick={onSafety}>Report unsafe access</button></section>{sticky("Finish work", () => changeStage(task.proofKind === "none" || task.proofKind === "gate" && stop.hasGate === false ? "complete" : "proof"), false)}</>;
+  return <>
+    {disabled && day.shift.status !== "on_route" ? <p className={s.proofRequirement}>Start the route and complete departure checks before working this stop.</p> : null}
+    <StopAccess stop={stop} disabled={disabled} onSafety={onSafety} />
+    <div className={s.serviceEstimate}><FieldIcon name="clock" size={18} /><span>{serviceName(task)}</span><b>{task.estimatedMinutes} min planned</b></div>
+    <div className={s.mapActions}><MapLink stop={stop} testMode={testMode} /><button className={s.secondary} disabled={disabled || !!activeService(day)} onClick={onEta}>Arrival estimate</button></div>
+
+    {task.instructions ? <section className={s.card}><h3>Service instructions</h3><p>{task.instructions}</p></section> : null}
+    {delivery.length ? <section className={s.card}><span className={s.eyebrow}>DOG FOOD DELIVERY</span><h2>What to deliver</h2><div className={s.deliveryList}>{delivery.map((item) => <div key={item.productId}><FieldIcon name="bag" size={22} /><span>{item.name}</span><b>{item.quantity} bag{item.quantity === 1 ? "" : "s"}</b></div>)}</div><p>{task.placementNote || "Place the bags in the assigned delivery location."}</p></section> : null}
+    <section className={s.card}><span className={s.eyebrow}>BEFORE YOU START</span><h2>Safety checklist</h2><label className={s.check}><input type="checkbox" checked={dogsSecured} onChange={(event) => setDogsSecured(event.target.checked)} disabled={disabled} />{task.entryRequired ? "Dogs are secured away from the service area" : "The delivery area is clear of unsecured dogs"}</label><label className={s.check}><input type="checkbox" checked={safe} onChange={(event) => setSafe(event.target.checked)} disabled={disabled} />I checked access and it is safe to work</label>{["unknown", "unsafe"].includes(stop.safety) && task.entryRequired ? <p className={s.error}>Do not enter. This stop requires office clearance.</p> : null}</section>
+    {sticky("Start service", async () => { if (await onAction("start_task", { taskId: task.id, safe: true })) changeStage("service"); }, !stop.arrivedAt || !safe || !dogsSecured || task.entryRequired && ["unknown", "unsafe"].includes(stop.safety))}
+  </>;
+}
+function SafetyReport({ stop, task, disabled, onClose, onSubmit }) {
+  const [unsecured, setUnsecured] = useState(true), [skip, setSkip] = useState(true), [contact, setContact] = useState(true), [notes, setNotes] = useState("");
+  return <><button className={s.backLink} onClick={onClose}><FieldIcon name="back" size={17} /> Back to stop</button><div className={s.safetyHero}><span className={s.safetyGlyph}><FieldIcon name="alert" size={32} /></span><span className={s.eyebrow}>SAFETY FIRST</span><h1>Dog unsecured.</h1><p>Stay outside the service area. Do not enter until the office records clearance.</p></div><section className={s.card}><h2>{stop.name}</h2><p>{stop.address}</p><div className={s.workTags}><span>{serviceName(task)}</span><span>{stop.dogCount} {stop.dogCount === 1 ? "dog" : "dogs"}</span></div></section><form className={s.safetyForm} onSubmit={(event) => { event.preventDefault(); onSubmit({ notes }); }}><section className={s.card}><h2>Report unsafe access</h2><p className={s.tip}>This report marks unsafe access, skips the affected service and creates an office review item.</p><label className={s.toggleCheck}><span><b>Mark access unsafe</b><small>A dog is unsecured or access is unsafe.</small></span><input type="checkbox" checked={unsecured} required onChange={(event) => setUnsecured(event.target.checked)} /></label><label className={s.toggleCheck}><span><b>Skip this service</b><small>The visit needs office follow-up.</small></span><input type="checkbox" checked={skip} required onChange={(event) => setSkip(event.target.checked)} /></label><label className={s.toggleCheck}><span><b>Contact the office</b><small>Add this safety report to the office queue.</small></span><input type="checkbox" checked={contact} required onChange={(event) => setContact(event.target.checked)} /></label><label>What happened?<textarea value={notes} required maxLength={2000} onChange={(event) => setNotes(event.target.value)} placeholder="Describe the dog, access issue and where you are waiting" /></label><p className={s.safetyInstruction}><FieldIcon name="shield" size={18} />Keep a safe distance and wait for office guidance.</p></section><div className={s.safetySubmit}><button className={s.bigPrimary} disabled={disabled || !unsecured || !skip || !contact || !notes.trim()}>Submit &amp; alert office</button><small>The office receives the report when your device syncs.</small></div></form></>;
+}
+function CloseoutReview({ day, summary, pending, proofCount, missingProof, safetyHold, online, disabled, onStart, onCheck, onFinish, onSync, onViewStop, onBack }) {
+  const finished = day.shift.status === "finished", wrapping = day.shift.status === "wrapping", unaccounted = summary.services - summary.accounted;
+  const blocked = disabled || unaccounted > 0 || missingProof > 0 || safetyHold;
+  const wrapChecksDone = WRAPCHECKS.every(([id]) => day.shift.wrapchecks[id]);
+  return <>
+    {onBack ? <button className={s.backLink} onClick={onBack}><FieldIcon name="back" size={17} /> Back to route</button> : null}
+    <div className={s.pageHeading}><span className={s.eyebrow}>END OF ROUTE</span><h1>{finished ? "Route saved." : "Finish your route"}</h1><p>{finished ? "Your service records and actual work time have been recorded." : "Review proof and safety, then finish your wrap checklist."}</p></div>
+    <div className={s.closeoutStats}><div><FieldIcon name="check" /><b>{summary.stopsFinished}/{summary.stops}</b><span>Stops finished</span></div><div><FieldIcon name="camera" /><b>{proofCount}</b><span>Photos saved</span></div><div><FieldIcon name="alert" /><b>{summary.unresolvedIssues}</b><span>Open issues</span></div></div>
+    {unaccounted || missingProof || safetyHold ? <section className={`${s.card} ${s.attention}`}><h2>Closeout needs attention</h2>{unaccounted ? <p>{unaccounted} scheduled service{unaccounted === 1 ? "" : "s"} still need completion or a skip reason.</p> : null}{missingProof ? <p>{missingProof} completed services are missing required photos.</p> : null}{safetyHold ? <p>Unresolved safety items require office clearance before normal closeout.</p> : null}</section> : null}
+    {wrapping ? <section className={s.card}><span className={s.eyebrow}>FINAL CHECKS</span><h2>Before you clock out</h2>{WRAPCHECKS.map(([id, label]) => <label className={s.check} key={id}><input type="checkbox" checked={!!day.shift.wrapchecks[id]} disabled={disabled} onChange={(event) => onCheck(id, event.target.checked)} />{label}</label>)}<InventoryForm id="field-wrap-inventory" hideSubmit items={day.inventory} mode="returns" disabled={blocked || !wrapChecksDone} onSubmit={onFinish} /></section> : null}
+    <details className={`${s.card} ${s.summaryDetails}`} open={!wrapping}><summary>Route summary<span>{hours(summary.paidSeconds)} recorded</span></summary><div className={s.summaryLine}><span>Services completed</span><b>{summary.completed}</b></div><div className={s.summaryLine}><span>Services skipped</span><b>{summary.skipped}</b></div><div className={s.summaryLine}><span>Photo checks</span><b>{missingProof ? missingProof + " missing" : "Required proof present"}</b></div><div className={s.summaryLine}><span>Device sync</span><b>{pending ? pending + " queued" : "Up to date"}</b></div></details>
+    <details className={s.closeoutStops} open={unaccounted > 0}><summary>Today's stops<span>{summary.stopsFinished} of {day.stops.length} finished</span></summary>{day.stops.map((stop, index) => <button key={stop.id} onClick={() => onViewStop(stop)}><span className={s.stopNumber}>{stop.tasks.every(taskDone) ? <FieldIcon name="check" size={16} /> : index + 1}</span><div><b>{stop.name}</b><small>{stop.tasks.filter((task) => task.status === "completed").length} complete · {stop.tasks.reduce((n, task) => n + task.photos.length, 0)} photos</small></div><span className={s.statusBadge}>{stop.tasks.every(taskDone) ? "Accounted" : "Needs work"}</span></button>)}</details>
+    {wrapping ? <div className={`${s.closeoutAction} ${s.focusActions}`}><button className={s.bigPrimary} form="field-wrap-inventory" type="submit" disabled={blocked || !wrapChecksDone}>Continue to clock-out</button><small>{wrapChecksDone ? "Review returned stock, then enter your final odometer." : "Complete the final checks above before clock-out."}</small></div> : finished ? <section className={`${s.card} ${s.closeoutComplete}`}><span className={s.successGlyph}><FieldIcon name="check" size={24} /></span><h2>{pending ? "Work saved on this device" : "Your work is synced"}</h2><p>Clocked out at {time(day.shift.clockOut)}.</p>{pending ? <button disabled={!online} onClick={onSync}>Sync saved work</button> : null}</section> : <div className={s.closeoutAction}><button className={s.bigPrimary} disabled={blocked || !online || day.shift.status !== "on_route"} onClick={onStart}>Sync &amp; close route</button><small>{!online ? "Reconnect to sync and close. Work is saved on this device." : blocked ? "Resolve the items above before closing this route." : "Continue to the wrap-up checklist and final odometer."}</small></div>}
+  </>;
+}
+
 function ProofPhotos({ photos, local }) {
   const { API } = useContext(Environment);
   const [urls, setUrls] = useState([]);
@@ -1567,7 +922,7 @@ function ActionDialog({
   const ref = useRef(null),
     [mileage, setMileage] = useState(""),
     [notes, setNotes] = useState(""),
-    [reason, setReason] = useState("Locked gate"),
+    [reason, setReason] = useState(modal.safety ? "Unsafe animal" : "Locked gate"),
     [breakType, setBreakType] = useState("paid"),
     [minutes, setMinutes] = useState(15),
     [confirm, setConfirm] = useState(false);
@@ -1609,7 +964,8 @@ function ActionDialog({
         <button className={s.textButton} type="button" onClick={onClose}>
           Close
         </button>
-        <h2>{pretty(modal.type)}</h2>
+        <h2>{modal.safety ? "Unsafe or unsecured dog" : modal.type === "skip_task" ? "Skip service" : pretty(modal.type)}</h2>
+        {modal.safety ? <p className={s.error}>Stay clear of the property. This creates a safety report for the office and blocks entry until the office records clearance.</p> : null}
         {modal.type === "on_way" && !customerTextsEnabled ? (
           <p>
             Customer texts are currently off. This saves an arrival estimate for
@@ -1649,15 +1005,14 @@ function ActionDialog({
         {modal.type === "skip_task" ? (
           <label>
             Reason
-            <select value={reason} onChange={(e) => setReason(e.target.value)}>
-              {[
+            <select value={reason} disabled={modal.safety} onChange={(e) => setReason(e.target.value)}>
+              {(modal.safety ? ["Unsafe animal"] : [
                 "Locked gate",
-                "Unsafe animal",
                 "Weather",
                 "Customer request",
                 "Equipment",
                 "Other",
-              ].map((r) => (
+              ]).map((r) => (
                 <option key={r}>{r}</option>
               ))}
             </select>
@@ -1695,10 +1050,10 @@ function ActionDialog({
             required
             onChange={(e) => setConfirm(e.target.checked)}
           />
-          I reviewed this action
+          {modal.safety ? "I am clear of the property and need office follow-up" : "I reviewed this action"}
           {needsMileage ? " and verified the odometer" : ""}.
         </label>
-        <button disabled={disabled}>Save {pretty(modal.type)}</button>
+        <button disabled={disabled}>{modal.safety ? "Save safety report" : `Save ${pretty(modal.type)}`}</button>
       </form>
     </dialog>
   );

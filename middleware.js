@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { verifyAdminRequest } from "@/lib/admin-auth";
 import { getDb } from "@/lib/db";
 import { verifyFieldRequest, verifyOfficeRequest } from "@/lib/field-auth";
+import { getRuntimeEnv } from "@/lib/cloudflare";
+import { crmBillingEnabled } from "@/lib/crm-billing-security.mjs";
+import { localPreviewPaymentOrigin } from "@/lib/local-preview-payments.mjs";
 
 const PUBLIC_ADMIN_PATHS = new Set(["/admin/login", "/admin/login/", "/api/admin/session", "/api/admin/session/"]);
 // The offline shell contains no customer data. Every data/proof API remains authenticated.
@@ -10,6 +13,20 @@ const PUBLIC_OFFICE_PATHS = new Set(["/office/login", "/office/login/", "/api/of
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const GOOGLE_MAP_ADMIN_PATHS = new Set(["/admin/call-guide", "/admin/call-guide/"]);
 const DENSITY_MAP_ADMIN_PATHS = new Set(["/admin/acquisition", "/admin/acquisition/"]);
+const BILLING_ADMIN_PATHS = new Set(["/admin/crm/billing", "/admin/crm/billing/"]);
+
+function billingFrameOrigin(path, requestOrigin) {
+  if (!BILLING_ADMIN_PATHS.has(path)) return null;
+  try {
+    const env = getRuntimeEnv();
+    const localOrigin = localPreviewPaymentOrigin(env, requestOrigin);
+    if (localOrigin) return localOrigin;
+    if (!crmBillingEnabled(env) || env.CRM_PAYMENTS_PROVIDER === 'fake') return null;
+    const url = new URL(env.CARDPOINTE_UAT_BASE_URL);
+    if (url.protocol !== 'https:' || !/^[a-z0-9]+(?:-[a-z0-9]+)*-uat\.cardconnect\.com$/.test(url.hostname) || url.username || url.password || url.port || url.search || url.hash || !['/cardconnect/rest', '/cardconnect/rest/'].includes(url.pathname)) return null;
+    return url.origin;
+  } catch { return null; }
+}
 
 function crossSiteMutation(request) {
   if (SAFE_METHODS.has(request.method)) return false;
@@ -92,6 +109,7 @@ export async function middleware(request) {
   const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(24))));
   const googleMapPage = GOOGLE_MAP_ADMIN_PATHS.has(path);
   const densityMapPage = DENSITY_MAP_ADMIN_PATHS.has(path);
+  const billingOrigin = billingFrameOrigin(path, request.nextUrl.origin);
   const policy = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
@@ -109,7 +127,7 @@ export async function middleware(request) {
     "object-src 'none'",
     "base-uri 'none'",
     "form-action 'self'",
-    "frame-src 'none'",
+    billingOrigin ? `frame-src ${billingOrigin}` : "frame-src 'none'",
     "frame-ancestors 'none'",
   ].join("; ");
   const requestHeaders = new Headers(request.headers);

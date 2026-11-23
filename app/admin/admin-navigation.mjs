@@ -19,11 +19,7 @@ export const ADMIN_NAVIGATION = [
     { id: "scorecard", label: "Management scorecard", href: "/admin/?view=scorecard" },
   ] },
   { id: "crm", label: "Routing & CRM", items: [
-    { id: "planning", label: "Route planning & assignments", href: "/admin/routes/" },
-    { id: "dispatch", label: "Daily dispatch · Route Partner", href: "/admin/route-partner/" },
-    { id: "field-workdays", label: "Field operations & services", href: "/admin/route-partner/workdays/" },
-    { id: "team", label: "Field team & access", href: "/admin/route-partner/team/" },
-    { id: "office-access", label: "Office access", href: "/admin/office-access/" },
+    { id: "crm-dashboard", label: "Route OS CRM", href: "/admin/crm/" },
   ] },
   { id: "dog-food", label: "Dog food", items: [
     { id: "food-customers", label: "Customer information hub", href: "/admin/dog-food/customers/" },

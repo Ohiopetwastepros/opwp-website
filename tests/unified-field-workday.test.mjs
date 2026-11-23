@@ -44,7 +44,7 @@ test.beforeEach(t => {
 });
 
 test('successful first sign-in without an assigned route opens an empty workday safely',()=>{
-  const result={day:null,member:{id:'member',organizationId:'org'},changes:[],messages:[],offlineUntil:'2026-10-13T23:00:00Z'};
+  const result={day:null,member:{id:'member',organizationId:'org',name:'Technician'},changes:[],messages:[],offlineUntil:'2026-10-13T23:00:00Z'};
   for(const saved of [null,undefined]){
     const opened=adoptServerWorkday(saved,result);
     assert.equal(opened.day,null);assert.deepEqual(opened.member,result.member);assert.deepEqual(opened.photos,{});assert.deepEqual(opened.drafts,{});assert.deepEqual(opened.pending,[]);
@@ -53,11 +53,12 @@ test('successful first sign-in without an assigned route opens an empty workday 
 });
 
 test('route removal retains pending work for review and clears only backed-up device attachments',()=>{
-  const saved={day:{id:'old-shift',revision:2},pending:[{id:'unsynced'}],photos:{proof:'photo-bytes'},drafts:{task:'private note'}};
+  const photo=new Blob(['photo-bytes'],{type:'image/jpeg'});
+  const saved={day:{id:'old-shift',revision:2},pending:[{id:'unsynced'}],photos:{proof:photo},drafts:{task:'private note'}};
   const result={day:null,member:{id:'member'},changes:[],messages:[]};
-  assert.throws(()=>adoptServerWorkday(saved,result),/Pending work is retained/);assert.equal(saved.photos.proof,'photo-bytes');assert.equal(saved.pending.length,1);
+  assert.throws(()=>adoptServerWorkday(saved,result),/Pending work is retained/);assert.equal(saved.photos.proof,photo);assert.equal(saved.pending.length,1);
   const backedUp={...saved,pending:[]};assert.deepEqual(adoptServerWorkday(backedUp,result).photos,{});
-  const same=adoptServerWorkday(backedUp,{...result,day:{id:'old-shift',revision:2}});assert.equal(same.photos.proof,'photo-bytes');assert.equal(same.drafts.task,'private note');
+  const same=adoptServerWorkday(backedUp,{...result,day:{id:'old-shift',revision:2}});assert.equal(same.photos.proof,photo);assert.equal(same.drafts.task,'private note');
 });
 
 function fixture() {

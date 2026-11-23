@@ -1,5 +1,6 @@
 import { getDb } from '@/lib/db';
 import { verifyFieldRequest } from '@/lib/field-auth';
+import { technicianHistory } from '@/lib/field-technician-view.mjs';
 export const dynamic = 'force-dynamic';
 export async function GET(request) {
   const db = getDb();
@@ -12,5 +13,5 @@ export async function GET(request) {
     AND p.status IN ('finalized','in_progress','completed')
     AND s.service_date BETWEEN date('now','-30 days') AND date('now','+14 days')
     ORDER BY s.service_date DESC,s.created_at DESC LIMIT 90`).bind(auth.member.organizationId,auth.member.id).all();
-  return Response.json({ok:true,shifts:rows.results || []},{headers:{'Cache-Control':'private, no-store'}});
+  return Response.json({ok:true,shifts:technicianHistory(rows.results)},{headers:{'Cache-Control':'private, no-store'}});
 }

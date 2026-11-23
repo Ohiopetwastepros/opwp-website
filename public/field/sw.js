@@ -1,4 +1,4 @@
-const CACHE = "opwp-field-shell-v1";
+const CACHE = "opwp-field-shell-v2-privacy";
 const ROOT = "/field/app/";
 function allowed(url) {
   return (

@@ -10,6 +10,8 @@ import { checkQuoteFollowUpWorker } from "../scripts/check-quote-follow-up-worke
 
 const processors = ["runScheduledQuoteFollowUps", "runScheduledYardOps", "runFailedPaymentRecovery", "processFieldMessages", "runScheduledReviewRequests"];
 const existingTasks = ["runScheduledDensityRefresh", "runScheduledDispatchPreparation", "runScheduledFoodOperations"];
+const subscriptionTask = 'processDueCrmSubscriptions';
+const billingTask = 'runScheduledCrmBilling';
 const imports = `import { runScheduledQuoteFollowUps } from "../lib/quote-follow-up-delivery.js";
 import { runScheduledYardOps } from "../lib/lead-assistant.js";
 import { runFailedPaymentRecovery } from "../lib/failed-payment-reconciliation.js";
@@ -42,7 +44,7 @@ async function executeWorker(source, cron, rejectedProcessor = "") {
       contexts.push(request.url);
       return run();
     },
-    ...Object.fromEntries([...processors, ...existingTasks].map(name => [name, async actualEnv => {
+    ...Object.fromEntries([...processors, ...existingTasks, subscriptionTask, billingTask].map(name => [name, async actualEnv => {
       assert.equal(actualEnv, env);
       calls.push(name);
       if (name === rejectedProcessor) throw new Error("Fixture processor failed");
@@ -61,12 +63,12 @@ test("all five processors run once on */10 alongside other */10 blocks, even wit
     const patched = patchQuoteFollowUpWorker(source);
     assert.equal(patchQuoteFollowUpWorker(patched), patched, "patch is byte-idempotent");
     const result = await executeWorker(patched, "*/10 * * * *");
-    assert.deepEqual(result.calls.sort(), [...processors, ...existingTasks].sort());
-    assert.deepEqual(result.contexts, ["https://opwp.internal/quote-follow-ups"]);
-    assert.equal(result.waits.length, existingTasks.length + 2, "quote group has its own waitUntil");
+    assert.deepEqual(result.calls.sort(), [...processors, ...existingTasks, subscriptionTask, billingTask].sort());
+    assert.deepEqual(result.contexts, ["https://opwp.internal/crm-billing-uat", "https://opwp.internal/subscription-schedule", "https://opwp.internal/quote-follow-ups"]);
+    assert.equal(result.waits.length, existingTasks.length + 4, "billing, subscription and quote groups have independent waitUntil tasks");
     assert.deepEqual(result.logs, processors.map(processor => ({ event: "scheduled_follow_up_processor", processor, success: true })));
     assert.ok(result.outcomes.every(outcome => outcome.status === "fulfilled"));
-    assert.deepEqual(Array.from(result.outcomes[0].value), processors, "completion logging preserves processor results");
+    assert.deepEqual(Array.from(result.outcomes.find(outcome => Array.isArray(outcome.value)).value), processors, "completion logging preserves processor results");
     for (const cron of ["0 * * * *", "5 * * * *", "15 * * * *", "35 * * * *"]) {
       const skipped = await executeWorker(patched, cron);
       assert.deepEqual(skipped.calls, []);
@@ -80,8 +82,9 @@ test("processor failures are observable without logging error details or swallow
   assert.deepEqual(result.logs, processors.map(processor => ({
     event: "scheduled_follow_up_processor", processor, success: processor !== "runFailedPaymentRecovery",
   })));
-  assert.equal(result.outcomes[0].status, "rejected");
-  assert.match(result.outcomes[0].reason.message, /Fixture processor failed/);
+  const rejected = result.outcomes.filter(outcome => outcome.status === 'rejected');
+  assert.equal(rejected.length, 1);
+  assert.match(rejected[0].reason.message, /Fixture processor failed/);
   assert.equal(JSON.stringify(result.logs).includes("Fixture processor failed"), false);
 });
 
@@ -93,7 +96,7 @@ test('review processing is added when the quote processor was already called', a
   assert.equal(patchQuoteFollowUpWorker(patched), patched);
   const result = await executeWorker(patched, '*/10 * * * *');
   assert.equal(result.calls.filter(name=>name==='runScheduledReviewRequests').length, 1);
-  assert.deepEqual(result.calls.sort(), [...processors, ...existingTasks].sort());
+  assert.deepEqual(result.calls.sort(), [...processors, ...existingTasks, subscriptionTask, billingTask].sort());
 });
 
 test("missing worker markers fail before writing an incomplete patch", () => {
@@ -127,7 +130,7 @@ test("the actual build patch chain installs and validates follow-ups on an OpenN
   }
   const patched = await fs.readFile(workerPath, "utf8");
   const result = await executeWorker(patched, "*/10 * * * *");
-  assert.deepEqual(result.calls.sort(), [...processors, ...existingTasks].sort());
+  assert.deepEqual(result.calls.sort(), [...processors, ...existingTasks, subscriptionTask, billingTask].sort());
   assert.equal(run("patch-quote-follow-up-worker.mjs").status, 0);
   assert.equal(await fs.readFile(workerPath, "utf8"), patched);
 

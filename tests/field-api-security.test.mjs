@@ -6,10 +6,11 @@ import vm from 'node:vm';
 import { readBoundedProviderJson,readBoundedBytes } from '../lib/bounded-body.mjs';
 import { FieldError,imageMatches,coordinates } from '../lib/field-policy.mjs';
 import { reviewCloseoutIdentity } from '../lib/field-sync-review.mjs';
+import { technicianLegacyDay, technicianFieldActionResult, technicianText } from '../lib/field-technician-view.mjs';
 const source=path=>fs.readFileSync(new URL(path,import.meta.url),'utf8').replace(/^\uFEFF/,'').replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'');
 function actionFixture({authorized=true,fail=null}={}){
   let calls=0;
-  const api=runPrivateInNewContext(source('../app/api/field/action/route.js')+'\n({POST})',{Response,URL,console,RangeError,FieldError,readBoundedProviderJson,getDb:()=>({}),verifyFieldRequest:async()=>({authorized,member:{id:'tech'}}),fieldQuota:async()=>true,checkRateLimit:async()=>({allowed:true}),executeFieldCommand:async()=>{calls++;if(fail)throw fail;return {message:'Saved'};},applyFieldAction:()=>{},getFieldToday:async()=>null});return {api,calls:()=>calls};
+  const api=runPrivateInNewContext(source('../app/api/field/action/route.js')+'\n({POST})',{Response,URL,console,RangeError,FieldError,readBoundedProviderJson,technicianLegacyDay,technicianFieldActionResult,technicianText,getDb:()=>({}),verifyFieldRequest:async()=>({authorized,member:{id:'tech'}}),fieldQuota:async()=>true,checkRateLimit:async()=>({allowed:true}),executeFieldCommand:async()=>{calls++;if(fail)throw fail;return {message:'Saved'};},applyFieldAction:()=>{},getFieldToday:async()=>null});return {api,calls:()=>calls};
 }
 const request=(data,origin='https://example.com')=>new Request('https://example.com/api/field/action/',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify(data)});
 test('field mutation requires a session and positive same-origin evidence',async()=>{

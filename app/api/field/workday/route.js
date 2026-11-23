@@ -13,6 +13,7 @@ import {
 } from "@/lib/field-messages.js";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { offlineAccessUntil } from "@/lib/field-offline-access.mjs";
+import { technicianWorkdayResult, technicianReceipt } from "@/lib/field-technician-view.mjs";
 export const dynamic = "force-dynamic";
 export async function GET(request) {
   try {
@@ -24,7 +25,7 @@ export async function GET(request) {
       });
     return workdayJson({
       ok: true,
-      ...result,
+      ...technicianWorkdayResult(result),
       offlineUntil: offlineAccessUntil(auth.expiresAt),
       customerTextsEnabled: fieldMessagesConfigured(getRuntimeEnv()),
     });
@@ -58,7 +59,7 @@ export async function POST(request) {
           ),
         ),
       );
-    return workdayJson({ ok: true, ...result });
+    return workdayJson({ ok: true, ...technicianReceipt(result) });
   } catch (error) {
     return workdayError(error);
   }

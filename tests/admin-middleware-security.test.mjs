@@ -3,10 +3,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { crmBillingEnabled } from '../lib/crm-billing-security.mjs';
+import { localPreviewPaymentOrigin } from '../lib/local-preview-payments.mjs';
 const source=fs.readFileSync(new URL('../middleware.js',import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'');
-function fixture(authorized=false){
+function fixture(authorized=false,env={}){
  const authCalls=[];
- const middleware=runPrivateInNewContext(source+'\nmiddleware',{Headers,URL,Uint8Array,crypto,btoa,NextResponse:{next(options){const r=new Response(null);r.forwarded=options?.request?.headers;return r;},json:Response.json,redirect(url,options){return new Response(null,{status:307,headers:{...options?.headers,location:String(url)}});}},getDb:()=>({}),verifyAdminRequest:async()=>{authCalls.push('admin');return {authorized};},verifyFieldRequest:async()=>({authorized:false}),verifyOfficeRequest:async()=>({authorized:false})});
+ const middleware=runPrivateInNewContext(source+'\nmiddleware',{Headers,URL,Uint8Array,crypto,btoa,crmBillingEnabled,localPreviewPaymentOrigin,getRuntimeEnv:()=>env,NextResponse:{next(options){const r=new Response(null);r.forwarded=options?.request?.headers;return r;},json:Response.json,redirect(url,options){return new Response(null,{status:307,headers:{...options?.headers,location:String(url)}});}},getDb:()=>({}),verifyAdminRequest:async()=>{authCalls.push('admin');return {authorized};},verifyFieldRequest:async()=>({authorized:false}),verifyOfficeRequest:async()=>({authorized:false})});
  return {middleware,authCalls};
 }
 function request(path,method='GET',headers={}){const url='https://ohiopetwastepros.com'+path;return {url,nextUrl:new URL(url),method,headers:new Headers(headers)};}
@@ -58,4 +60,36 @@ test('valid same-origin MFA requests pass and office/field sessions cannot becom
  const good=fixture(true);assert.equal((await good.middleware(request('/api/admin/office-access/','POST',{origin:'https://ohiopetwastepros.com'}))).status,200);
  const bad=fixture(false);for(const path of ['/api/office/route-assignment/','/api/field/today/'])assert.equal((await bad.middleware(request(path))).status,401);
  for(const path of ['/admin/login/','/api/admin/session/'])assert.equal((await bad.middleware(request(path))).status,200);
+});
+
+test('only the exact gated billing page permits its assigned UAT hosted payment origin',async()=>{
+ const env={APP_ENV:'preview',ROUTE_OS_BILLING_ENABLED:'true',CRM_PAYMENTS_ENV:'uat',CARDPOINTE_UAT_BASE_URL:'https://fts-uat.cardconnect.com/cardconnect/rest/'};
+ const {middleware}=fixture(true,env);
+ for(const path of ['/admin/crm/billing','/admin/crm/billing/']){
+  const response=await middleware(request(path));const policy=response.headers.get('content-security-policy');
+  assert.match(policy,/frame-src https:\/\/fts-uat\.cardconnect\.com;/);
+  assert.equal(policy.split(';').filter(part=>part.includes('cardconnect')).length,1);
+  assert.equal(response.forwarded.get('content-security-policy'),policy);assert.equal(response.headers.get('referrer-policy'),'no-referrer');
+  assert.match(policy,/frame-ancestors 'none'/);assert.equal(response.headers.get('x-frame-options'),'DENY');
+ }
+ for(const path of ['/admin/security/','/admin/crm/subscriptions/','/admin/crm/billing/extra','/api/admin/crm/billing/'])assert.match((await middleware(request(path))).headers.get('content-security-policy'),/frame-src 'none'/);
+});
+
+test('billing iframe CSP fails closed for disabled, fake, production, and malformed gateways',async()=>{
+ const base={APP_ENV:'preview',ROUTE_OS_BILLING_ENABLED:'true',CRM_PAYMENTS_ENV:'uat',CARDPOINTE_UAT_BASE_URL:'https://fts-uat.cardconnect.com/cardconnect/rest/'};
+ for(const override of [{APP_ENV:'production'},{ROUTE_OS_BILLING_ENABLED:'false'},{CRM_PAYMENTS_ENV:'production'},{CRM_PAYMENTS_PROVIDER:'fake'},
+  {CARDPOINTE_UAT_BASE_URL:'https://fts.cardconnect.com/cardconnect/rest/'},{CARDPOINTE_UAT_BASE_URL:'http://fts-uat.cardconnect.com/cardconnect/rest/'},
+  {CARDPOINTE_UAT_BASE_URL:'https://fts-uat.cardconnect.com.evil.example/cardconnect/rest/'},{CARDPOINTE_UAT_BASE_URL:'https://user:pass@fts-uat.cardconnect.com/cardconnect/rest/'},
+  {CARDPOINTE_UAT_BASE_URL:'https://fts-uat.cardconnect.com:8443/cardconnect/rest/'},{CARDPOINTE_UAT_BASE_URL:'https://fts-uat.cardconnect.com/cardconnect/rest/?bad=1'},
+  {CARDPOINTE_UAT_BASE_URL:'https://fts-uat.cardconnect.com/cardconnect/rest/#bad'},{CARDPOINTE_UAT_BASE_URL:'https://fts-uat.cardconnect.com/other/'},
+ ])assert.match((await fixture(true,{...base,...override}).middleware(request('/admin/crm/billing/'))).headers.get('content-security-policy'),/frame-src 'none'/);
+});
+
+test('local fake iframe CSP permits only its exact enabled loopback billing page', async () => {
+ const origin='http://localhost:8787',env={APP_ENV:'development',ROUTE_OS_BILLING_ENABLED:'true',CRM_PAYMENTS_ENV:'uat',CRM_PAYMENTS_PROVIDER:'fake',LOCAL_PREVIEW_ENABLED:'true',LOCAL_PREVIEW_ORIGIN:origin};
+ const localRequest=path=>{const url=origin+path;return {url,nextUrl:new URL(url),method:'GET',headers:new Headers()};};
+ assert.match((await fixture(true,env).middleware(localRequest('/admin/crm/billing/'))).headers.get('content-security-policy'),/frame-src http:\/\/localhost:8787;/);
+ for(const path of ['/admin/security/','/admin/crm/billing/extra']) assert.match((await fixture(true,env).middleware(localRequest(path))).headers.get('content-security-policy'),/frame-src 'none'/);
+ assert.match((await fixture(true,{...env,APP_ENV:'production'}).middleware(localRequest('/admin/crm/billing/'))).headers.get('content-security-policy'),/frame-src 'none'/);
+ assert.match((await fixture(true,env).middleware(request('/admin/crm/billing/'))).headers.get('content-security-policy'),/frame-src 'none'/);
 });

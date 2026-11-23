@@ -44,6 +44,7 @@
   "devDependencies": {
     "eslint": "10.14.0",
     "eslint-plugin-react-hooks": "7.1.1",
+    "fake-indexeddb": "6.2.8",
     "wrangler": "4.154.0"
   },
   "overrides": {

@@ -53,6 +53,28 @@ export function patchQuoteFollowUpWorker(source) {
                 () => runScheduledReviewRequests(env))
         );`);
   }
+  // The native subscription scheduler is independent and disabled unless its
+  // separately approved flag is enabled. It records reminders; it never sends.
+  if (!source.includes('from "../lib/crm-subscription-store.mjs"')) {
+    source = source.replace(importMarker, `import { processDueCrmSubscriptions } from "../lib/crm-subscription-store.mjs";\n${importMarker}`);
+  }
+  if (!/\bprocessDueCrmSubscriptions\s*\(\s*env\b/.test(source)) {
+    source = source.replace(scheduledMarker, `${scheduledMarker}
+        if (controller.cron === "*/10 * * * *") ctx.waitUntil(
+            runWithCloudflareRequestContext(new Request("https://opwp.internal/subscription-schedule"), env, ctx,
+                () => processDueCrmSubscriptions(env, { now: controller.scheduledTime }))
+        );`);
+  }
+  if (!source.includes('from "../lib/crm-billing-worker.mjs"')) {
+    source = source.replace(importMarker, `import { runScheduledCrmBilling } from "../lib/crm-billing-worker.mjs";\n${importMarker}`);
+  }
+  if (!/\brunScheduledCrmBilling\s*\(\s*env\b/.test(source)) {
+    source = source.replace(scheduledMarker, `${scheduledMarker}
+        if (controller.cron === "*/10 * * * *") ctx.waitUntil(
+            runWithCloudflareRequestContext(new Request("https://opwp.internal/crm-billing-uat"), env, ctx,
+                () => runScheduledCrmBilling(env, { now: controller.scheduledTime }))
+        );`);
+  }
   checkQuoteFollowUpWorker(source);
   return source;
 }

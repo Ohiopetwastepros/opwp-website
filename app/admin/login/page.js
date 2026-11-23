@@ -23,7 +23,7 @@ export default async function LoginPage({ searchParams }) {
         <a className={styles.brand} href="/"><span className={styles.brandMark}>O</span><span><strong>OPWP</strong><small>Operating system</small></span></a>
         <div className={styles.storyBody}>
           <span className={styles.kicker}>One operating layer</span>
-          <h1>Routes, service, and delivery—working as one.</h1>
+          <h1>Routes, service, and delivery working as one.</h1>
           <p>The management workspace built to keep field operations clear, accountable, and ready for the day.</p>
           <div className={styles.signalRow}><span><b>01</b> Plan</span><span><b>02</b> Review</span><span><b>03</b> Release</span></div>
         </div>

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { verifyFieldRequest } from "@/lib/field-auth";
 import { getFieldToday } from "@/lib/field-operations";
+import { technicianLegacyDay } from "@/lib/field-technician-view.mjs";
 import FieldClient from "../FieldClient";
 import styles from "../field.module.css";
 
@@ -35,7 +36,7 @@ export default async function FieldPage() {
   }
   return (
     <main className={`opwp-field-shell ${styles.shell}`}>
-      <FieldClient initialDay={initialDay} />
+      <FieldClient initialDay={technicianLegacyDay(initialDay)} />
     </main>
   );
 }

@@ -6,6 +6,7 @@ import { FieldError } from "@/lib/field-policy.mjs";
 import { readBoundedProviderJson } from "@/lib/bounded-body.mjs";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { fieldQuota } from "@/lib/field-quota.mjs";
+import { technicianLegacyDay, technicianFieldActionResult, technicianText } from "@/lib/field-technician-view.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +27,10 @@ export async function POST(request) {
     // The command is already committed. A refresh failure must not claim it failed.
     const day = /^\d{4}-\d{2}-\d{2}$/.test(date) ? await getFieldToday(db, auth, date, body.shiftId).catch(() => null) : null;
     console.log(JSON.stringify({ message: "field action completed", action: body.action, memberId: auth.member.id, shiftId: body.shiftId || null }));
-    return Response.json({ ok: true, ...result, day }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ ok: true, ...technicianFieldActionResult(result), day: technicianLegacyDay(day) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "The field action could not be completed.";
     console.error(JSON.stringify({ message: "field action failed", action: body?.action, memberId: auth.member.id, error: message }));
-    return Response.json({ ok: false, error: error instanceof FieldError ? message : "The action could not be saved. Retry the same action." }, { status: error instanceof FieldError ? error.status : 500, headers: { "Cache-Control": "no-store" } });
+    return Response.json({ ok: false, error: error instanceof FieldError ? technicianText(message) : "The action could not be saved. Retry the same action." }, { status: error instanceof FieldError ? error.status : 500, headers: { "Cache-Control": "no-store" } });
   }
 }

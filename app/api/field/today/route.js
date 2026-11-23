@@ -2,6 +2,7 @@ import { getDb } from "@/lib/db";
 import { verifyFieldRequest } from "@/lib/field-auth";
 import { getFieldToday } from "@/lib/field-operations";
 import { validDispatchDate } from "@/lib/daily-route-optimizer.mjs";
+import { technicianLegacyDay } from "@/lib/field-technician-view.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export async function GET(request) {
   const date = new URL(request.url).searchParams.get("date") || "";
   if (!validDate(date)) return Response.json({ ok: false, error: "A valid service date is required." }, { status: 400 });
   const shiftId = String(new URL(request.url).searchParams.get('shiftId') || '').slice(0,100);
-  try { return Response.json({ ok: true, day: await getFieldToday(db, auth, date, shiftId) }, { headers: { "Cache-Control": "no-store" } }); }
+  try { return Response.json({ ok: true, day: technicianLegacyDay(await getFieldToday(db, auth, date, shiftId)) }, { headers: { "Cache-Control": "no-store" } }); }
   catch (error) {
     const message = error instanceof Error ? error.message : "The field route could not be loaded.";
     console.error(JSON.stringify({ message: "field day load failed", memberId: auth.member.id, date, error: message }));

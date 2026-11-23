@@ -3,12 +3,13 @@ import { getDb } from "@/lib/db";
 import { authenticateFieldMember, createFieldSession, expiredFieldSessionCookie, fieldAuthConfigured, fieldSessionCookie, revokeFieldSession, verifyFieldRequest } from "@/lib/field-auth";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { readBoundedProviderJson } from "@/lib/bounded-body.mjs";
+import { technicianMember } from "@/lib/field-technician-view.mjs";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   const auth = await verifyFieldRequest(request.headers, getDb());
-  return NextResponse.json({ ok: true, authenticated: auth.authorized, member: auth.authorized ? auth.member : null }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ok: true, authenticated: auth.authorized, member: auth.authorized ? technicianMember(auth.member) : null }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request) {
@@ -24,7 +25,7 @@ export async function POST(request) {
   if (!email || !/^\d{6}$/.test(pin)) return NextResponse.json({ ok: false, error: "Enter your email and six-digit PIN." }, { status: 400 });
   const auth = await authenticateFieldMember(db, email, pin);
   if (!auth.authorized) return NextResponse.json({ ok: false, error: auth.locked ? "Too many attempts. Try again in 15 minutes or contact management." : "That email or PIN is not correct." }, { status: auth.locked ? 429 : 401 });
-  const response = NextResponse.json({ ok: true, member: auth.member }, { headers: { "Cache-Control": "no-store" } });
+  const response = NextResponse.json({ ok: true, member: technicianMember(auth.member) }, { headers: { "Cache-Control": "no-store" } });
   response.cookies.set(fieldSessionCookie(await createFieldSession(db, auth.member.id), request.url));
   return response;
 }
