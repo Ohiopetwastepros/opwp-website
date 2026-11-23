@@ -1,10 +1,14 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "opwp-website",
-  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
+  },
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-08-28",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "workers_dev": true,
   "preview_urls": false,
   "routes": [
@@ -42,7 +46,7 @@
     "LEAD_PLAYBOOK_ENABLED": "true",
     "LEAD_PLAYBOOK_AUTO_SEND_ENABLED": "true",
     "LEAD_PLAYBOOK_NOTIFY_ENABLED": "true",
-    "LEAD_AUTOMATION_CONTROLLED_TEST_ONLY": "true",
+    "LEAD_AUTOMATION_CONTROLLED_TEST_ONLY": "false",
     "META_CADENCE_ENABLED": "false",
     "FOOD_SALES_NATIVE_ENABLED": "true",
     "FOOD_SALES_RECORDING_ENABLED": "true",
@@ -72,10 +76,10 @@
     "META_GRAPH_API_VERSION": "v26.0",
     "META_ALLOWED_PAGE_IDS": "617929208074485",
     "META_AUTOMATION_ENABLED": "true",
-    "META_AUTOMATION_APPROVAL_ID": "meta-live-2026-11-18",
+    "META_AUTOMATION_APPROVAL_ID": "meta-live-2026-11-23-golive",
     "META_TEST_MODE": "false",
     "META_TEST_APPROVAL_ID": "meta-test-2026-11-18",
-    "META_TEST_RECIPIENTS": "+14192620424",
+    "META_TEST_RECIPIENTS": "",
     "META_TEST_FORM_IDS": "1725121795904553",
     "META_APPROVED_SMS_FORMS": "{\"1725121795904553\":{\"pageId\":\"617929208074485\",\"consentField\":\"text_message_consent\",\"disclosure\":\"Can we text you your quote? By choosing Yes, you agree Ohio Pet Waste Pros may send texts, including automated texts, about your quote and service to the number above. Consent isn't required to buy. Msg and data rates may apply. Reply STOP to opt out.\",\"version\":\"fb-consent-2026-11-18\"}}"
   },
@@ -84,6 +88,12 @@
     "head_sampling_rate": 1
   },
   "triggers": {
-    "crons": ["*/10 * * * *", "0 * * * *", "5 * * * *", "15 * * * *", "35 * * * *"]
+    "crons": [
+      "*/10 * * * *",
+      "0 * * * *",
+      "5 * * * *",
+      "15 * * * *",
+      "35 * * * *"
+    ]
   }
 }
