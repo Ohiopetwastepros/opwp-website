@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import fs from 'node:fs';
-import {densityAddress,densityAddressHash,normalizeDensityClients,buildDensityAnalysis,closedWeekCapacity,DENSITY_SOURCE_KEY,DENSITY_REVIEWS_KEY} from '../lib/live-density.mjs';
+import {densityAddress,densityAddressHash,normalizeDensityClients,buildDensityAnalysis,closedWeekCapacity,localReliableGeocode,DENSITY_SOURCE_KEY,DENSITY_REVIEWS_KEY} from '../lib/live-density.mjs';
 import {listDensityCustomers,readLiveDensity,refreshLiveDensity,densityHandlers,readDensityReviews,saveDensityReview} from '../lib/live-density-store.mjs';
 const now=new Date(),capturedAt=now.toISOString();
 const record=(id,n,patch={})=>({id,createdTime:'2026-01-01T12:00:00Z',fields:{Status:'Active','Client Name':'Fixture '+id,Address:`${n} Fixture Lane`,City:'Perrysburg',ZIP:'43551',Frequency:'Weekly','Service Day':'Monday','Assigned Tech':staffPrivate.reliefShort,'Est. Service Minutes':8,'MRR ($)':100,...patch}});
@@ -36,6 +36,32 @@ test('density uses verified local locations, corrects ZIPs and preserves unknown
   assert.equal(densityAddress({Address:'1 Main',City:'Lambertville',ZIP:'48144'}),'1 Main, Lambertville, MI, 48144');
   assert.throws(()=>normalizeDensityClients([records[0],records[0]],map),/Duplicate/);
   assert.equal(normalizeDensityClients([record('zip',1,{ZIP:'99999'})],new Map([['zip',g()]]))[0].zip,'43551');
+});
+
+test('local route screening accepts validated Census interpolation without raising confidence or widening territory',()=>{
+  const census={...g(),confidence:null,match_type:'census_interpolated'};
+  assert.equal(localReliableGeocode(census),true);
+  assert.equal(census.confidence,null);
+  for(const patch of [{latitude:null},{longitude:null},{latitude:NaN},{longitude:Infinity},{latitude:40.9},{latitude:42.4},{longitude:-84.7},{longitude:-82.6}])
+    assert.equal(localReliableGeocode({...census,...patch}),false);
+  assert.equal(localReliableGeocode({...g(),confidence:.74}),false);
+  assert.equal(localReliableGeocode({...g(),confidence:1,match_type:'street'}),false);
+  assert.equal(localReliableGeocode({...g(),confidence:.75}),true);
+});
+
+test('density refresh uses and persists Census locations, then reuses the cache without geocoding unchanged addresses',async()=>{
+  const f=database(),rows=[records[0]];
+  f.put('business_cockpit',{opwp:{customers:rows,time:[]}});
+  let calls=0;
+  const geocode=async()=>{calls++;return {ok:true,data:{latitude:41.535,longitude:-83.665,formattedAddress:'1 FIXTURE LANE, PERRYSBURG, OH, 43551',confidence:null,matchType:'census_interpolated',placeId:'',source:'census'}};};
+  const options={force:true,now,quota:fakeQuota,fetcher:async()=>response(rows),pause:async()=>{},geocode};
+  const first=await refreshLiveDensity({DB:f.db,AIRTABLE_API_KEY:'fixture'},options);
+  assert.equal(first.source.clients[0].lat,41.535);assert.equal(first.source.clients[0].issue,null);
+  const cached=f.sql.prepare('SELECT confidence,match_type FROM route_geocode_cache').get();
+  assert.equal(cached.confidence,null);assert.equal(cached.match_type,'census_interpolated');
+  const second=await refreshLiveDensity({DB:f.db,AIRTABLE_API_KEY:'fixture'},{...options,now:new Date(now.getTime()+60000)});
+  assert.equal(second.source.clients[0].lat,41.535);assert.equal(second.source.geocodeCalls,0);assert.equal(calls,1);
+  f.sql.close();
 });
 test('pockets recompute after new and removed clients, have unique coverage and stable centers',()=>{
   const original=buildDensityAnalysis(source());assert.equal(original.pockets[0].customers,5);assert.equal(original.scope.coveredClients,5);

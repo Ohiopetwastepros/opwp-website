@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PRICING, YARD_TIERS, calcLocalQuote, haulAwayPrice, isInArea } from "@/app/free-quote/pricing";
+import { CLEANUP_RANGE_EXPLANATION, PRICING, YARD_TIERS, calcLocalQuote, formatCleanupRange, haulAwayPrice, isInArea } from "@/app/free-quote/pricing";
 import { BILLING_VISITS_PER_MONTH, callGuideProration } from "@/lib/call-guide-proration.mjs";
 import { formatLeadPhone } from "@/lib/lead-inbox.mjs";
 import PropertyMap from "./PropertyMap";
@@ -32,12 +32,16 @@ const initialForm = {
   billingName: "", billingZip: "", cardLastFour: "",
 };
 
-function money(value) {
-  return value == null ? "--" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
+function money(value, minimumFractionDigits = 2) {
+  return value == null ? "--" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits, maximumFractionDigits: 2 }).format(value);
 }
 
 function range(value) {
-  return value ? `${money(value[0])}-${money(value[1])}` : "Custom review";
+  return value ? formatCleanupRange(value) : "Custom review";
+}
+
+function formatInvoiceRange(value) {
+  return value ? value.map((amount) => money(amount, 0)).join(" to ") : "Custom review";
 }
 
 function formatDate(value) {
@@ -90,8 +94,8 @@ function MockInvoice({ form, cleanupRange, addonLines, invoiceRange, proration, 
       {proration.quantity > 0 ? <div className={styles.invoiceItem}><strong>Prorated {FREQUENCIES[form.frequency]} service · {proration.dates.map((date) => formatDate(date)).join("; ")}<small>Monthly rate {money(monthlyTotal)} ÷ {proration.divisor} · includes monthly add-ons</small></strong><span>{proration.quantity.toFixed(2)}</span><span>{money(proration.rate)}</span><b>{money(proration.amount)}</b></div> : null}
     </div>
     {form.frequency !== "one_time" ? <div className={styles.invoiceNote}><p>{proration.pending ? "Prorated service is pending. Confirm the first-cleanup date, recurring schedule, and monthly price to complete the invoice total." : proration.quantity ? "Prorated dates exclude the initial cleanup. The line amount uses the monthly rate divided by the billing average, multiplied by quantity, then rounded to cents. Confirm these dates in Sweep & Go." : "There are no recurring cleanups remaining in the initial month."}</p></div> : null}
-    <div className={styles.invoiceTotals}><div><span>Subtotal</span><b>{range(invoiceRange)}</b></div><div><span>Tax</span><b>$0.00</b></div><div className={styles.invoiceGrandTotal}><span>Invoice total</span><b>{range(invoiceRange)}</b></div></div>
-    <div className={styles.invoiceNote}><strong>What to tell the customer</strong><p>This is the estimated first invoice. The initial cleanup portion stays within the displayed range unless the actual yard condition requires approval for a different amount. {form.frequency !== "one_time" ? "It also includes the remaining prorated cleanups for the first month. Regular monthly billing begins the following month. Treatments and products listed above cover the first visit only." : "It covers the one-time cleanup and selected add-ons."}</p></div>
+    <div className={styles.invoiceTotals}><div><span>Subtotal</span><b>{formatInvoiceRange(invoiceRange)}</b></div><div><span>Tax</span><b>$0.00</b></div><div className={styles.invoiceGrandTotal}><span>Invoice total</span><b>{formatInvoiceRange(invoiceRange)}</b></div></div>
+    <div className={styles.invoiceNote}><strong>What to tell the customer</strong><p>This is the estimated first invoice. The initial cleanup portion stays within the displayed range unless the actual yard condition requires approval for a different amount. {CLEANUP_RANGE_EXPLANATION} {form.frequency !== "one_time" ? "It also includes the remaining prorated cleanups for the first month. Regular monthly billing begins the following month. Treatments and products listed above cover the first visit only." : "It covers the one-time cleanup and selected add-ons."}</p></div>
   </div>;
 }
 
@@ -147,6 +151,7 @@ export default function NewClientCallGuide({ googleMapsKey, routeEndpoint = "/ap
   const recurringPerCleanup = monthlyTotal == null ? null : monthlyTotal / billingVisits;
   const selectedCleanupRate = recurringPerCleanup == null ? null : recurringPerCleanup + perTreatmentTotal;
   const cleanupRange = form.frequency === "one_time" ? quote.oneTimeRange : quote.initialRange;
+  const rangeExplanation = cleanupRange ? ` ${CLEANUP_RANGE_EXPLANATION}` : "";
   const invoiceAddonLines = selectedAddons.map((item) => ({
     id: item.id,
     description: item.charge === "monthly" ? `Initial ${item.name.replace(/^Add /, "")}` : item.name,
@@ -184,8 +189,8 @@ export default function NewClientCallGuide({ googleMapsKey, routeEndpoint = "/ap
     const priceText = form.frequency === "one_time" ? `${range(quote.oneTimeRange)} for the one-time cleanup` : `${money(monthlyTotal)} per month`;
     const firstDate = form.startDatePending ? "with the first date still pending" : `starting ${formatDate(form.startDate)}`;
     const scheduleText = form.frequency === "one_time" ? (form.startDatePending ? "a one-time cleanup with the date still pending" : `a cleanup on ${formatDate(form.startDate)}`) : `${FREQUENCIES[form.frequency]} service on ${scheduledDays || "a day we still need to confirm"}, ${firstDate}`;
-    return `Let me read everything back, ${customer}. I have ${fullAddress(form) || "your address still to confirm"}, ${dogText}, and ${scheduleText}. Your price is ${priceText}. We will access the yard through ${form.gateLocation || "the access point we still need to confirm"}, and place the bagged waste ${form.wasteLocation || "where you direct us"}. Is everything correct?`;
-  }, [form, monthlyTotal, quote, scheduledDays]);
+    return `Let me read everything back, ${customer}. I have ${fullAddress(form) || "your address still to confirm"}, ${dogText}, and ${scheduleText}. Your price is ${priceText}.${form.frequency === "one_time" ? rangeExplanation : ""} We will access the yard through ${form.gateLocation || "the access point we still need to confirm"}, and place the bagged waste ${form.wasteLocation || "where you direct us"}. Is everything correct?`;
+  }, [form, monthlyTotal, quote, rangeExplanation, scheduledDays]);
 
   const welcome = useMemo(() => {
     const name = form.firstName.trim() || "there";
@@ -193,12 +198,12 @@ export default function NewClientCallGuide({ googleMapsKey, routeEndpoint = "/ap
       ? (form.startDatePending ? "We will confirm your one-time cleanup date shortly." : `Your one-time cleanup is scheduled for ${formatDate(form.startDate)}.`)
       : `You are scheduled for ${FREQUENCIES[form.frequency]} service on ${scheduledDays || "a service day we will confirm shortly"}.${form.startDatePending ? " We will confirm your first cleanup date shortly." : ` Your first cleanup is ${formatDate(form.startDate)}.`}`;
     const price = form.frequency === "one_time"
-      ? `The cleanup estimate is ${range(quote.oneTimeRange)}, based on buildup and time required.`
-      : `Your ongoing service rate is ${money(monthlyTotal)}/month.${quote.initialRange ? ` Your initial cleanup is estimated at ${range(quote.initialRange)} based on buildup and time required.` : ""}`;
+      ? `The cleanup estimate is ${range(quote.oneTimeRange)}.`
+      : `Your ongoing service rate is ${money(monthlyTotal)}/month.${quote.initialRange ? ` Your initial cleanup is estimated at ${range(quote.initialRange)}.` : ""}`;
     const notifications = form.notificationType === "both" ? "We will text when we are on the way and when service is complete." : form.notificationType === "on_the_way" ? "We will text when we are on the way." : form.notificationType === "completed" ? "We will text when service is complete." : "";
     const billing = form.frequency === "one_time" ? "" : " Monthly billing runs automatically on the 1st.";
-    return `Hi ${name} - welcome to Ohio Pet Waste Pros! ${schedule} ${price}${billing} Please keep ${form.gateLocation || "the yard entrance"} accessible and follow the dog plan we discussed. We will place the bagged waste ${form.wasteLocation || "in the agreed location"}. ${notifications} Questions? Reply here. -${form.sender || "Craig"}`;
-  }, [form, monthlyTotal, quote, scheduledDays]);
+    return `Hi ${name} - welcome to Ohio Pet Waste Pros! ${schedule} ${price}${rangeExplanation}${billing} Please keep ${form.gateLocation || "the yard entrance"} accessible and follow the dog plan we discussed. We will place the bagged waste ${form.wasteLocation || "in the agreed location"}. ${notifications} Questions? Reply here. -${form.sender || "Craig"}`;
+  }, [form, monthlyTotal, quote, rangeExplanation, scheduledDays]);
 
   async function analyzeRoute({ signal } = {}) {
     const requestId = ++routeRequest.current;
@@ -290,6 +295,7 @@ export default function NewClientCallGuide({ googleMapsKey, routeEndpoint = "/ap
             <div><span>Effective rate per cleanup</span><strong>{form.frequency === "one_time" ? range(quote.oneTimeRange) : money(selectedCleanupRate)}</strong></div>
             <div><span>Initial cleanup estimate</span><strong>{range(cleanupRange)}</strong></div>
           </div>
+          {cleanupRange ? <small className={styles.quoteCaveat}>{CLEANUP_RANGE_EXPLANATION}</small> : null}
           {!form.yardSize && form.frequency !== "one_time" ? <small className={styles.quoteCaveat}>Select the yard size to finalize the displayed recurring price. The current amount uses no yard-size adjustment.</small> : null}
           <div className={styles.addons}><span>Optional add-ons · selections update every total immediately</span>{PRICING.addons.filter((item) => !item.id.startsWith("food_")).map((item) => <label key={item.id}><input type="checkbox" checked={addons.includes(item.id)} onChange={() => toggleAddon(item.id)} /><span><strong>{item.name}</strong><small>{money(addonPrice(item))} {item.charge === "monthly" ? "/ month" : item.charge === "per_treatment" ? "/ treatment" : "one time"}</small><small className={styles.addonVisitRate}>{item.charge === "monthly" ? `${money(addonPerVisit(item))} per visit at ${FREQUENCY_NAMES[form.frequency] || "selected"} frequency` : item.charge === "per_treatment" ? `${money(addonPerVisit(item))} on each treated visit` : `${money(addonPerVisit(item))} on the one-time visit`}</small></span></label>)}</div>
         </Panel>
@@ -384,10 +390,10 @@ export default function NewClientCallGuide({ googleMapsKey, routeEndpoint = "/ap
               {perTreatmentTotal ? <div><span>Includes selected treatment(s)</span><b>{money(perTreatmentTotal)}</b></div> : null}
               <div><span>Initial cleanup estimate</span><b>{range(quote.initialRange)}</b></div>
               <div><span>Remaining monthly cleanups{proration.pending ? "" : ` (${proration.quantity})`}</span><b>{proration.pending ? "Pending" : money(proration.amount)}</b></div>
-              <div><span>Mock initial invoice total</span><b>{range(invoiceRange)}</b></div>
-            </> : <><div className={styles.total}><span>One-time cleanup estimate</span><b>{range(quote.oneTimeRange)}</b></div>{selectedAddons.map((item) => <div key={item.id}><span>{item.name}</span><b>{money(addonPrice(item))}</b></div>)}<div><span>Mock invoice total</span><b>{range(invoiceRange)}</b></div></>}
+              <div><span>Mock initial invoice total</span><b>{formatInvoiceRange(invoiceRange)}</b></div>
+            </> : <><div className={styles.total}><span>One-time cleanup estimate</span><b>{range(quote.oneTimeRange)}</b></div>{selectedAddons.map((item) => <div key={item.id}><span>{item.name}</span><b>{money(addonPrice(item))}</b></div>)}<div><span>Mock invoice total</span><b>{formatInvoiceRange(invoiceRange)}</b></div></>}
           </div>
-          <Script>{form.frequency === "one_time" ? `Based on ${form.dogs} dog${form.dogs === "1" ? "" : "s"} and the current buildup, the one-time cleanup estimate is ${range(invoiceRange)} with the selected add-ons.` : `For ${form.dogs} dog${form.dogs === "1" ? "" : "s"} with ${FREQUENCIES[form.frequency]} service, the ongoing rate is ${money(monthlyTotal)} per month. That works out to ${money(selectedCleanupRate)} per cleanup with the selected add-ons. The estimated first invoice is ${range(invoiceRange)}.`}</Script>
+          <Script>{form.frequency === "one_time" ? `Based on ${form.dogs} dog${form.dogs === "1" ? "" : "s"} and the current buildup, the one-time cleanup estimate is ${formatInvoiceRange(invoiceRange)} with the selected add-ons.` : `For ${form.dogs} dog${form.dogs === "1" ? "" : "s"} with ${FREQUENCIES[form.frequency]} service, the ongoing rate is ${money(monthlyTotal)} per month. That works out to ${money(selectedCleanupRate)} per cleanup with the selected add-ons. The estimated first invoice is ${formatInvoiceRange(invoiceRange)}.`}{rangeExplanation}</Script>
           <details className={styles.priceTable}><summary>View current pricing tables</summary>{Object.entries(PRICING.monthly).map(([frequency, rows]) => <div key={frequency}><strong>{FREQUENCY_NAMES[frequency]}</strong><p>{Object.entries(rows).filter(([,value]) => value != null).map(([dogs, value]) => `${dogs} dog${dogs === "1" ? "" : "s"}: ${money(value)}`).join(" · ")}</p></div>)}<div><strong>Selected buildup</strong><p>{LAST_CLEANED_NAMES[form.lastCleaned]} · initial {range(PRICING.initialCleanup[form.lastCleaned]?.[Number(form.dogs)])} · one-time {range(calcLocalQuote({ dogs: form.dogs, frequency: "one_time", lastCleaned: form.lastCleaned }).oneTimeRange)}</p></div></details>
         </Panel>
 

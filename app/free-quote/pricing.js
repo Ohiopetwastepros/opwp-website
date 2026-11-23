@@ -1,14 +1,22 @@
-// OPWP quote pricing config — mirrors Sweep & Go "Pricing Setup".
-// Source of truth: Onboarding System/quote-widget.html ("EDIT PRICING HERE") +
-// Onboarding System/Pricing-Structure.md. Recurring prices are MONTHLY totals
-// (Prepaid Fixed Monthly). null = "not offered" for that dog/frequency combo.
+// Website quote pricing mirrors Sweep & Go Pricing Setup. Recurring prices are
+// prepaid fixed monthly totals. Unlisted cleanup ranges require a custom quote.
+export const PRICING_VERSION = "sng-2026-11-20";
+export const CLEANUP_RANGE_EXPLANATION = "We provide a range which is based on how much waste is in the yard and how long it takes the technician.";
+
+const wholeDollars = new Intl.NumberFormat("en-US", {
+  style: "currency", currency: "USD", maximumFractionDigits: 0,
+});
+
+export function formatCleanupRange([low, high]) {
+  return `${wholeDollars.format(low)} to ${wholeDollars.format(high)}`;
+}
 
 export const PRICING = {
   monthly: {
-    twice_a_week:     { 1: 162, 2: 180, 3: 207, 4: 234, 5: 252, 6: 270, 7: 288 },
-    once_a_week:      { 1: 90, 2: 100, 3: 115, 4: 130, 5: 140, 6: 150, 7: 160 },
-    every_other_week: { 1: 68, 2: 75, 3: 87, 4: null, 5: null, 6: null, 7: null },
-    once_a_month:     { 1: 50, 2: 55, 3: null, 4: null, 5: null, 6: null, 7: null },
+    twice_a_week:     { 1: 175, 2: 190, 3: 225, 4: 245, 5: 275, 6: 305, 7: 335 },
+    once_a_week:      { 1: 95, 2: 105, 3: 120, 4: 130, 5: 140, 6: 150, 7: 160 },
+    every_other_week: { 1: 72, 2: 80, 3: 92, 4: null, 5: null, 6: null, 7: null },
+    once_a_month:     { 1: 55, 2: 65, 3: null, 4: null, 5: null, 6: null, 7: null },
   },
 
   visitsPerMonth: { twice_a_week: 8, once_a_week: 4, every_other_week: 2, once_a_month: 1 },
@@ -17,7 +25,7 @@ export const PRICING = {
     { id: "twice_a_week", name: "2x / week", sub: "For heavy-use yards", maxDogs: 7 },
     { id: "once_a_week", name: "Weekly", sub: "Best fit for most yards", popular: true, maxDogs: 7 },
     { id: "every_other_week", name: "Bi-weekly", sub: "Lower-maintenance option", maxDogs: 3 },
-    { id: "once_a_month", name: "Monthly", sub: "Light-duty / small dogs", maxDogs: 1 },
+    { id: "once_a_month", name: "Monthly", sub: "Light-duty / small dogs", maxDogs: 2 },
     { id: "one_time", name: "One-time clean", sub: "Reset & catch-up clean", maxDogs: 7 },
   ],
 
@@ -34,21 +42,21 @@ export const PRICING = {
   ],
 
   initialCleanup: {
-    one_week: { 1: [18.48, 25], 2: [21.93, 28], 3: [23.09, 30], 4: [24.25, 31], 5: [25.4, 32] },
-    two_weeks: { 1: [25.4, 32], 2: [30.02, 37], 3: [32.33, 39], 4: [34.64, 41], 5: [36.95, 43] },
-    three_weeks: { 1: [35.2, 42], 2: [42.51, 49], 3: [46.17, 53], 4: [49.82, 56], 5: [53.48, 60] },
-    one_month: { 1: [45, 55], 2: [55, 65], 3: [60, 70], 4: [65, 75], 5: [80, 90] },
-    two_months: { 1: [60, 70], 2: [70, 80], 3: [80, 90], 4: [90, 110], 5: [120, 140] },
-    "3_4_months": { 1: [79, 89], 2: [85, 95], 3: [89, 99], 4: [99, 119], 5: [140, 160] },
+    one_week:    { 1: [20, 26], 2: [23, 30], 3: [25, 33], 4: [28, 36], 5: [29, 37] },
+    two_weeks:   { 1: [27, 34], 2: [32, 39], 3: [36, 43], 4: [40, 47], 5: [42, 49] },
+    three_weeks: { 1: [37, 45], 2: [45, 52], 3: [51, 58], 4: [57, 65], 5: [60, 70] },
+    one_month:   { 1: [48, 58], 2: [58, 70], 3: [65, 75], 4: [75, 85], 5: [90, 105] },
+    two_months:  { 1: [65, 75], 2: [75, 85], 3: [90, 100], 4: [105, 125], 5: [140, 160] },
+    "3_4_months": { 1: [85, 95], 2: [90, 100], 3: [100, 110], 4: [115, 135], 5: [160, 185] },
   },
 
   oneTimeCleanup: {
-    one_week: { 1: [27.72, 37.5], 2: [32.9, 42], 3: [34.64, 45], 4: [36.39, 46.5], 5: [38.1, 48] },
-    two_weeks: { 1: [38.1, 48], 2: [45.03, 55.5], 3: [48.5, 58.5], 4: [51.96, 61.5], 5: [55.43, 64.5] },
-    three_weeks: { 1: [52.8, 63], 2: [63.77, 73.5], 3: [69.26, 79.5], 4: [74.73, 84], 5: [80.22, 90] },
-    one_month: { 1: [60, 75], 2: [75, 100], 3: [85, 110], 4: [105, 130], 5: [125, 150] },
-    two_months: { 1: [75, 100], 2: [95, 120], 3: [105, 130], 4: [125, 150], 5: [145, 170] },
-    "3_4_months": { 1: [95, 120], 2: [115, 140], 3: [125, 150], 4: [145, 170], 5: [165, 190] },
+    one_week:    { 1: [30, 41], 2: [36, 46], 3: [38, 50], 4: [42, 53], 5: [44, 55] },
+    two_weeks:   { 1: [42, 53], 2: [50, 60], 3: [53, 65], 4: [60, 70], 5: [65, 75] },
+    three_weeks: { 1: [58, 70], 2: [70, 80], 3: [75, 85], 4: [85, 95], 5: [90, 105] },
+    one_month:   { 1: [65, 80], 2: [80, 110], 3: [95, 120], 4: [120, 150], 5: [145, 170] },
+    two_months:  { 1: [80, 110], 2: [105, 130], 3: [115, 145], 4: [145, 170], 5: [165, 195] },
+    "3_4_months": { 1: [105, 130], 2: [125, 155], 3: [140, 165], 4: [165, 195], 5: [190, 220] },
   },
 
   addons: [
@@ -78,9 +86,9 @@ export const PRICING = {
 // upcharge: null = custom quote (over 3/4 acre)
 export const YARD_TIERS = [
   { id: "tiny",   label: "Up to 1/8 acre",   sub: "≤ 5,445 sq ft",        upcharge: 0  },
-  { id: "small",  label: "1/8 – 1/4 acre",   sub: "5,446 – 10,890 sq ft", upcharge: 10 },
-  { id: "medium", label: "1/4 – 1/2 acre",   sub: "10,891 – 21,780 sq ft",upcharge: 20 },
-  { id: "large",  label: "1/2 – 3/4 acre",   sub: "21,781 – 32,670 sq ft",upcharge: 30 },
+  { id: "small",  label: "1/8 to 1/4 acre",   sub: "5,446 to 10,890 sq ft", upcharge: 10 },
+  { id: "medium", label: "1/4 to 1/2 acre",   sub: "10,891 to 21,780 sq ft", upcharge: 20 },
+  { id: "large",  label: "1/2 to 3/4 acre",   sub: "21,781 to 32,670 sq ft", upcharge: 30 },
   { id: "xlarge", label: "Over 3/4 acre",     sub: "32,671+ sq ft",        upcharge: null },
   { id: "unsure", label: "Not sure",          sub: "We'll confirm at first visit", upcharge: 0 },
 ];
@@ -97,22 +105,28 @@ export function isInArea(zip) {
 }
 
 export function haulAwayPrice(dogs) {
-  return dogs >= 3 ? 31 : 21;
+  const addon = PRICING.addons.find(({ id }) => id === "haul_away");
+  return dogs >= 3 ? addon.price3Plus : addon.price;
+}
+
+export function isFrequencyOffered(frequency, dogs) {
+  const plan = PRICING.frequencies.find(({ id }) => id === frequency);
+  const count = Number(dogs);
+  return Number.isInteger(count) && count >= 1 && count <= (plan?.maxDogs ?? 0);
 }
 
 // Local (offline) quote calculation. Used immediately and as a fallback when the
 // live SNG proxy at /api/quote is not configured.
 export function calcLocalQuote({ dogs, frequency, lastCleaned }) {
-  const d = Math.max(1, Math.min(7, Number(dogs) || 1));
+  const d = Number(dogs);
   if (frequency === "one_time") {
     const grid = PRICING.oneTimeCleanup[lastCleaned];
     const range = grid && grid[d];
     return { type: "one_time", oneTimeRange: range || null, monthly: null };
   }
-  const monthly = PRICING.monthly[frequency]?.[d] ?? null;
+  const monthly = isFrequencyOffered(frequency, d) ? PRICING.monthly[frequency]?.[d] ?? null : null;
   const visits = PRICING.visitsPerMonth[frequency];
   const perVisit = monthly && visits ? monthly / visits : null;
-  const initGrid = PRICING.initialCleanup[lastCleaned];
-  const initialRange = initGrid && initGrid[d] ? initGrid[d] : null;
+  const initialRange = monthly == null ? null : PRICING.initialCleanup[lastCleaned]?.[d] ?? null;
   return { type: "recurring", monthly, perVisit, visits, initialRange };
 }

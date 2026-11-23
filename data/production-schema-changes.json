@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "path": "migrations/0060_unified_food_sales.sql",
+      "reviewedSource": "schema-proposals/0060_unified_food_sales.sql",
+      "sha256": "50f8854d0bed902b108c13b733b2fadc44dc078fc93449df56d09e09bbb0f351"
+    },
+    {
+      "path": "migrations/0061_food_sales_counts_customers.sql",
+      "reviewedSource": "schema-proposals/0061_food_sales_counts_customers.sql",
+      "sha256": "1adb2c40cf42ded43c0c8742801f41c0fd53611be35b2f811c90fd736e45039e"
+    },
+    {
+      "path": "migrations/0062_food_customer_hub.sql",
+      "reviewedSource": "schema-proposals/0062_food_customer_hub.sql",
+      "sha256": "83ce62b6e316a807c0213c1c29ed21479d397bc784868a90b29a0440d8c73c92"
+    },
+    {
+      "path": "migrations/0063_food_sale_intake.sql",
+      "reviewedSource": "schema-proposals/0063_food_sale_intake.sql",
+      "sha256": "bf822ddce2b3572e92686e08d92de0d6695f18604f3af92e4954a94d55ea529d"
+    },
+    {
+      "path": "migrations/0064_independent_food_backend.sql",
+      "reviewedSource": "schema-proposals/0064_independent_food_backend.sql",
+      "sha256": "113be82d56e654e7cd812412f846e25cf4dcaf246096a5ae42f28a23cc4b535c"
+    },
+    {
+      "path": "migrations/0065_food_customer_optional_intake.sql",
+      "reviewedSource": "schema-proposals/0065_food_customer_optional_intake.sql",
+      "sha256": "79151fae0ca50935de0d1085bd776ba4dd58c71a8547c714dd7d10dd25762918"
+    },
+    {
+      "path": "migrations/0066_food_source_reconciliation.sql",
+      "reviewedSource": "schema-proposals/0066_food_source_reconciliation.sql",
+      "sha256": "743fc3b24effbc77c70e0e99e4f993a76771ed20b7ad0713f517d3de854fa069"
+    },
+    {
+      "path": "migrations/0067_review_requests.sql",
+      "reviewedSource": "schema-proposals/0067_review_requests.sql",
+      "sha256": "60d6f65e923fd67fb87fa7f159441c2fc539b8e88124eb572223876032b7b2c5"
+    },
+    {
+      "path": "migrations/0068_lead_inbox_trash.sql",
+      "reviewedSource": "schema-proposals/0068_lead_inbox_trash.sql",
+      "sha256": "f704a60455a2cac8eada1de6cc73c7125ec976545bdc2c780c6942d6e91b9643"
+    },
+    {
+      "path": "migrations/0069_lead_playbook.sql",
+      "reviewedSource": "schema-proposals/0069_lead_playbook.sql",
+      "sha256": "d69338415bff37f80d0614c9a2f6932ad37a82c22a269cb2febe0ba205298419"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
+import {archiveFoodExternalStripe} from '../lib/food-external-stripe.mjs';
 import {runPrivateInNewContext} from './helpers/private-vm.mjs';
 import staffPrivate from '../lib/staff-private.json' with {type:'json'};
-import {foodProfileComplete,FOOD_STATES} from '../lib/dog-food-profile.mjs';
+import {foodProfileComplete,FOOD_STATES,foodAddressInput,foodPhone} from '../lib/dog-food-profile.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,14 +19,14 @@ async function setup(routes=false,{sendEmail,charge}={}) {
   if(!routes)f.sql.exec(`CREATE TABLE IF NOT EXISTS route_partner_plan_events(id TEXT,organization_id TEXT,event_type TEXT,actor_email TEXT,details TEXT);`);
   await f.service.syncFoodOperations(f.env,{force:true});
   const sends=[];
-  const base={readFoodPlanning,foodProfileComplete,FOOD_STATES,locateFoodAddress:async()=>null,readFoodDeliveryChoices:async()=>({deliveryAvailable:true,days:[1,2,3,4,5].map(weekday=>({weekday})),tonyDates:[]}),...logic,...food,...checkout,...cadence,...f.service,crypto,Date,Map,URL,URLSearchParams,JSON,TextEncoder,Buffer,workflowSchema,getDb:()=>f.db};
+  const base={readFoodPlanning,foodProfileComplete,FOOD_STATES,foodAddressInput,foodPhone,locateFoodAddress:async()=>null,readFoodDeliveryChoices:async()=>({deliveryAvailable:true,days:[1,2,3,4,5].map(weekday=>({weekday})),tonyDates:[]}),...logic,...food,...checkout,...cadence,...f.service,crypto,Date,Map,URL,URLSearchParams,JSON,TextEncoder,Buffer,workflowSchema,getDb:()=>f.db};
   const payments=runPrivateInNewContext(source('dog-food-payments.js')+'\n({recordDogFoodPayment,activateDogFoodSubscriptionFromOrder})',base);
   const field=runPrivateInNewContext(source('field-operations.js')+'\n({prepareFieldRelease})',{...base,OPWP_ORGANIZATION_ID:'org-opwp',FieldError:logic.FoodError});
   const fulfillment=runPrivateInNewContext(source('dog-food-fulfillment.js')+'\n({reserveFoodLots,checkFoodLotReconciliation,scheduleFoodOrders,foodFulfillmentCommand})',{...base,...field,...payments});
   const portal=runPrivateInNewContext(source('dog-food-portal.js')+'\n({readFoodPortal,saveFoodProfile,createFoodPortalOrder,manageFoodSubscription})',{...base,...fulfillment});
   const workflow=runPrivateInNewContext(source('dog-food-workflow.js')+'\n({flushFoodProjections,flushFoodEmails,upsertFoodProjection})',{...base,sendTransactionalEmail:async(env,message)=>{sends.push(message);return sendEmail?sendEmail(message,sends.length):'email_'+sends.length;}});
   const renewals=runPrivateInNewContext(source('dog-food-renewals.js')+'\n({runScheduledDogFoodRenewals})',{...base,...fulfillment,...payments,console,stripeConfigured:()=>true,createStripePaymentIntent:charge||(()=>{throw new Error('No test charge configured');})});
-  const events=runPrivateInNewContext(source('stripe-events.js')+'\n({processStripeEvent})',{...base,...payments,retrieveStripePaymentMethod:async()=>({id:'pm_test',customer:'cus_test',card:{brand:'visa',last4:'4242'}})});
+  const events=runPrivateInNewContext(source('stripe-events.js')+'\n({processStripeEvent})',{archiveFoodExternalStripe,...base,...payments,retrieveStripePaymentMethod:async()=>({id:'pm_test',customer:'cus_test',card:{brand:'visa',last4:'4242'}})});
   f.sql.exec("UPDATE dog_food_workflow_settings SET posting_enabled=1,email_enabled=1; UPDATE dog_food_products SET retail_price_cents=5900 WHERE id='edf-22-12-pink-40';");
   f.sql.prepare(`INSERT INTO dog_food_stock_lots(id,product_id,lot_number,best_before,usable_bags,counted_date,confirmed_by) VALUES ('lot','edf-22-12-pink-40','TEST-LOT','2030-01-01',8,?,'test')`).run(logic.foodDate());
   // In-memory mailbox and synthetic test-only passphrase; no production credentials.
@@ -35,7 +36,7 @@ async function setup(routes=false,{sendEmail,charge}={}) {
   const login=await food.loginFoodAccount(f.db,{email:'workflow@example.test',password:temporary});
   assert.equal(login.passwordChangeRequired,true);
   await assert.rejects(food.loginFoodAccount(f.db,{email:'workflow@example.test',password:temporary}));
-  const active=await food.redeemFoodEmail(f.db,{token:login.setupToken,password:'Synthetic test-only passphrase!',passwordConfirm:'Synthetic test-only passphrase!'});
+  const active=await food.redeemFoodEmail(f.db,{token:login.setupToken,password:'Synthetic test-only passphrase!',passwordConfirm:'Synthetic test-only passphrase!',firstName:'Test',lastName:'Buyer',phone:'4195550101'});
   const account=await food.foodAccountSession(f.db,new Headers({cookie:food.foodCookie(active.sessionToken).split(';')[0]}));
   await portal.saveFoodProfile(f.db,account,{profile:{firstName:'Test',lastName:'Buyer',phone:'4195550101',address:'123 Test','city':'Toledo',state:'OH',zip:'43614',placement:'Front door'}});
   f.sql.prepare("UPDATE dog_food_customers SET stripe_customer_id='cus_test' WHERE id=?").run(account.customer_id);
@@ -140,6 +141,13 @@ test('renewal timeout retains the same cycle; stale uncertainty and SNG plans ne
   f.sql.exec("UPDATE dog_food_orders SET renewal_attempted_at=datetime('now','-24 hours')");
   assert.equal((await f.runScheduledDogFoodRenewals(f.env)).results[0].status,'payment_review');assert.equal(attempts,1);
   f.sql.exec("UPDATE dog_food_customers SET sng_client_id='sng-linked'");assert.equal((await f.runScheduledDogFoodRenewals(f.env)).processed,0);assert.equal(attempts,1);
+});
+
+test('inactive customers never create a renewal order, reserve stock or issue a Stripe charge',async()=>{
+  let attempts=0;const f=await setup(true,{charge:async()=>{attempts++;throw Error('Inactive customer must not charge');}});await duePlan(f);
+  const before=f.sql.prepare('SELECT count(*) n FROM dog_food_orders').get().n;
+  f.sql.exec("UPDATE dog_food_customers SET status='inactive'");
+  assert.equal((await f.runScheduledDogFoodRenewals(f.env)).processed,0);assert.equal(attempts,0);assert.equal(f.sql.prepare('SELECT count(*) n FROM dog_food_orders').get().n,before);
 });
 test('lost Airtable write response retries the same stable ID and source revisions remain pending',async()=>{
   const f=await setup();await f.create();f.loseWrite();

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PRICING } from "../app/free-quote/pricing.js";
+import { CLEANUP_RANGE_EXPLANATION, PRICING } from "../app/free-quote/pricing.js";
 import { metaCleanupAnswer, metaCleanupSummary, metaWebsiteQuote, nextMetaResponse } from "../lib/meta-conversation.mjs";
 
 const lead = { name: "ExampleLead", number_of_dogs: 2, zip: "43615", clean_up_frequency: "Weekly" };
@@ -15,14 +15,32 @@ test("initial and one-time estimates match all 60 listed cleanup chart cells wit
       assert.deepEqual(quote?.initialRange || quote?.range, expected, `${frequency}/${dogs}/${last_cleaned}`);
       assert.equal(quote.basis.lastCleaned, last_cleaned);
       assert.equal(quote.basis.dogs, Number(dogs));
-      assert.match(quote.text, /exact.*after we see the yard/);
+      assert.ok(quote.text.includes(`$${expected[0]} to $${expected[1]}. ${CLEANUP_RANGE_EXPLANATION}`));
+      assert.equal(quote.text.split(CLEANUP_RANGE_EXPLANATION).length - 1, 1);
+      assert.doesNotMatch(quote.text, /[\u2013\u2014]|exact.*after we see the yard/i);
       cells++;
     }
   }
   assert.equal(cells, 60);
-  assert.deepEqual(metaWebsiteQuote(details).initialRange, [55, 65]);
-  assert.equal(metaWebsiteQuote({ ...details, yard_size_tier: "small" }).monthly, 110);
-  assert.deepEqual(metaWebsiteQuote({ ...details, clean_up_frequency: "One Time" }).range, [75, 100]);
+  assert.deepEqual(metaWebsiteQuote(details).initialRange, [58, 70]);
+  assert.equal(metaWebsiteQuote({ ...details, yard_size_tier: "small" }).monthly, 115);
+  assert.deepEqual(metaWebsiteQuote({ ...details, clean_up_frequency: "One Time" }).range, [80, 110]);
+});
+
+test("Meta weekly quotes use the current base rate and add each yard fee only to recurring service", () => {
+  const weeklyRates = [95, 105, 120, 130, 140];
+  const yardFees = { tiny: 0, small: 10, medium: 20, large: 30 };
+  for (const [index, base] of weeklyRates.entries()) {
+    const dogs = index + 1;
+    for (const [yard_size_tier, fee] of Object.entries(yardFees)) {
+      const quote = metaWebsiteQuote({ ...details, number_of_dogs: dogs, yard_size_tier });
+      assert.equal(quote.monthly, base + fee, `${dogs} dogs / ${yard_size_tier}`);
+      assert.equal(quote.basis.monthlyBase, base);
+      assert.equal(quote.basis.yardUpcharge, fee);
+      assert.deepEqual(quote.initialRange, PRICING.initialCleanup.one_month[dogs]);
+      assert.ok(quote.text.includes(`$${(base + fee).toFixed(2)} per month`));
+    }
+  }
 });
 
 test("unlisted history, dog counts, yard sizes and service combinations never produce automatic prices", () => {
@@ -32,8 +50,8 @@ test("unlisted history, dog counts, yard sizes and service combinations never pr
     for (const yard_size_tier of [undefined, "xlarge", "unsure", "invented"]) assert.equal(metaWebsiteQuote({ ...details, clean_up_frequency, yard_size_tier }), null);
   }
   assert.equal(metaWebsiteQuote({ ...details, clean_up_frequency: "Biweekly", number_of_dogs: 4 }), null);
-  // The chart lists $55 but the frequency menu limits Monthly to one dog: fail closed pending Craig's review.
-  assert.equal(metaWebsiteQuote({ ...details, clean_up_frequency: "Monthly", number_of_dogs: 2 }), null);
+  assert.equal(metaWebsiteQuote({ ...details, clean_up_frequency: "Monthly", number_of_dogs: 2 }).monthly, 65);
+  assert.equal(metaWebsiteQuote({ ...details, clean_up_frequency: "Monthly", number_of_dogs: 3 }), null);
 });
 
 test("cleanup history is required even for yes or a pricing question and accepts explicit ordinary answers", () => {
@@ -61,7 +79,7 @@ test("cleanup corrections invalidate an accepted quote and pending route audit a
   const accepted = { details, details_confirmed: true, quote: metaWebsiteQuote(details), quote_accepted: true, expected: "", handoff: true, ready_for_route_audit: true };
   const corrected = nextMetaResponse({ lead, state: accepted, text: "actually it was 2 months ago", confirmationSent: true });
   assert.equal(corrected.state.details.last_cleaned, "two_months");
-  assert.deepEqual(corrected.state.quote.initialRange, [70, 80]);
+  assert.deepEqual(corrected.state.quote.initialRange, [75, 85]);
   assert.equal(corrected.state.quote_accepted, false);
   assert.equal(corrected.state.ready_for_route_audit, false);
   assert.equal(corrected.state.expected, "quote_acceptance");
@@ -69,5 +87,5 @@ test("cleanup corrections invalidate an accepted quote and pending route audit a
   assert.equal(custom.state.quote, null); assert.equal(custom.state.quote_accepted, false);
   assert.equal(custom.state.ready_for_route_audit, false); assert.match(custom.response, /custom quote/);
   assert.match(metaCleanupSummary(custom.state), /Custom quote/);
-  assert.doesNotMatch(metaCleanupSummary(custom.state), /\$55/);
+  assert.doesNotMatch(metaCleanupSummary(custom.state), /\$/);
 });

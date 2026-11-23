@@ -43,7 +43,7 @@ ${importMarker}
                 : controller.cron === "15 * * * *"
                         ? runScheduledReviewPipeline(env)
                     : controller.cron === "35 * * * *"
-                        ? runScheduledRouteBookRefresh(env)
+                        ? runScheduledRouteBookRefresh(env, controller.scheduledTime)
                         : Promise.resolve({ skipped: true, reason: "no_route_book_task" }));
         ctx.waitUntil(task);
     },`);

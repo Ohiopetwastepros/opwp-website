@@ -9,6 +9,7 @@ export const ADMIN_NAVIGATION = [
   { id: "customers", label: "Customers & growth", items: [
     { id: "customers", label: "Customers & retention", href: "/admin/?view=customers" },
     { id: "pipeline", label: "Leads", href: "/admin/quote-funnel/" },
+    { id: "review-requests", label: "Google review requests", href: "/admin/review-requests/" },
     { id: "acquisition", label: "Acquisition", href: "/admin/acquisition/" },
   ] },
   { id: "operations", label: "Operations", items: [
@@ -25,9 +26,13 @@ export const ADMIN_NAVIGATION = [
     { id: "office-access", label: "Office access", href: "/admin/office-access/" },
   ] },
   { id: "dog-food", label: "Dog food", items: [
+    { id: "food-customers", label: "Customer information hub", href: "/admin/dog-food/customers/" },
+    { id: "food-sale", label: "Record a food sale", href: "/admin/dog-food/record-sale/" },
     { id: "dog-food", label: "Sales operations", href: "/admin/dog-food/" },
     { id: "food-inventory", label: "Inventory & monthly demand", href: "/admin/dog-food/inventory/" },
     { id: "food-profit", label: "Sales & profit/loss", href: "/admin/dog-food/profit-loss/" },
+    { id: "food-settings", label: "Plans & settings", href: "/admin/dog-food/settings/" },
+    { id: "food-staff", label: "Staff accounts", href: "/admin/dog-food/staff-access/" },
     { id: "food", label: "Sales & retention", href: "/admin/?view=food" },
   ] },
   { id: "systems", label: "Systems & settings", items: [

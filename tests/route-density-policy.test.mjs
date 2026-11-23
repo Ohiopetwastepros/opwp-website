@@ -13,22 +13,34 @@ test('Kenwood incorrect Oregon ZIP cannot create Tuesday Oregon density', () => 
   const stop = { region: 'East Toledo / Oregon', location: { formattedAddress: '1201 Example Lane, Toledo, OH 43606, United States of America' } };
   assert.equal(resolvedStopRegion(stop, (city, zip) => zip === '43606' ? 'West Toledo' : 'East Toledo / Oregon'), 'West Toledo');
 });
-test('bounded matrices inspect the end of a long route without artificial depot edges', async () => {
-  const candidate = { n: 100 }, depot = { n: 0 };
-  const stops = Array.from({length:60}, (_,i) => ({n:i+1}));
-  let calls = 0;
-  const result = await evaluateRouteInsertion(candidate, stops, depot, async points => {
-    calls++;
-    assert.ok(points.length <= 29);
-    return {ok:true, data:{matrix:points.map(from => points.map(to => {
-      const cost = from.n === 100 || to.n === 100 ? ([59,60].includes(from.n === 100 ? to.n : from.n) ? 6 : 100) : 10;
-      return {time:cost, distance:cost};
-    }))}};
-  });
-  assert.equal(calls, 3);
-  assert.equal(result.seconds, 2);
-  assert.ok(result.nearest.some(row => row.index === 59));
+test('Census comma-separated state and ZIP correct a stale source region', () => {
+  const stop = { region: 'East Toledo / Oregon', location: { formattedAddress: '1201 EXAMPLE LANE, TOLEDO, OH, 43606' } };
+  assert.equal(resolvedStopRegion(stop, (_city, zip) => zip === '43606' ? 'West Toledo' : 'East Toledo / Oregon'), 'West Toledo');
 });
-test('one failed matrix withholds a partial route recommendation', async () => {
-  assert.equal(await evaluateRouteInsertion({}, [{},{}], {}, async () => ({ok:false})), null);
+test('insertion uses one bounded neighbor check and a conservative out-and-back road estimate', async () => {
+  const candidate = { latitude: 41.6, longitude: -83.6 };
+  const stops = Array.from({length:5}, (_,i) => ({latitude:41.6, longitude:-83.6 + i / 100}));
+  let calls = 0;
+  const result = await evaluateRouteInsertion(candidate, stops, async (point, neighbors) => {
+    calls++;
+    assert.equal(point, candidate);
+    assert.equal(neighbors, stops);
+    return [{ index: 0, roadMinutes: 10, roadMiles: 4 }, { index: 4, roadMinutes: 2, roadMiles: 1 }];
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.seconds, 240);
+  assert.equal(result.meters, 3218.688);
+  assert.equal(result.nearest[0].index, 4);
+  assert.equal(result.method, 'nearest_neighbor_estimate');
+});
+test('failed or unusable neighbor checks withhold a route recommendation', async () => {
+  assert.equal(await evaluateRouteInsertion({}, [{},{}], async () => null), null);
+  assert.equal(await evaluateRouteInsertion({}, [{}], async () => [{ index: 5, roadMinutes: 1, roadMiles: 1 }, { index: 0, roadMinutes: NaN, roadMiles: 1 }]), null);
+});
+test('insertion refuses unbounded neighbor sets before any provider work', async () => {
+  let calls = 0;
+  const check = async () => { calls++; return []; };
+  assert.equal(await evaluateRouteInsertion({}, [], check), null);
+  assert.equal(await evaluateRouteInsertion({}, Array(6).fill({}), check), null);
+  assert.equal(calls, 0);
 });

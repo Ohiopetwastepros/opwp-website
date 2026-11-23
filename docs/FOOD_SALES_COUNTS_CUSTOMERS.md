@@ -1,0 +1,11 @@
+# Staff sales and customer directory
+
+Staff sales can use the existing owner-confirmed physical count checkpoints and subsequent movements. This mode records its source snapshot, count reference, quantity and available balance on each sale. It does not create lot numbers, claim verified expiration dates, or change the customer portal's lot checks. Pending sales reserve shared stock; actual handoffs consume it. The existing native order, item, payment and fulfillment records remain authoritative. The shared inventory model deduplicates Airtable projections using exact native line IDs.
+
+The food-sales settings select `confirmed_count` for staff recording after separate database approval. Existing orders retain their original stock basis. The global inventory command lease, current-snapshot guard and atomic save protect concurrent reservations and retries. Shared stock must still be confirmed and sufficient. Native recording freezes the old direct Airtable sale-entry path; existing receipts and SNG billing remain available.
+
+The customer directory uses `dog_food_customers`, independently of `dog_food_accounts`. Customer import adds contacts and exact source references, not credentials, subscriptions, historical sales, balances or stock. Unknown email and phone values remain blank. Nonblank emails retain their unique index. Source replay does not duplicate contacts; conflicting or ambiguous matches are held for review. Existing customer details and profile addresses are preserved.
+
+Tony's authenticated search starts after one character and returns up to 20 matching names, phones or emails. Staff can select a customer without requiring an email. Portal registration still verifies email and links by that exact email; a name alone never establishes account ownership. Contacts without emails require office review to link to a future portal profile. No signup or invitation email is sent by contact import.
+
+Migration `0061_food_sales_counts_customers.sql` adds two stock-basis columns, two evidence/source tables, one lookup index and four guards, replaces two fulfillment guards, and changes the customer-email index to exclude empty strings. Defaults preserve the original lot behavior. It does not itself import contacts, enable recording, or alter stock quantities. Its exact reviewed bytes are bound in `data/production-schema-changes.json`.

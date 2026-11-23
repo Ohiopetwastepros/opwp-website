@@ -54,6 +54,9 @@ const cityRedirects = [
 const toRule = ([source, destination]) => ({ source, destination, permanent: true });
 
 const nextConfig = {
+  // Wrangler bundles workers-og's precompiled WASM for workerd. Keeping it
+  // external here prevents Next's Node webpack pass from parsing WASM as JS.
+  serverExternalPackages: ["workers-og"],
   // Preserve the exact WordPress URL structure (trailing slashes) so rankings transfer.
   trailingSlash: true,
   poweredByHeader: false,
@@ -74,7 +77,7 @@ const nextConfig = {
     }, {
       // Admin middleware owns these headers so global defaults cannot be
       // appended to (and weaken) its DENY / no-referrer policies.
-      source: "/:path((?!field/app(?:/|$)|admin(?:/|$)|api/admin(?:/|$)|dog-food/account(?:/|$)|api/dog-food/(?:account|session|order)(?:/|$)).*)",
+      source: "/:path((?!field/app(?:/|$)|admin(?:/|$)|api/admin(?:/|$)|food-sales(?:/|$)|api/food-sales(?:/|$)|dog-food/account(?:/|$)|api/dog-food/(?:account|session|order)(?:/|$)).*)",
       headers: [
         { key: "X-Frame-Options", value: "SAMEORIGIN" },
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

@@ -1,0 +1,20 @@
+{
+  "dataClass": "synthetic",
+  "transport": "loopback HTTP; real handlers and SQLite; provider and rate-limit transports isolated",
+  "login": "individual session",
+  "customer": "existing shared customer",
+  "formulas": 2,
+  "totalCents": 12714,
+  "openingReceiptCents": 1000,
+  "lostResponseRecovered": true,
+  "sameIdReplay": true,
+  "differentPayloadRejected": true,
+  "receiptReplay": true,
+  "finalPaymentStatus": "paid",
+  "fulfillmentStatus": "completed",
+  "balanceCents": 0,
+  "recentOrderCount": 1,
+  "crossSiteRejected": true,
+  "forbiddenActionRejected": true,
+  "logoutRevoked": true
+}

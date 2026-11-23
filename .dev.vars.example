@@ -115,3 +115,56 @@ META_TEST_FORM_IDS=""
 FIELD_NOTIFICATIONS_ENABLED="false"
 FIELD_SMS_DAILY_LIMIT="100"
 FIELD_QUO_WEBHOOK_SIGNING_KEY=""
+# Native food-sales pilot is disabled until the proposed schema, pricing and grants are approved.
+FOOD_SALES_NATIVE_ENABLED=false
+# Enable new native sales only after inventory verification; also freezes legacy new-sale entry.
+FOOD_SALES_RECORDING_ENABLED=false
+# Allow staff count-based sales against the saved checkpoints during reconciliation.
+FOOD_SALES_USE_PREVIOUS_COUNTS=false
+# Keep true after pilot activation if native writers are later paused.
+FOOD_SALES_LEGACY_WRITES_FROZEN=false
+# Separate review of actual SNG evidence is required before replacing legacy reconciliation.
+FOOD_SALES_SNG_RECONCILIATION_ENABLED=false
+
+# Lead playbook Phase 1. Leave disabled until Craig approves migration 0069 and release.
+LEAD_PLAYBOOK_ENABLED=false
+LEAD_PLAYBOOK_AUTO_SEND_ENABLED=false
+LEAD_AUTOMATION_CONTROLLED_TEST_ONLY=false
+META_CADENCE_ENABLED=false
+LEAD_PLAYBOOK_NOTIFY_ENABLED=false
+LEAD_CLASSIFIER_ENABLED=false
+LEAD_CLASSIFIER_PROVIDER="workers_ai"
+LEAD_CLASSIFIER_MODEL="@cf/meta/llama-3.1-8b-instruct"
+LEAD_CLASSIFIER_DAILY_CAP="100"
+LEAD_CLASSIFIER_KILL_SWITCH=true
+# Optional Workers AI binding AI must be configured separately before enabling classification.
+# Private comma-separated IDs, reviewed against real Quo payloads. Unknown authors are Sona.
+QUO_HUMAN_USER_IDS=""
+QUO_SONA_USER_IDS=""
+# Comma-separated learning-only phone numbers, in E.164 format. Never used for sending.
+QUO_LEARNING_NUMBERS=""
+QUO_BUSINESS_PHONE_NUMBER_ID=""
+QUO_INDUSTRY_PHONE_NUMBER_ID=""
+META_ALLOWED_INSTAGRAM_IDS=""
+LEAD_PLAYBOOK_HASH_KEY=""
+LEAD_PLAYBOOK_LINK_SECRET=""
+LEAD_PLAYBOOK_CRAIG_CELL=""
+# Existing customers remain held for manual review, including fresh sales
+# inquiries. A form, affirmative text, intake flag or ownership handback never
+# authorizes automated enrollment. Craig documents the separate request and
+# handles it manually; general automatic admission needs a separately reviewed
+# authenticated approval feature and is not enabled by this release.
+# The sole automation exception is a private, expiring controlled-test scope.
+# Keep empty unless the owner approves one exact canonical Meta conversation.
+# JSON keys (all required, no extras): approvalId, approvedBy, approvedAt,
+# expiresAt, organizationId, submissionId, conversationId, phone, formId, metaLeadId.
+# UTC times must include seconds and Z; validity is at most 24 hours. The scope
+# must match one META_TEST_RECIPIENTS, LEAD_PLAYBOOK_CRAIG_CELL, one
+# META_TEST_FORM_IDS, canonical Meta intake and its recorded consent provenance.
+# LEAD_AUTOMATION_CONTROLLED_TEST_ONLY must remain true. Consent, suppression,
+# ownership, closed-thread, pricing and route checks still apply. Install actual
+# operational values privately only after approval; never commit them here.
+LEAD_PLAYBOOK_CUSTOMER_TEST_EXCEPTION=""
+LEAD_PLAYBOOK_ADMIN_ORIGIN="https://www.ohiopetwastepros.com"
+AIRTABLE_PLAYBOOK_DRAFTS_TABLE_ID=""
+AIRTABLE_PLAYBOOK_LIBRARY_TABLE_ID=""

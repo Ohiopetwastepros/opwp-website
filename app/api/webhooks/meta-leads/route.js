@@ -7,6 +7,9 @@ import { processAirtableQueue } from "@/lib/lead-assistant";
 import { outboundFetch } from "@/lib/outbound-request";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { OPWP_ORGANIZATION_ID } from "@/lib/route-partner";
+import { playbookEnabled } from "@/lib/lead-playbook.mjs";
+import { normalizeMetaLearningEvents } from "@/lib/playbook-ownership.mjs";
+import { recordPlaybookMetaEvent } from "@/lib/lead-playbook-ingest";
 
 export const dynamic = "force-dynamic";
 const responseHeaders = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
@@ -46,6 +49,18 @@ export async function POST(request) {
   if (!await verifyMetaSignature(raw, request.headers.get("x-hub-signature-256"), env.META_APP_SECRET)) return Response.json({ ok: false, error: "Invalid signature." }, { status: 401, headers: responseHeaders });
   let body;
   try { body = JSON.parse(new TextDecoder().decode(raw)); } catch { return Response.json({ ok: false, error: "Invalid request." }, { status: 400, headers: responseHeaders }); }
+  if (playbookEnabled(env)) {
+    let learningEvents;
+    try { learningEvents = normalizeMetaLearningEvents(body, env); }
+    catch { return Response.json({ ok: false, error: "Messaging account scope mismatch." }, { status: 403, headers: responseHeaders }); }
+    if (learningEvents.length) {
+      const learningDb = getDb();
+      if (!learningDb) return Response.json({ ok: false, error: "Storage is unavailable." }, { status: 503, headers: responseHeaders });
+      for (const event of learningEvents) await recordPlaybookMetaEvent(learningDb, env, event);
+      // Mixed leadgen + messaging payloads still continue through lead intake.
+      if (!metaLeadIds(body).length) return Response.json({ ok: true, accepted: learningEvents.length, learningOnly: true }, { headers: responseHeaders });
+    }
+  }
   const events = metaLeadIds(body);
   const allowedPages = String(env.META_ALLOWED_PAGE_IDS || "").split(",").map((id) => id.trim()).filter(Boolean);
   if (!allowedPages.length) return Response.json({ ok: false, error: "Meta page scope is not configured." }, { status: 503, headers: responseHeaders });
@@ -67,11 +82,13 @@ export async function POST(request) {
     try {
       const data = await fetchMetaLead(env, event);
       const lead = await storeMetaLead(db, env, data, event);
-      await processAirtableQueue({ ...env, DB: db }, 1, lead.id);
       await db.prepare(`UPDATE lead_webhook_events SET status='processed',processed_at=CURRENT_TIMESTAMP WHERE provider='meta' AND event_id=?`).bind(event.leadId).run();
       accepted += 1;
       // The durable outbox remains available to cron if this immediate attempt is interrupted.
       await processMetaConfirmations({ ...env, DB: db }, { submissionId: lead.id, limit: 1 });
+      // D1 owns intake and its durable mirror queue. A reporting-provider delay
+      // must never sit ahead of the customer's instant confirmation.
+      await processAirtableQueue({ ...env, DB: db }, 1, lead.id);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Meta lead processing failed.";
       await db.prepare(`UPDATE lead_webhook_events SET status='failed',error_message=?,processed_at=CURRENT_TIMESTAMP WHERE provider='meta' AND event_id=?`).bind(message.slice(0, 500), event.leadId).run();

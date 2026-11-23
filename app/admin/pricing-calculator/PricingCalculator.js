@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { PRICING } from "@/app/free-quote/pricing";
+import { CLEANUP_RANGE_EXPLANATION, PRICING, formatCleanupRange } from "@/app/free-quote/pricing";
 import { calculateJobPrice } from "@/lib/pricing-economics.mjs";
 import styles from "./pricing-calculator.module.css";
 
@@ -30,7 +30,8 @@ function PriceBook() {
   const grid = PRICING[type];
   return <section className={styles.priceBook}>
     <div className={styles.bookHead}><div><span>Current website source of truth</span><h2>Cleanup price book</h2></div><div className={styles.segmented}><button className={type === "initialCleanup" ? styles.selected : ""} onClick={() => setType("initialCleanup")}>Initial cleanup</button><button className={type === "oneTimeCleanup" ? styles.selected : ""} onClick={() => setType("oneTimeCleanup")}>One-time service</button></div></div>
-    <div className={styles.tableWrap}><table><thead><tr><th>Last cleaned</th>{[1,2,3,4,5,6,7].map((dogs) => <th key={dogs}>{dogs} dog{dogs > 1 ? "s" : ""}</th>)}</tr></thead><tbody>{PRICING.lastCleanedOptions.map((option) => <tr key={option.id}><th>{option.label}</th>{[1,2,3,4,5,6,7].map((dogs) => { const range = grid[option.id]?.[dogs]; return <td key={dogs} className={!range ? styles.custom : ""}>{range ? `${money(range[0], range[0] % 1 ? 2 : 0)}–${money(range[1], range[1] % 1 ? 2 : 0)}` : "Custom"}</td>; })}</tr>)}</tbody></table></div>
+    <p>{CLEANUP_RANGE_EXPLANATION} For 8 or more dogs, use a custom quote.</p>
+    <div className={styles.tableWrap}><table><thead><tr><th>Last cleaned</th>{[1,2,3,4,5,6,7].map((dogs) => <th key={dogs}>{dogs} dog{dogs > 1 ? "s" : ""}</th>)}</tr></thead><tbody>{PRICING.lastCleanedOptions.map((option) => <tr key={option.id}><th>{option.label}</th>{[1,2,3,4,5,6,7].map((dogs) => { const range = grid[option.id]?.[dogs]; return <td key={dogs} className={!range ? styles.custom : ""}>{range ? formatCleanupRange(range) : "Custom"}</td>; })}</tr>)}</tbody></table></div>
     <p>These values load directly from the same pricing configuration used by the website quote flow, preventing a second stale copy.</p>
   </section>;
 }

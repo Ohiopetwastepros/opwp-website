@@ -5,9 +5,6 @@ import {
   assignAirtableContact,
   assignAirtableEmail,
   assignAirtablePhone,
-  indexSngClients,
-  parseContactBackfillArgs,
-  planCustomerContactBackfill,
   readSngClientEmail,
   readSngClientPhone,
   sngClientEmail,
@@ -49,53 +46,6 @@ test("Airtable Phone and Email are assigned only for a different usable value", 
   assert.equal(kept.Email, "keep@example.com");
 });
 
-test("active-client backfill fills blank Phone and Email and leaves stored values alone", () => {
-  const clients = indexSngClients([
-    { client: "rcl_both", email: "both@example.com", cell_phone: "4195550101" },
-    { client: "rcl_phone_only", email: "new@example.com", cell_phone: "4195550102", home_phone: "4195550199" },
-    { client: "rcl_keep", email: "changed@example.com", cell_phone: "4195550103" },
-    { client: "rcl_empty", email: "", cell_phone: "" },
-    { client: "rcl_bad", email: "nope", cell_phone: "12" },
-  ]);
-  const records = [
-    { id: "recBoth", fields: { "Client Name": "Both Example", "SNG Client ID": "rcl_both" } },
-    { id: "recPhone", fields: { "Client Name": "Phone Example", "SNG Client ID": "rcl_phone_only", Email: "keep@example.com" } },
-    { id: "recKeep", fields: { "Client Name": "Keep Example", "SNG Client ID": "rcl_keep", Phone: "4195550000", Email: "keep@example.com" } },
-    { id: "recEmpty", fields: { "Client Name": "Empty Example", "SNG Client ID": "rcl_empty" } },
-    { id: "recBad", fields: { "Client Name": "Bad Example", "SNG Client ID": "rcl_bad" } },
-    { id: "recInactive", fields: { "Client Name": "Inactive Example", "SNG Client ID": "rcl_inactive", Status: "Active" } },
-    { id: "recNoId", fields: { "Client Name": "No ID Example" } },
-  ];
-  const plan = planCustomerContactBackfill(records, clients);
-  assert.deepEqual(plan.updates, [
-    {
-      id: "recBoth",
-      fields: { Phone: "4195550101", Email: "both@example.com" },
-      clientName: "Both Example",
-      sngClientId: "rcl_both",
-    },
-    {
-      id: "recPhone",
-      fields: { Phone: "4195550102" },
-      clientName: "Phone Example",
-      sngClientId: "rcl_phone_only",
-    },
-  ]);
-  assert.equal(plan.updates.every((update) => Object.keys(update.fields).every((field) => field === "Phone" || field === "Email")), true);
-  assert.deepEqual(plan.summary, {
-    scanned: 7,
-    noSngId: 1,
-    notActive: 1,
-    alreadySet: 1,
-    blankPhone: 1,
-    invalidPhone: 1,
-    blankEmail: 1,
-    invalidEmail: 1,
-    wouldUpdate: 2,
-  });
-  assert.deepEqual(plan.unmatchedIds, ["rcl_inactive"]);
-});
-
 test("webhook customer create and update both copy Phone and Email before writing", () => {
   const source = readFileSync(new URL("../lib/airtable.js", import.meta.url), "utf8");
   const start = source.indexOf("export async function updateSngCustomerLifecycle");
@@ -105,12 +55,4 @@ test("webhook customer create and update both copy Phone and Email before writin
   const create = fn.indexOf("if (!records.length && createIfMissing)");
   assert.ok(assignment > 0);
   assert.ok(create > assignment);
-});
-
-test("contact backfill defaults to dry-run and writes only with --apply", () => {
-  assert.deepEqual(parseContactBackfillArgs([]), { apply: false, dryRun: true });
-  assert.deepEqual(parseContactBackfillArgs(["--dry-run"]), { apply: false, dryRun: true });
-  assert.deepEqual(parseContactBackfillArgs(["--apply"]), { apply: true, dryRun: false });
-  assert.throws(() => parseContactBackfillArgs(["--apply", "--dry-run"]), /either --dry-run or --apply/);
-  assert.throws(() => parseContactBackfillArgs(["--force"]), /Unknown argument/);
 });

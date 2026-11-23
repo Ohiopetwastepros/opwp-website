@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:cloudflare": "opennextjs-cloudflare build && node scripts/patch-open-next-worker.mjs && node scripts/patch-quote-follow-up-worker.mjs",
+    "build:cloudflare": "opennextjs-cloudflare build && node scripts/patch-open-next-worker.mjs && node scripts/patch-quote-follow-up-worker.mjs && node scripts/check-quote-follow-up-worker.mjs",
     "check:worker-startup": "wrangler check startup",
-    "preview": "opennextjs-cloudflare build && node scripts/patch-open-next-worker.mjs && node scripts/patch-quote-follow-up-worker.mjs && opennextjs-cloudflare preview",
+    "preview": "opennextjs-cloudflare build && node scripts/patch-open-next-worker.mjs && node scripts/patch-quote-follow-up-worker.mjs && node scripts/check-quote-follow-up-worker.mjs && opennextjs-cloudflare preview",
     "deploy": "node scripts/deploy.mjs",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv",
     "db:migrate:local": "node scripts/require-private-migrations.mjs && wrangler d1 migrations apply opwp-backend --local",
@@ -21,7 +21,7 @@
     "test:http-security": "node scripts/http-security-smoke.mjs",
     "audit:production": "npm audit --omit=dev --audit-level=high",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint app components lib scripts middleware.js next.config.js",
     "deployment:pending": "node scripts/deploy.mjs --pending",
     "deployment:check": "node scripts/deployment-controller.mjs",
     "prebuild": "node scripts/prepare-build-inputs.mjs",
@@ -30,15 +30,20 @@
   },
   "dependencies": {
     "@opennextjs/cloudflare": "1.20.13",
+    "fast-png": "8.0.0",
     "jose": "6.2.3",
+    "jpeg-js": "0.4.4",
     "leaflet": "1.9.4",
     "next": "15.5.28",
     "otpauth": "9.5.2",
     "qrcode": "1.5.4",
     "react": "19.0.0",
-    "react-dom": "19.0.0"
+    "react-dom": "19.0.0",
+    "workers-og": "0.0.27"
   },
   "devDependencies": {
+    "eslint": "10.14.0",
+    "eslint-plugin-react-hooks": "7.1.1",
     "wrangler": "4.154.0"
   },
   "overrides": {

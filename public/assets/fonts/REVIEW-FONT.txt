@@ -1,0 +1,5 @@
+Personalized review previews use HankenGrotesk-ExtraBold.ttf, a static ExtraBold
+font from the Hanken Grotesk project by Alfredo Marco Pradil.
+
+Source: https://github.com/marcologous/hanken-grotesk/blob/master/fonts/ttf/HankenGrotesk-ExtraBold.ttf
+License: SIL Open Font License 1.1, included in OFL-Hanken-Grotesk.txt.

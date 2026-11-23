@@ -7,6 +7,7 @@ import { transactionalEmailConfig, sendTransactionalEmail } from '@/lib/submissi
 import { FoodAccountError, foodCookie, foodAccountSession, foodEmail, foodTokenHash, beginFoodEmail, redeemFoodEmail, loginFoodAccount, logoutFoodAccount } from '@/lib/dog-food-account.mjs';
 import { readFoodPortal } from '@/lib/dog-food-portal';
 import { stripeConfigured } from '@/lib/stripe';
+import {linkStaffFoodPortalProfile} from '@/lib/food-customer-hub.mjs';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,7 +18,7 @@ export async function GET(request) {
   try {
     const db = getDb(), env = getRuntimeEnv();
     if (!db) return reply({ error: 'Account service is unavailable.' }, 503);
-    return reply({ ok: true, ...await readFoodPortal(db, await foodAccountSession(db, request.headers)), paymentConfigured: stripeConfigured(env), emailConfigured: transactionalEmailConfig(env).configured });
+    return reply({ ok: true, ...await readFoodPortal(db, await foodAccountSession(db, request.headers),env), paymentConfigured: stripeConfigured(env), emailConfigured: transactionalEmailConfig(env).configured });
   } catch { return reply({ error: 'Account service is temporarily unavailable.' }, 503); }
 }
 export async function POST(request) {
@@ -53,6 +54,7 @@ export async function POST(request) {
       result = await beginFoodEmail(db, { email: body.email, kind: body.action === 'signup' ? 'verify' : 'reset', origin: applicationConfig(env).siteOrigin, send: message => sendTransactionalEmail(env, message) });
     } else if (body.action === 'redeem') result = await redeemFoodEmail(db, body);
     else result = await loginFoodAccount(db, body);
-    return reply({ ok: true, message: result.message || 'Signed in.', ...(result.passwordChangeRequired ? { passwordChangeRequired: true, setupToken: result.setupToken } : {}) }, 200, result.sessionToken ? foodCookie(result.sessionToken) : null);
+    if(result.sessionToken)await linkStaffFoodPortalProfile(db,result.sessionToken);
+    return reply({ ok: true, message: result.message || 'Signed in.', ...(result.passwordChangeRequired ? { passwordChangeRequired: true, signupDetailsRequired: result.signupDetailsRequired, setupToken: result.setupToken } : {}) }, 200, result.sessionToken ? foodCookie(result.sessionToken) : null);
   } catch (error) { return reply({ ok: false, error: error instanceof FoodAccountError ? error.message : 'Account service is temporarily unavailable.' }, error instanceof FoodAccountError ? error.status : 503); }
 }

@@ -1,7 +1,7 @@
 import staffPrivate from '../lib/staff-private.json' with {type:'json'};
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluateTravel, parseTravelTime, summarizeTravel, summarizeTravelDates, travelDate, travelJobs, travelPairs, travelWeek } from "../lib/stop-travel.mjs";
+import { evaluateTravel, parseTravelTime, scheduledTravelDate, summarizeTravel, summarizeTravelDates, travelDate, travelJobs, travelPairs, travelWeek } from "../lib/stop-travel.mjs";
 
 const event=(job,type,data={},extra={})=>({id:`${job}:${type}`,external_id:`${job}.0`,event_type:`job:${type}`,source:"sweep_and_go",payload:JSON.stringify({data:{job_id:job,employee_id:Number(staffPrivate.providerIds.primary),employee_name:staffPrivate.primaryName,date:"2025-07-09",...data}}),...extra});
 const samples=[
@@ -29,6 +29,14 @@ test("Eastern timestamps handle winter/summer, explicit offsets and midnight",()
   assert.equal(parseTravelTime("2025-07-09T09:12:00-04:00"),parseTravelTime("2025-07-09 09:12:00"));
   assert.equal(travelDate(Date.parse("2025-07-10T02:00:00Z")),"2025-07-09");
   for(const time of ["2026-03-08 02:30:00","2026-11-01 01:30:00","2026-02-30 11:00:00","2025-07-09",""])assert.equal(parseTravelTime(time),null);
+});
+
+test("scheduled stop travel waits until 9 PM Eastern in summer and winter",()=>{
+  for(const date of ["2026-01-16","2026-07-16","2026-03-08","2026-11-01"]){
+    assert.equal(scheduledTravelDate(parseTravelTime(`${date} 20:59:59`)),null);
+    assert.equal(scheduledTravelDate(parseTravelTime(`${date} 21:00:00`)),date);
+    assert.equal(scheduledTravelDate(parseTravelTime(`${date} 23:05:00`)),date);
+  }
 });
 test("duplicate job IDs and webhook replays produce one transition",()=>{
   const jobs=travelJobs([...samples,...samples,event("1.0","completed",{start_time:"2025-07-09 09:00:00",end_time:"2025-07-09 09:12:00"})]);

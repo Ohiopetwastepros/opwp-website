@@ -15,6 +15,7 @@ export function accountFixture() {
   },batch:async statements=>{sql.exec('BEGIN');try{const result=[];for(const s of statements)result.push(await s.run());sql.exec('COMMIT');return result;}catch(e){sql.exec('ROLLBACK');throw e;}}};
   return {sql,db};
 }
+const signupContact={firstName:'New',lastName:'Buyer',phone:'4195550198'};
 const now = 1800000000, password = 'A memorable dog food password!';
 async function register(db,email='buyer@example.com') {
   let mail;
@@ -22,7 +23,7 @@ async function register(db,email='buyer@example.com') {
   const temporary = mail.text.match(/Temporary password: (\S+)/)[1];
   const restricted = await auth.loginFoodAccount(db,{email,password:temporary},now+1);
   assert.equal(restricted.passwordChangeRequired,true);assert.equal(restricted.sessionToken,undefined);
-  const session = await auth.redeemFoodEmail(db,{token:restricted.setupToken,password,passwordConfirm:password},now+2);
+  const session = await auth.redeemFoodEmail(db,{token:restricted.setupToken,password,passwordConfirm:password,...signupContact},now+2);
   return {session,temporary,restricted};
 }
 test('one-use temporary password verifies email but cannot access orders before mandatory password change',async()=>{
@@ -82,7 +83,10 @@ test('eight-character capital/special password and matching confirmation are enf
   assert.deepEqual(foodPasswordCriteria(valid),{length:true,capital:true,special:true,bounded:true});
   assert.equal(foodPasswordCriteria('Abcdefg_').special,true);
   assert.equal(foodPasswordCriteria('Abcdefg ').special,false);
-  const session=await auth.redeemFoodEmail(db,{token,password:valid,passwordConfirm:valid},now+3);
+  for(const field of Object.keys(signupContact))await assert.rejects(auth.redeemFoodEmail(db,{token,password:valid,passwordConfirm:valid,...signupContact,[field]:''},now+3),/create your account/);
+  assert.equal(sql.prepare('SELECT count(*) n FROM dog_food_accounts').get().n,0);
+  const session=await auth.redeemFoodEmail(db,{token,password:valid,passwordConfirm:valid,...signupContact},now+3);
+  assert.equal(sql.prepare('SELECT phone FROM dog_food_customers').get().phone,'+14195550198');
   assert.ok(session.sessionToken);assert.ok(await auth.loginFoodAccount(db,{email:'confirmed@example.com',password:valid},now+4));
   await auth.beginFoodEmail(db,{email:'confirmed@example.com',kind:'reset',origin:'https://example.com',send:async value=>{mail=value;}},now+5);
   const resetToken=mail.text.match(/#reset=(\S+)/)[1];

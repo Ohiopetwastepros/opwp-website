@@ -9,6 +9,9 @@ import { readBoundedBytes } from "@/lib/bounded-body.mjs";
 import { recordQuoDelivery, processMetaConfirmations } from "@/lib/meta-lead-workflow.mjs";
 import { recordFoodCollectionReply, processFoodCollectionReplies, recordFoodCollectionDelivery } from "@/lib/dog-food-collections";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { playbookEnabled } from "@/lib/lead-playbook.mjs";
+import { quoLearningScope } from "@/lib/playbook-ownership.mjs";
+import { recordPlaybookQuoEvent } from "@/lib/lead-playbook-ingest";
 
 export const dynamic = "force-dynamic";
 const responseHeaders = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
@@ -31,14 +34,23 @@ export async function POST(request) {
   const delivery = ["message.delivered", "message.failed"].includes(body?.type) && body?.data?.object?.direction === "outgoing";
   if (!event && !delivery) return Response.json({ ok: true, accepted: 0 }, { headers: responseHeaders });
   const configuredNumber = normalizePhone(env.QUO_FROM_NUMBER);
-  const scopedNumber = normalizePhone(event ? event.to : body.data.object.from);
-  if (!configuredNumber || scopedNumber !== configuredNumber) return Response.json({ ok: false, error: "Phone scope mismatch." }, { status: 403, headers: responseHeaders });
+  const scopedNumber = normalizePhone(event ? event.direction === "outbound" ? event.from : event.to : body.data.object.from);
+  const scope = playbookEnabled(env) && event ? quoLearningScope(env, event) : { allowed: scopedNumber === configuredNumber, learningOnly: false };
+  if (!configuredNumber || !scope.allowed || (scopedNumber !== configuredNumber && !scope.learningOnly)) return Response.json({ ok: false, error: "Phone scope mismatch." }, { status: 403, headers: responseHeaders });
   const db = getDb();
   if (!db) return Response.json({ ok: false, error: "Storage is unavailable." }, { status: 503, headers: responseHeaders });
+  if (event?.isGroup && playbookEnabled(env)) return Response.json({ ok: true, accepted: 0, ignoredReason: "group_thread" }, { headers: responseHeaders });
   if (delivery) {
-    await recordQuoDelivery(db, body);
-    await recordFoodCollectionDelivery(db, body);
+    if (!scope.learningOnly) {
+      await recordQuoDelivery(db, body);
+      await recordFoodCollectionDelivery(db, body);
+    }
+    if (event && playbookEnabled(env)) await recordPlaybookQuoEvent(db, env, event);
     return Response.json({ ok: true, accepted: 1 }, { headers: responseHeaders });
+  }
+  if (scope.learningOnly) {
+    await recordPlaybookQuoEvent(db, env, event);
+    return Response.json({ ok: true, accepted: 1, learningOnly: true }, { headers: responseHeaders });
   }
   // Staff reports are scoped to the verified staff phone and signed OPWP inbox.
   // They must never enter prospect intake or trigger customer auto-replies.
@@ -58,7 +70,8 @@ export async function POST(request) {
   }
   try {
     const result = await recordInboundQuoMessage(db, env, event);
-    if (result.submissionId) await processMetaConfirmations({ ...env, DB: db }, { submissionId: result.submissionId, limit: 1 });
+    if (playbookEnabled(env)) await recordPlaybookQuoEvent(db, env, event);
+    if (result.submissionId && !playbookEnabled(env)) await processMetaConfirmations({ ...env, DB: db }, { submissionId: result.submissionId, limit: 1 });
     await db.prepare(`UPDATE lead_webhook_events SET status='processed',processed_at=CURRENT_TIMESTAMP WHERE provider='quo' AND event_id=?`).bind(event.eventId).run();
     return Response.json({ ok: true, accepted: 1, leadCreated: result.leadCreated, ignoredReason: result.ignoredReason || null, autoReplied: result.autoReplied }, { headers: responseHeaders });
   } catch (error) {

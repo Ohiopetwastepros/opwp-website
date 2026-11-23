@@ -1,0 +1,35 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import {setup} from './helpers/unified-food-sales-fixture.mjs';
+import {customerBody} from './helpers/food-customer-input.mjs';
+import * as hub from '../lib/food-customer-hub.mjs';
+import {FoodError} from '../lib/dog-food-operations.mjs';
+
+test('owner customer history retains exact formula, quantity, receipt and handoff details without another customer\'s sale',async()=>{
+  const fixture=setup(),first=await fixture.save();
+  const secondCustomer=await hub.foodCustomerCommand(fixture.db,customerBody({firstName:'Second',lastName:'Buyer',phone:'4195550197',email:'second@example.test',dogCount:'',frequency:'',smsConsent:false}),'owner',{office:true});
+  const second=await fixture.save({customerId:secondCustomer.id,items:[{productId:'edf-22-12-pink-40',quantity:2}]});
+  fixture.sql.prepare("INSERT INTO dog_food_payments(id,order_id,provider,idempotency_key,amount_cents,status) VALUES('synthetic-receipt',?,'staff_cash','synthetic-receipt',6357,'captured')").run(first.orderId);
+  let authorized=false;
+  const source=fs.readFileSync(new URL('../app/api/admin/dog-food/customers/route.js',import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'');
+  const context={...hub,FoodError,Response,URL,getRuntimeEnv:()=>({DB:fixture.db}),verifyAdminRequest:async()=>({authorized,email:'owner@example.test'}),checkRateLimit:async()=>({allowed:true}),rateLimitResponse:()=>Response.json({}, {status:429}),salesHeaders:{'Cache-Control':'private, no-store'},salesError:error=>Response.json({error:error.message},{status:error.status||503}),readFoodOperations:fixture.service.readFoodOperations};
+  const api=vm.runInNewContext(source+'\n({GET})',context),request=new Request('https://example.test/api/admin/dog-food/customers/?id=buyer');
+  assert.equal((await api.GET(request)).status,401);
+  authorized=true;
+  const response=await api.GET(request),data=await response.json();
+  assert.equal(response.status,200);
+  const orders=data.customers[0].orders;
+  assert.equal(orders.length,1);
+  assert.equal(orders[0].id,first.orderId);
+  assert.equal(orders[0].items[0].quantity,1);
+  assert.equal(orders[0].items[0].formula,'22-12');
+  assert.equal(orders[0].items[0].color,'Pink');
+  assert.deepEqual(orders[0].receiptMethods,['staff_cash']);
+  assert.equal(orders[0].handoffStatus,'preparing');
+  assert.ok(!JSON.stringify(orders).includes(second.orderId));
+  fixture.sql.prepare('DELETE FROM dog_food_pickups WHERE order_id=?').run(first.orderId);
+  const withoutHandoff=await (await api.GET(request)).json();
+  assert.equal(withoutHandoff.customers[0].orders[0].handoffStatus,'unknown');
+});

@@ -1,0 +1,15 @@
+.page { padding: 56px 24px 72px; background: #f5f4ee; min-height: 70vh; }
+.card { display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1.1fr); max-width: 1040px; margin: 0 auto; background: #fff; border-radius: 24px; overflow: hidden; box-shadow: 0 16px 52px rgba(22, 51, 72, .1); }
+.photo { position: relative; background: #183c5a; }
+.photo picture { display: block; height: 100%; }
+.photo img { display: block; width: 100%; height: 100%; aspect-ratio: 3 / 4; object-fit: cover; object-position: center top; }
+.photoLabel { position: absolute; bottom: 18px; left: 24px; right: 24px; width: fit-content; max-width: calc(100% - 48px); padding: 7px 13px; border-radius: 7px; color: #fff; background: rgba(18, 44, 64, .92); font-size: 14px; font-weight: 700; }
+.content { padding: 38px 48px 42px; }
+.eyebrow { text-transform: uppercase; letter-spacing: .1em; font-size: 12px; font-weight: 800; color: #486944; margin-bottom: 12px; }
+.content h1 { color: #183c5a; font-size: clamp(30px, 4.5vw, 43px); line-height: 1.12; letter-spacing: -.025em; margin-bottom: 20px; }
+.thanks, .ask { font-size: 18px; line-height: 1.7; max-width: 620px; margin-bottom: 14px; }
+.button { display: flex; justify-content: center; align-items: center; gap: 16px; width: 100%; min-height: 62px; margin: 28px 0 22px; padding: 16px 24px; color: #fff; background: #347c2c; border-radius: 10px; text-decoration: none; font-size: 21px; font-weight: 800; }
+.button:hover { background: #286222; }
+.signoff { font-size: 15px; line-height: 1.75; color: #52616b; }
+@media (max-width: 800px) { .card { grid-template-columns: minmax(0, 1fr); max-width: 600px; } .photo img { height: auto; } }
+@media (max-width: 600px) { .page { padding: 26px 16px 40px; } .card { border-radius: 18px; } .content { padding: 28px 24px 30px; } .photoLabel { left: 16px; right: 16px; bottom: 12px; font-size: 12px; max-width: calc(100% - 32px); } .thanks, .ask { font-size: 17px; } }

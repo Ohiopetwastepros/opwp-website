@@ -9,9 +9,9 @@ const task = source.slice(source.indexOf('        const task = '), source.indexO
 test('route book runs only at minute 35, never as the ten-minute scheduler fallback', async () => {
   for (const cron of ['*/10 * * * *', '35 * * * *']) {
     let calls = 0;
-    const scope = { controller: { cron }, env: {}, ctx: {}, Request, atEasternMidnight: false,
+    const scope = { controller: { cron, scheduledTime: 12345 }, env: {}, ctx: {}, Request, atEasternMidnight: false,
       runWithCloudflareRequestContext: (_, __, ___, callback) => callback(),
-      runScheduledRouteBookRefresh: async () => { calls++; } };
+      runScheduledRouteBookRefresh: async (_, time) => { assert.equal(time,12345); calls++; } };
     await runPrivateInNewContext(`${task}\ntask;`, scope);
     assert.equal(calls, cron === '35 * * * *' ? 1 : 0);
   }
