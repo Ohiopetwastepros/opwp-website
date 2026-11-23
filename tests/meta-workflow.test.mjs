@@ -231,7 +231,7 @@ test("signed Meta → YardOps → Airtable → Quo → reply integration, retrie
     }
     await api.processAirtableQueue(env, 10);
     assert.match(mirrors.at(-1).records[0].fields["Customer Question"], /Customer's cleanup answer: about 1 month/);
-    assert.match(mirrors.at(-1).records[0].fields["Customer Question"], /\$55.00–\$65.00/);
+    assert.match(mirrors.at(-1).records[0].fields["Customer Question"], /\$55.00 to \$65.00/);
     const id = select(db, "submissions")[0].id;
     const token = await fixtureAdminSession("craig@ohiopetwastepros.com");
     const auditRequest = new Request(`https://opwp.test/api/admin/growth-desk/${id}`, { method: "PATCH", headers: { origin: "https://opwp.test", "content-type": "application/json", cookie: `__Host-opwp_admin_mfa=${token}` }, body: JSON.stringify({ action: "audit_meta_route", days: ["Tuesday"], snapshotAt }) });

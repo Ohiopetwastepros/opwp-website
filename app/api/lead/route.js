@@ -1,10 +1,11 @@
-import { queuePartialQuoteFollowUp, saveSubmission, upsertPartialQuoteSubmission } from "@/lib/db";
+import { getDb, queuePartialQuoteFollowUp, saveSubmission, upsertPartialQuoteSubmission } from "@/lib/db";
 import { queueSubmissionNotificationSafe } from "@/lib/submission-notifications";
 import { protectJsonRequest, verifyTurnstile } from "@/lib/public-api-security";
 import { validateLeadInput } from "@/lib/public-input";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getRuntimeEnv } from "@/lib/cloudflare";
 import { runInitialQuoteSms } from "@/lib/quote-initial-sms.mjs";
+import {createFunnelRouteToken} from '@/lib/lead-funnel-signup.mjs';
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export async function POST(request) {
 
   const isPartial = validation.value.source === "partial_quote";
   if (isPartial) validation.value.follow_up_consent_at = new Date().toISOString();
-  const saved = isPartial && validation.value.funnel_id
+  const saved = isPartial && (validation.value.funnel_id || getRuntimeEnv().LEAD_FUNNEL_ENABLED === 'true')
     ? await upsertPartialQuoteSubmission({ body: validation.value, funnelId: validation.value.funnel_id, lifecycleStage: validation.value.lifecycle_stage })
     : await saveSubmission({
         kind: isPartial ? "partial_quote" : "question",
@@ -38,10 +39,11 @@ export async function POST(request) {
     try { getCloudflareContext().ctx.waitUntil(task); }
     catch { await task; }
   }
-  const notification = await queueSubmissionNotificationSafe({
+  const notification = isPartial && getRuntimeEnv().LEAD_FUNNEL_ENABLED === 'true' ? {status:'decision_monitor'} : await queueSubmissionNotificationSafe({
     submissionId: saved.id,
     type: isPartial ? "partial_quote" : "question",
     body: validation.value,
   });
-  return Response.json({ ok: true, stored: saved.configured, id: saved.id, notification: notification.status, smsFollowup: smsFollowup?.status || null });
+  const routeToken=isPartial && saved.configured && getRuntimeEnv().LEAD_FUNNEL_ENABLED==='true' ? await createFunnelRouteToken(getDb(),saved.id) : undefined;
+  return Response.json({ ok: true, stored: saved.configured, id: saved.id, routeToken, notification: notification.status, smsFollowup: smsFollowup?.status || null },{headers:{'Cache-Control':'no-store, private','Referrer-Policy':'no-referrer'}});
 }

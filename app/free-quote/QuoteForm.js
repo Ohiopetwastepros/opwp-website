@@ -49,7 +49,7 @@ const secHead = (first = false) => ({
 });
 
 const money  = (n) => "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-const rngStr = ([lo, hi]) => `${money(lo)}–${money(hi)}`;
+const rngStr = ([lo, hi]) => `${money(lo)} to ${money(hi)}`;
 
 function Btn({ children, active, onClick, style = {} }) {
   return (
@@ -137,6 +137,10 @@ export default function QuoteForm() {
   const [funnelId, setFunnelId] = useState("");
   const [partialRetry, setPartialRetry] = useState(0);
   const [prefillNotice, setPrefillNotice] = useState('');
+  const [routeToken,setRouteToken]=useState('');
+  const [routeDay,setRouteDay]=useState('');
+  const [routeNotice,setRouteNotice]=useState('');
+  const [routeAddressKey,setRouteAddressKey]=useState('');
   const signupFormRef = useRef(null);
 
   // Browsers can visually autofill controlled inputs without firing React's
@@ -197,6 +201,7 @@ export default function QuoteForm() {
         setAddress(value.address||'');setCity(value.city||'');setUsState(value.state||'OH');setZip(value.zip||'');
         setDogs(Number(value.dogs));setFrequency(value.frequency);setLastCleaned(value.lastCleaned);setYardSize(value.yardSize);
         setSelected(Object.fromEntries((value.addons||[]).map(id=>[id,true])));
+        if(value.serviceDay){setRouteDay(value.serviceDay);setRouteAddressKey(JSON.stringify([value.address||'',value.city||'',value.state||'OH',value.zip||'',value.frequency]));}
         if(value.funnelId){setFunnelId(value.funnelId);try{window.sessionStorage.setItem('opwp_quote_funnel_id',value.funnelId);}catch{/* in-memory attribution remains available */}}
         setPrefillNotice('Your details are filled in. Please review your quote, confirm your information, and complete secure signup.');
       }).catch(error => {if(!stopped)setPrefillNotice(error.message+' You can still complete the form below.');});
@@ -302,7 +307,7 @@ export default function QuoteForm() {
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.ok !== true) throw new Error("partial_quote_capture_failed");
-        if (!cancelled) leadStageRef.current = lifecycleStage;
+        if (!cancelled) { leadStageRef.current = lifecycleStage; if(data.routeToken)setRouteToken(data.routeToken); }
       } catch {
         if (!cancelled && partialRetry < 2) window.setTimeout(() => setPartialRetry((value) => value + 1), 1500 * (partialRetry + 1));
       }
@@ -310,6 +315,19 @@ export default function QuoteForm() {
     capture();
     return () => { cancelled = true; };
   }, [funnelId, inArea, phoneReady, emailReady, followupConsent, zipClean, phone, email, firstName, lastName, dogs, frequency, lastCleaned, yardSize, monthlyTotal, selected, coupon, step, partialRetry]);
+
+  useEffect(()=>{
+    if(step!==2 || !routeToken || address.trim().length<5 || city.trim().length<2 || frequency==='one_time')return;
+    let stopped=false;
+    const controller=new AbortController();
+    const timer=setTimeout(()=>{
+      fetch('/api/lead-route/',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',signal:controller.signal,
+        body:JSON.stringify({token:routeToken,address,city,state:usState,zip:zipClean})})
+        .then(async response=>{const data=await response.json();if(stopped)return;if(!response.ok)throw Error(data.error);setRouteDay(data.day||'');setRouteNotice(data.message||'');setRouteAddressKey(JSON.stringify([address,city,usState,zipClean,frequency]));})
+        .catch(()=>{if(!stopped){setRouteDay('');setRouteNotice('We will confirm your service day during setup.');}});
+    },1200);
+    return()=>{stopped=true;clearTimeout(timer);controller.abort();};
+  },[step,routeToken,address,city,usState,zipClean,frequency]);
 
   // If the dog count pushes the current frequency past its cap (e.g. Monthly + 2 dogs),
   // fall back to Weekly so the form never sits on a disabled option.
@@ -333,7 +351,7 @@ export default function QuoteForm() {
     const parts = [];
     if (yardTier && yardTier.id !== "tiny") {
       parts.push(yardIsXL
-        ? `Yard size: Over 3/4 acre — custom upcharge to be confirmed.`
+        ? `Yard size: Over 3/4 acre. Custom upcharge to be confirmed.`
         : `Yard size: ${yardTier.label} → +$${yardUpcharge}/mo. Subscription rate includes yard upcharge.`
       );
     }
@@ -620,7 +638,7 @@ export default function QuoteForm() {
       {zipReady && !inArea && (
         <>
           <div style={{ background: "#fff5f4", border: "1.5px solid #f1c9c5", borderRadius: "12px", padding: "16px 18px", marginBottom: "18px", fontSize: "14px", color: "#8a3b36", lineHeight: 1.5 }}>
-            We&apos;re not in <strong>{zipClean}</strong> yet — but we&apos;re expanding fast. Leave your info and we&apos;ll reach out the moment we cover your area.
+            We&apos;re not in <strong>{zipClean}</strong> yet, but we&apos;re expanding fast. Leave your info and we&apos;ll reach out the moment we cover your area.
           </div>
           <div style={{ display: "grid", gap: "14px", marginBottom: "14px" }}>
             <div>
@@ -1068,6 +1086,7 @@ export default function QuoteForm() {
         </div>
       </div>
 
+      {frequency!=='one_time'&&routeAddressKey===JSON.stringify([address,city,usState,zipClean,frequency])&&(routeDay||routeNotice)?<p role="status">{routeDay?`Recommended recurring service day: ${routeDay}. `:''}{routeNotice||'Final availability and your start date are confirmed during setup.'}</p>:null}
       {/* ── Dog info ── */}
       <div style={secHead()}>About Your Dog{dogs > 1 ? "s" : ""}</div>
       <div style={{ marginBottom: "14px" }}>
@@ -1078,8 +1097,8 @@ export default function QuoteForm() {
         <label style={lbl}>Is it safe for our team to be in the yard with your dog? {req}</label>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "8px" }}>
           {[
-            ["yes",      "Yes — completely safe"],
-            ["no",       "No — keep indoors during service"],
+            ["yes",      "Yes, completely safe"],
+            ["no",       "No, keep indoors during service"],
           ].map(([val, label]) => (
             <Btn key={val} active={safeDog === val} onClick={() => setSafeDog(val)}>{label}</Btn>
           ))}

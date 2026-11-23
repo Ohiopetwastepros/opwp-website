@@ -105,6 +105,11 @@ META_AUTOMATION_APPROVAL_ID=""
 META_CADENCE_APPROVAL_ID=""
 # JSON keyed by form ID: {"FORM_ID":{"pageId":"PAGE_ID","consentField":"sms_consent","disclosure":"Exact approved disclosure","version":"reviewed-v1"}}
 META_APPROVED_SMS_FORMS="{}"
+LEAD_FUNNEL_ENABLED="false"
+META_LEADS_EXPECTED="false"
+META_LEAD_SILENCE_HOURS="24"
+# Date-versioned Quo webhook secret; keep the legacy key for legacy subscriptions.
+QUO_WEBHOOK_KEY=""
 META_TEST_MODE="false"
 META_TEST_APPROVAL_ID=""
 META_TEST_RECIPIENTS=""

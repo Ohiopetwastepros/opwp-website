@@ -7,6 +7,9 @@ import { processAirtableQueue } from "@/lib/lead-assistant";
 import { outboundFetch } from "@/lib/outbound-request";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { OPWP_ORGANIZATION_ID } from "@/lib/route-partner";
+import { runInitialQuoteSms } from '@/lib/quote-initial-sms.mjs';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
+import {recordLeadFeed} from '@/lib/lead-funnel-health.mjs';
 
 export const dynamic = "force-dynamic";
 const responseHeaders = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
@@ -27,7 +30,7 @@ async function fetchMetaLead(env, event) {
   const version = String(env.META_GRAPH_API_VERSION || "");
   if (!/^v\d{1,2}\.\d$/.test(version) || !env.META_PAGE_ACCESS_TOKEN) throw new Error("Meta lead retrieval is not configured.");
   const url = new URL(`https://graph.facebook.com/${version}/${encodeURIComponent(event.leadId)}`);
-  url.searchParams.set("fields", "id,created_time,field_data,form_id");
+  url.searchParams.set("fields", "id,created_time,field_data,form_id,custom_disclaimer_responses");
   const response = await outboundFetch(url, { headers: { Authorization: `Bearer ${env.META_PAGE_ACCESS_TOKEN}`, Accept: "application/json" }, cache: "no-store" }, { provider: "meta", operation: "retrieve_lead", timeoutMs: 12000, retries: 1, retryable: true });
   const data = await readBoundedProviderJson(response);
   if (!response.ok || !data?.id) throw new Error(`Meta lead retrieval failed (${response.status}).`);
@@ -53,6 +56,7 @@ export async function POST(request) {
   if (!events.length) return Response.json({ ok: true, accepted: 0 }, { headers: responseHeaders });
   const db = getDb();
   if (!db) return Response.json({ ok: false, error: "Storage is unavailable." }, { status: 503, headers: responseHeaders });
+  await recordLeadFeed(db,'meta',{status:'received',lastVerifiedAt:new Date().toISOString()});
   let accepted = 0;
   for (const event of events) {
     const claim = await db.prepare(`INSERT INTO lead_webhook_events (provider,event_id,organization_id,status)
@@ -67,17 +71,22 @@ export async function POST(request) {
     try {
       const data = await fetchMetaLead(env, event);
       const lead = await storeMetaLead(db, env, data, event);
-      await processAirtableQueue({ ...env, DB: db }, 1, lead.id);
+      if (env.LEAD_FUNNEL_ENABLED !== 'true') await processAirtableQueue({ ...env, DB: db }, 1, lead.id);
       await db.prepare(`UPDATE lead_webhook_events SET status='processed',processed_at=CURRENT_TIMESTAMP WHERE provider='meta' AND event_id=?`).bind(event.leadId).run();
       accepted += 1;
       // The durable outbox remains available to cron if this immediate attempt is interrupted.
-      await processMetaConfirmations({ ...env, DB: db }, { submissionId: lead.id, limit: 1 });
+      if (env.LEAD_FUNNEL_ENABLED === 'true') {
+        const task = runInitialQuoteSms({...env,DB:db},{submissionId:lead.id});
+        try { getCloudflareContext().ctx.waitUntil(task); } catch { await task; }
+      } else await processMetaConfirmations({ ...env, DB: db }, { submissionId: lead.id, limit: 1 });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Meta lead processing failed.";
       await db.prepare(`UPDATE lead_webhook_events SET status='failed',error_message=?,processed_at=CURRENT_TIMESTAMP WHERE provider='meta' AND event_id=?`).bind(message.slice(0, 500), event.leadId).run();
       console.error(JSON.stringify({ event: "meta_lead_processing_failed", leadId: event.leadId, message }));
+      await recordLeadFeed(db,'meta',{status:'failed',reason:'lead_retrieval_or_storage_failed'});
       return Response.json({ ok: false, error: "Meta lead processing failed." }, { status: 503, headers: responseHeaders });
     }
   }
+  await recordLeadFeed(db,'meta',{status:'success',lastProcessedAt:new Date().toISOString()});
   return Response.json({ ok: true, accepted }, { headers: responseHeaders });
 }

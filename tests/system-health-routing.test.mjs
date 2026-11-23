@@ -19,7 +19,7 @@ async function health(options={}) {
     return {};
   },async all(){if(options.runQueryFails)throw Error('history unavailable');return {results:runs};}};}};
   const config={integrations:Object.fromEntries(['sweepAndGo','airtable','stripe','quickBooks','geoapify','fieldProofs'].map(key=>[key,{configured:true,webhookConfigured:true,provider:'r2'}]))};
-  const fn=runPrivateInNewContext(source+'\ngetSystemHealth;',{applicationConfig:()=>config,getDb:()=>db,notificationProvider:()=>({configured:true,name:'quo'}),submissionEmailProviderStatus:()=>({configured:true,name:'resend'}),getInitialSmsHealth:async()=>({status:'healthy',overdue:0,scheduler:{},watchdog:{},...options.initialSms}),Date:Clock});
+  const fn=runPrivateInNewContext(source+'\ngetSystemHealth;',{applicationConfig:()=>config,getDb:()=>db,notificationProvider:()=>({configured:true,name:'quo'}),submissionEmailProviderStatus:()=>({configured:true,name:'resend'}),getInitialSmsHealth:async()=>({status:'healthy',overdue:0,scheduler:{},watchdog:{},...options.initialSms}),getRuntimeEnv:()=>({}),getLeadFunnelHealth:async()=>({status:'healthy',incidents:[],...options.leadFunnel}),Date:Clock});
   const result=await fn();
   return {queries,row:name=>result.rows.find(row=>row.name===name)};
 }
@@ -62,6 +62,6 @@ test('submission emails disclose their actual scope and provider acceptance limi
 test('overdue initial texts and a failed health read have a dedicated red status',async()=>{
   for(const initialSms of [{status:'attention',overdue:1},{status:'attention',error:true}]){
     const h=await health({initialSms});assert.equal(h.row('Initial lead texts').tone,'red');
-    assert.match(h.row('Initial lead texts').details,/two minutes late/);
+    assert.match(h.row('Initial lead texts').details,/one minute late/);
   }
 });
