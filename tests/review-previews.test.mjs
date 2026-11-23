@@ -136,7 +136,7 @@ test("page metadata and email keep the personalized asset while messages use the
   assert.equal(metadata.robots.index, false);
   assert.equal(metadata.referrer, "no-referrer");
   const sms = buildReviewRequestSms({ firstName: "Jennifer", tech: "tony", previewToken: token });
-  assert.equal(sms.split("\n").at(-1), "Reply STOP to opt out");
+  assert.doesNotMatch(sms, /Reply STOP to opt out|Text STOP to unsubscribe/i);
   assert.ok(sms.split("\n")[0].includes(`You can leave one here: ${REVIEW_URL}`));
   assert.ok(!sms.includes(page));
   const email = buildReviewRequestEmail({ firstName: "Jennifer", tech: "tony", previewToken: token, unsubscribeUrl: `${REVIEW_SITE_ORIGIN}/review/unsubscribe/?token=fixture` });

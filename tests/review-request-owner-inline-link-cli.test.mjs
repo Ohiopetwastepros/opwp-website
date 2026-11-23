@@ -137,9 +137,9 @@ test('Inline link CLI approves the new job with all three previous jobs present 
   assert.equal(f.result().previewVerification.jpeg1200x630, true);
   assert.equal(f.result().previewVerification.personalizedOgTagPresent, true);
   assert.equal(f.result().previewVerification.noImageRobotsTag, true);
-  assert.equal(f.result().smsBody.split('\n').at(-1), 'Reply STOP to opt out');
+  assert.doesNotMatch(f.result().smsBody, /Reply STOP to opt out|Text STOP to unsubscribe/i);
   assert.ok(f.result().smsBody.includes('You can leave one here: ' + REVIEW_URL + ' '));
-  assert.ok(f.result().smsBody.indexOf(REVIEW_URL) < f.result().smsBody.indexOf('Reply STOP to opt out'));
+  assert.ok(f.result().smsBody.includes(REVIEW_URL));
   assert.doesNotMatch(f.result().smsBody, /ohiopetwastepros\.com\/review\//);
   assert.equal(f.commands.filter(args => args[1] === 'd1').length, 3, 'absence checked before approval and immediately before POST');
   assert.equal(f.process.exitCode, 0);

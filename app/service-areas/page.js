@@ -6,7 +6,7 @@ export const metadata = {
       "Service Areas | Dog Poop Removal Across Greater Toledo & SE Michigan",
   },
   description:
-    "Ohio Pet Waste Pros provides dog poop removal across Toledo, Sylvania, Perrysburg, Maumee, Holland, Bowling Green and 20+ communities in NW Ohio & SE Michigan. Find your city.",
+    "Ohio Pet Waste Pros provides dog poop removal across Toledo, Sylvania, Perrysburg, Maumee, Holland, Bowling Green and other communities in NW Ohio & SE Michigan. Find your city.",
   alternates: { canonical: "/service-areas/" },
   robots: { index: true, follow: true },
   openGraph: {
@@ -36,7 +36,6 @@ const ohio = [
   { name: "Berkey", href: "/dog-poop-removal-berkey-oh/" },
   { name: "Bowling Green", href: "/dog-poop-removal-bowling-green-oh/" },
   { name: "Walbridge", href: "/dog-poop-removal-walbridge-oh/" },
-  { name: "Genoa", href: "/dog-poop-removal-genoa-oh/" },
   { name: "Curtice", href: "/dog-poop-removal-curtice-oh/" },
   { name: "Dunbridge", href: "/dog-poop-removal-dunbridge-oh/" },
   { name: "Haskins", href: "/dog-poop-removal-haskins-oh/" },
@@ -98,7 +97,7 @@ export default function ServiceAreasPage() {
               marginBottom: "20px",
             }}
           >
-            25+ communities served
+            {ohio.length + michigan.length} communities listed
           </div>
           <h1
             style={{

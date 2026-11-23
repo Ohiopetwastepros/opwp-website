@@ -149,6 +149,22 @@ META_ALLOWED_INSTAGRAM_IDS=""
 LEAD_PLAYBOOK_HASH_KEY=""
 LEAD_PLAYBOOK_LINK_SECRET=""
 LEAD_PLAYBOOK_CRAIG_CELL=""
+# Existing customers remain held for manual review, including fresh sales
+# inquiries. A form, affirmative text, intake flag or ownership handback never
+# authorizes automated enrollment. Craig documents the separate request and
+# handles it manually; general automatic admission needs a separately reviewed
+# authenticated approval feature and is not enabled by this release.
+# The sole automation exception is a private, expiring controlled-test scope.
+# Keep empty unless the owner approves one exact canonical Meta conversation.
+# JSON keys (all required, no extras): approvalId, approvedBy, approvedAt,
+# expiresAt, organizationId, submissionId, conversationId, phone, formId, metaLeadId.
+# UTC times must include seconds and Z; validity is at most 24 hours. The scope
+# must match one META_TEST_RECIPIENTS, LEAD_PLAYBOOK_CRAIG_CELL, one
+# META_TEST_FORM_IDS, canonical Meta intake and its recorded consent provenance.
+# LEAD_AUTOMATION_CONTROLLED_TEST_ONLY must remain true. Consent, suppression,
+# ownership, closed-thread, pricing and route checks still apply. Install actual
+# operational values privately only after approval; never commit them here.
+LEAD_PLAYBOOK_CUSTOMER_TEST_EXCEPTION=""
 LEAD_PLAYBOOK_ADMIN_ORIGIN="https://www.ohiopetwastepros.com"
 AIRTABLE_PLAYBOOK_DRAFTS_TABLE_ID=""
 AIRTABLE_PLAYBOOK_LIBRARY_TABLE_ID=""

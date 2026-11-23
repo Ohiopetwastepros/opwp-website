@@ -61,3 +61,15 @@ worker-configuration.d.ts
 /scripts/prepare-meta-audit.py
 
 /lib/bank-private.json
+
+# Local secrets, caches and private operational reports
+.env.*
+!.env.example
+!.env.*.example
+.dev.vars.*
+!.dev.vars.example
+*.key
+*.pfx
+*.p12
+*.cache
+/docs/BACKEND_AUDIT_2026-11-20.md

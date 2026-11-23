@@ -236,7 +236,7 @@ test('the locked manual test bypasses quiet hours with flag false and records on
     const sms = f.calls.find(call => call.channel === 'sms').body;
     assert.deepEqual(sms.to, [OWNER_REVIEW_TEST.phone]);
     assert.equal(sms.from, OWNER_REVIEW_TEST.from);
-    assert.equal(sms.content, `Hi Craig, this is Craig with Ohio Pet Waste Pros. Thanks for letting Tony take care of your yard! If you were happy with the cleanup, would you take a minute to leave us a Google review? It really helps our small family business grow. You can leave one here: ${REVIEW_URL} \u{1F603}\n\nReply STOP to opt out`);
+    assert.equal(sms.content, `Hi Craig, this is Craig with Ohio Pet Waste Pros. Thanks for letting Tony take care of your yard! If you were happy with the cleanup, would you take a minute to leave us a Google review? It really helps our small family business grow. You can leave one here: ${REVIEW_URL} \u{1F603}`);
     const email = f.calls.find(call => call.channel === 'email').body;
     assert.deepEqual(email.to, [OWNER_REVIEW_TEST.email]);
     assert.match(email.html, new RegExp(result.ogImageUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
@@ -323,11 +323,11 @@ test('the separate locked retest sends once with an old sent job present and pre
     assert.notEqual(emailCalls[0].options.headers['Idempotency-Key'], emailCalls[1].options.headers['Idempotency-Key']);
     const sms = f.calls.filter(call => call.channel === 'sms')[1].body;
     assert.deepEqual(sms.to, [OWNER_REVIEW_TEST.phone]); assert.equal(sms.from, OWNER_REVIEW_TEST.from);
-    assert.equal(sms.content.split('\n').filter(line => line.trim()).at(-1), 'Reply STOP to opt out');
-    assert.ok(sms.content.endsWith('\n\nReply STOP to opt out'));
+    assert.doesNotMatch(sms.content, /Reply STOP to opt out|Text STOP to unsubscribe/i);
+    assert.doesNotMatch(sms.content, /Reply STOP to opt out|Text STOP to unsubscribe/i);
     assert.doesNotMatch(sms.content, /[\u2013\u2014]|five[- ]star/i);
     assert.equal(f.sqlite.prepare('SELECT template_version FROM review_requests WHERE job_id=?').get(OWNER_REVIEW_RETEST.jobId).template_version,
-      'review-request-initial-cleanup-v4');
+      'review-request-initial-cleanup-v5');
     assert.deepEqual(f.sqlite.prepare('SELECT * FROM review_requests WHERE id=?').get(original.requestId), originalRequest);
     assert.deepEqual(f.sqlite.prepare('SELECT * FROM review_request_deliveries WHERE request_id=? ORDER BY channel').all(original.requestId), originalDeliveries);
     f.authorize();
@@ -376,12 +376,12 @@ test('the Google-link identity is isolated from both completed jobs and uses a n
     const sms = f.calls.filter(call => call.channel === 'sms')[2].body;
     assert.deepEqual(Object.keys(sms).sort(), ['content', 'from', 'to'], 'Quo remains text-only');
     assert.deepEqual(sms.to, [OWNER_REVIEW_GOOGLE_LINK.phone]); assert.equal(sms.from, OWNER_REVIEW_GOOGLE_LINK.from);
-    assert.equal(sms.content.split('\n').filter(line => line.trim()).at(-1), 'Reply STOP to opt out');
+    assert.doesNotMatch(sms.content, /Reply STOP to opt out|Text STOP to unsubscribe/i);
     assert.deepEqual(sms.content.match(/https?:\/\/\S+/g), [REVIEW_URL]);
-    assert.ok(sms.content.endsWith('\n\nReply STOP to opt out'));
+    assert.doesNotMatch(sms.content, /Reply STOP to opt out|Text STOP to unsubscribe/i);
     assert.doesNotMatch(sms.content, /[\u2013\u2014]|five[- ]star|ohiopetwastepros\.com\/review\//i);
     assert.equal(f.sqlite.prepare('SELECT template_version FROM review_requests WHERE job_id=?').get(OWNER_REVIEW_GOOGLE_LINK.jobId).template_version,
-      'review-request-initial-cleanup-v4');
+      'review-request-initial-cleanup-v5');
     assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM airtable_cockpit_snapshots WHERE snapshot_key=?').get(OWNER_REVIEW_GOOGLE_LINK.approvalKey).n, 0);
     for (const row of oldRequests) assert.deepEqual(f.sqlite.prepare('SELECT * FROM review_requests WHERE id=?').get(row.id), row);
     for (const row of oldDeliveries) assert.deepEqual(f.sqlite.prepare('SELECT * FROM review_request_deliveries WHERE id=?').get(row.id), row);
@@ -431,7 +431,7 @@ test('the fourth locked identity can be approved after all three jobs exist and 
     assert.deepEqual(sms.to, [OWNER_REVIEW_INLINE_LINK.phone]); assert.equal(sms.from, OWNER_REVIEW_INLINE_LINK.from);
     assert.deepEqual(sms.content.match(/https?:\/\/\S+/g), [REVIEW_URL]);
     assert.ok(sms.content.includes(`You can leave one here: ${REVIEW_URL} \u{1F603}`));
-    assert.ok(sms.content.endsWith('\n\nReply STOP to opt out'));
+    assert.doesNotMatch(sms.content, /Reply STOP to opt out|Text STOP to unsubscribe/i);
     assert.doesNotMatch(sms.content, /[\u2013\u2014]|five[- ]star/i);
     const emailCalls = f.calls.filter(call => call.channel === 'email');
     assert.equal(emailCalls[3].options.headers['Idempotency-Key'], `manual-owner-review-test/${OWNER_REVIEW_INLINE_LINK.jobId}`);
@@ -440,7 +440,7 @@ test('the fourth locked identity can be approved after all three jobs exist and 
     assert.ok(emailCalls[3].body.html.includes(reviewRequestImageUrl(INLINE_LINK_REQUEST_ID)));
     assert.ok(emailCalls[3].body.html.includes(`href="${REVIEW_URL}"`));
     assert.equal(f.sqlite.prepare('SELECT template_version FROM review_requests WHERE job_id=?').get(OWNER_REVIEW_INLINE_LINK.jobId).template_version,
-      'review-request-initial-cleanup-v4');
+      'review-request-initial-cleanup-v5');
     for (const row of oldRequests) assert.deepEqual(f.sqlite.prepare('SELECT * FROM review_requests WHERE id=?').get(row.id), row);
     for (const row of oldDeliveries) assert.deepEqual(f.sqlite.prepare('SELECT * FROM review_request_deliveries WHERE id=?').get(row.id), row);
     for (const identity of [...oldIdentities, OWNER_REVIEW_INLINE_LINK]) {
@@ -703,7 +703,7 @@ test('verified-unsent completion claims the same locked request once and reuses 
     assert.equal(f.calls.find(call => call.channel === 'sms').body.from, OWNER_REVIEW_TEST.from);
     assert.deepEqual(f.calls.find(call => call.channel === 'sms').body.to, [OWNER_REVIEW_TEST.phone]);
     assert.deepEqual(f.calls.find(call => call.channel === 'email').body.to, [OWNER_REVIEW_TEST.email]);
-    assert.match(f.calls.find(call => call.channel === 'sms').body.content, /You can leave one here: https:\/\/g\.page\/r\/CXzwhf5RzsotEAE\/review \u{1F603}\n\nReply STOP to opt out$/u);
+    assert.match(f.calls.find(call => call.channel === 'sms').body.content, /You can leave one here: https:\/\/g\.page\/r\/CXzwhf5RzsotEAE\/review \u{1F603}$/u);
     assert.match(f.calls.find(call => call.channel === 'email').body.text, /Email: craig@ohiopetwastepros\.com/);
     const request = f.sqlite.prepare('SELECT * FROM review_requests').get();
     const payload = JSON.parse(request.payload);

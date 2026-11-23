@@ -19,7 +19,7 @@ async function fixtureAdminSession(email) {
   if (result.recoveryCodes.length) env.__recoveryCodes[email] = result.recoveryCodes;
   return result.sessionToken;
 }
-import { storeMetaLead, processMetaConfirmations, refreshPendingMetaConfirmations, queueMetaCadence, recordMetaReply, recordQuoDelivery, metaReleaseApproved, markMetaNoResponse } from "../lib/meta-lead-workflow.mjs";
+import { storeMetaLead, processMetaConfirmations as processMetaConfirmationsWithDirectory, refreshPendingMetaConfirmations, queueMetaCadence, recordMetaReply, recordQuoDelivery, metaReleaseApproved, markMetaNoResponse } from "../lib/meta-lead-workflow.mjs";
 import { exactDogs, mapMetaAnswers, metaCadenceQuietHours, metaConsentEvidence, buildMetaConfirmation, formatMetaSms } from "../lib/meta-lead-policy.mjs";
 import { nextMetaResponse, metaWebsiteQuote, META_RESPONSES } from "../lib/meta-conversation.mjs";
 import { auditMetaRoute, routeGuidanceFromSnapshot } from "../lib/meta-route-guidance.mjs";
@@ -58,6 +58,7 @@ function approve(db) {
     INSERT INTO meta_automation_releases VALUES ('test-cadence','org-opwp','meta-nurture-1-3-7-v1','test-owner','simulated tests only',datetime('now','-1 minute'),NULL);`);
 }
 const noon = new Date("2026-09-17T16:00:00Z");
+const processMetaConfirmations = (env, options = {}) => processMetaConfirmationsWithDirectory(env, {loadCustomerDirectory: async () => ({ok: true, complete: true, rows: []}), ...options});
 const select = (db, table) => db.sqlite.prepare(`SELECT * FROM ${table}`).all();
 
 test("Meta mapping preserves ambiguity, conflicts and separate consent", () => {
@@ -68,7 +69,7 @@ test("Meta mapping preserves ambiguity, conflicts and separate consent", () => {
   assert.equal(mapMetaAnswers({ dog_count: "2", number_of_dogs: "3" }).number_of_dogs, null);
   assert.equal(metaConsentEvidence({ meta_form_id: "f", original_fields: { contact_preference: "text" } }, { f: { consentField: "contact_preference" } }).valid, false);
   const message = buildMetaConfirmation({ name: "ExampleLead", number_of_dogs: null, zip: "", clean_up_frequency: "" });
-  assert.match(message, /How many dogs exactly/); assert.doesNotMatch(message, /I have 0|I have 4|undefined/); assert.match(message, /Reply STOP/);
+  assert.match(message, /how many dogs total/); assert.doesNotMatch(message, /I have 0|I have 4|undefined/); assert.match(message, /\n\nReply STOP to opt out$/);
 });
 
 test("storage is transactional and retries resolve to one lead, one Airtable record key and one confirmation", async () => {
@@ -131,7 +132,7 @@ test("pending confirmation copy refresh never sends, releases, or rewrites attem
     assert.equal(job.sent_at, prior.sent_at);
     assert.equal(job.provider_message_id, prior.provider_message_id);
     if (["queued", "blocked"].includes(job.status) && !job.attempted_at) {
-      assert.match(job.message_body, /^Hi ExampleLead, this is Craig with Ohio Pet Waste Pros\. Thanks for filling out our Facebook form\./);
+      assert.match(job.message_body, /^Hi ExampleLead, this is Craig with Ohio Pet Waste Pros\. Just to make sure I have it right,/);
       assert.match(job.message_body, /\n\nReply STOP to opt out$/);
       assert.doesNotMatch(job.message_body, /automated confirmation|[\u2013\u2014]/);
     } else assert.equal(job.message_body, prior.message_body);
@@ -176,7 +177,7 @@ test("complete first confirmations send overnight in winter and summer regardles
       content.push(JSON.parse(request.body).content); return Response.json({ data: { id: "overnight-first" } });
     } });
     assert.equal(result.sent, 1, timestamp); assert.deepEqual(content, [queued.message_body]);
-    assert.match(content[0], /I have you down for 2 dogs in ZIP 43615 with weekly service\. Did I get that right\?\n\nReply STOP to opt out$/);
+    assert.match(content[0], /Just to make sure I have it right, you have 2 dogs in ZIP 43615 and are looking for weekly service\. Did I get that right\?\n\nReply STOP to opt out$/);
     assert.equal(select(db, "lead_messages")[0].body, queued.message_body);
     assert.equal(select(db, "meta_sms_jobs").filter((job) => job.purpose === "follow_up").length, 0);
   }
@@ -213,7 +214,7 @@ async function queueInboundReply(db, saved, text, trigger = "night-inbound") {
   await recordMetaReply(db, saved.id, { providerMessageId: trigger, text, from: "+14195550100" });
 }
 
-test("identity, assistant, handoff, correction and pricing replies send at night with the exact standalone STOP footer", async () => {
+test("identity, assistant, handoff, correction and pricing replies send at night without an opt-out footer", async () => {
   for (const [text, response] of [
     ["are you a real person?", META_RESPONSES.human_help],
     ["yes", META_RESPONSES.yard],
@@ -229,8 +230,8 @@ test("identity, assistant, handoff, correction and pricing replies send at night
     await queueInboundReply(db, saved, text);
     const queued = select(db, "meta_sms_jobs").find((job) => job.purpose === "reply");
     assert.ok(queued, text); assert.ok(queued.message_body.includes(response), text);
-    assert.match(queued.message_body, /\n\nReply STOP to opt out$/);
-    assert.equal((queued.message_body.match(/Reply STOP/g) || []).length, 1);
+    assert.doesNotMatch(queued.message_body, /Reply STOP to opt out|Text STOP to unsubscribe/i);
+    assert.equal((queued.message_body.match(/Reply STOP/g) || []).length, 0);
     assert.doesNotMatch(queued.message_body, /[\u2013\u2014]/);
     const sent = [];
     const result = await processMetaConfirmations(env, { now: new Date("2026-11-19T06:00:00Z"), fetcher: async (_url, request) => {
@@ -255,7 +256,7 @@ test("deferred cadence jobs cannot consume the night batch ahead of a customer r
     sent.push(JSON.parse(request.body).content); return Response.json({ data: { id: "night-priority" } });
   } });
   assert.equal(result.sent, 1);
-  assert.deepEqual(sent, [`${META_RESPONSES.human_help}\n\nReply STOP to opt out`]);
+  assert.deepEqual(sent, [`${META_RESPONSES.human_help}`]);
   assert.equal(select(db, "meta_sms_jobs").filter((job) => job.purpose === "follow_up" && job.status === "queued").length, 3);
 });
 
@@ -270,7 +271,7 @@ test("disabled cadence neither queues new touches nor sends existing queued touc
   await processMetaConfirmations(disabled, { now: noon, fetcher: async (_url, request) => {
     content.push(JSON.parse(request.body).content); return Response.json({ data: { id: "second-initial" } });
   } });
-  assert.equal(content.length, 1); assert.match(content[0], /Thanks for filling out our Facebook form/);
+  assert.equal(content.length, 1); assert.match(content[0], /Just to make sure I have it right,/);
   assert.equal(select(db, "meta_sms_jobs").filter((job) => job.submission_id === second.id && job.purpose === "follow_up").length, 0);
   assert.equal(select(db, "meta_sms_jobs").filter((job) => job.purpose === "follow_up" && job.status === "queued").length, 3);
   assert.equal((await markMetaNoResponse(disabled)).marked, 0);
@@ -283,7 +284,7 @@ test("Meta static answers normalize dashes and an existing inline STOP footer be
   db.sqlite.prepare(`INSERT INTO lead_answer_library (answer_key,organization_id,category,question,answer_template,keywords,approval_status,auto_send_allowed,response_mode,updated_by)
     VALUES ('static-night','org-opwp','access','Gate question',?,?,'approved',1,'static','test-owner')`).run("Gate access\u2014please unlock it\u2013thank you. Reply STOP to opt out.", JSON.stringify(["sandboxzxpolicy"]));
   await queueInboundReply(db, saved, "What about sandboxzxpolicy?");
-  const expected = "Gate access-please unlock it-thank you.\n\nReply STOP to opt out";
+  const expected = "Gate access-please unlock it-thank you.";
   assert.equal(select(db, "meta_sms_jobs").find((job) => job.purpose === "reply").message_body, expected);
   const result = await processMetaConfirmations(env, { now: new Date("2026-11-19T06:00:00Z"), fetcher: async (_url, request) => {
     assert.equal(JSON.parse(request.body).content, expected); return Response.json({ data: { id: "static-night" } });
@@ -291,11 +292,11 @@ test("Meta static answers normalize dashes and an existing inline STOP footer be
   assert.equal(result.sent, 1);
   assert.equal(select(db, "lead_messages").find((row) => row.provider_message_id === "static-night").body, expected);
   const bounded = formatMetaSms(`${"x".repeat(1100)} Reply STOP to opt out.`);
-  assert.equal(bounded.length, 1000); assert.match(bounded, /\n\nReply STOP to opt out$/);
+  assert.equal(bounded.length, 1000); assert.doesNotMatch(bounded, /Reply STOP to opt out|Text STOP to unsubscribe/i);
   assert.equal(formatMetaSms(expected), expected);
 });
 
-test("a route-audited signup invitation sends at night with the standalone STOP footer", async () => {
+test("a route-audited signup invitation sends at night without an opt-out footer", async () => {
   const db = database(); approve(db); const env = { ...environment(db), META_CADENCE_APPROVAL_ID: "" };
   const saved = await storeMetaLead(db, env, form(), event());
   await processMetaConfirmations(env, { now: noon, fetcher: async () => Response.json({ data: { id: "initial" } }) });
@@ -304,7 +305,7 @@ test("a route-audited signup invitation sends at night with the standalone STOP 
   db.sqlite.prepare("UPDATE meta_lead_intakes SET response_state=? WHERE submission_id=?").run(JSON.stringify({ details: { zip: "43615", clean_up_frequency: "Weekly", address: "123 Maple Street, Toledo" }, ready_for_route_audit: true }), saved.id);
   const lead = { id: saved.id, source: "facebook", conversation_id: select(db, "lead_conversations")[0].id, payload: select(db, "submissions")[0].payload };
   await auditMetaRoute(db, lead, { days: ["Tuesday"], snapshotAt }, "test-owner");
-  const expected = "Craig has reviewed Tuesday as your service day. You can complete signup at https://www.ohiopetwastepros.com/free-quote/ . Your start date is confirmed during setup.\n\nReply STOP to opt out";
+  const expected = "Craig has reviewed Tuesday as your service day. You can complete signup at https://www.ohiopetwastepros.com/free-quote/ . Your start date is confirmed during setup.";
   assert.equal(select(db, "meta_sms_jobs").find((job) => job.purpose === "signup").message_body, expected);
   const result = await processMetaConfirmations(env, { now: new Date("2026-11-19T06:00:00Z"), fetcher: async (_url, request) => {
     assert.equal(JSON.parse(request.body).content, expected); return Response.json({ data: { id: "night-signup" } });
@@ -328,7 +329,7 @@ test("release and consent gates stay closed while incomplete confirmations can s
   await storeMetaLead(db, env, form("lead-1", { number_of_dogs: "4 or more", zip_code: "", service_frequency: "" }), event());
   let calls = 0;
   await processMetaConfirmations(env, { now: new Date("2026-09-17T05:00:00Z"), fetcher: async () => { calls++; return Response.json({ data: { id: "night-confirmation" } }); } });
-  assert.equal(calls, 1); assert.match(select(db, "meta_sms_jobs")[0].message_body, /How many dogs exactly/);
+  assert.equal(calls, 1); assert.match(select(db, "meta_sms_jobs")[0].message_body, /how many dogs total/);
   db.sqlite.exec("UPDATE meta_automation_releases SET revoked_at=CURRENT_TIMESTAMP");
   assert.equal(await metaReleaseApproved(db, env), false);
   assert.equal(metaCadenceQuietHours(new Date(NaN)), true);
@@ -385,8 +386,8 @@ test("Meta personal-text requests queue one owner email and pause the thread wit
   try {
     await recordMetaReply(db, saved.id, { providerMessageId: "identity-question", text: "are you a real person?", from: "+14195550100" }, { env });
     const disclosure = select(db, "meta_sms_jobs").find((job) => job.purpose === "reply");
-    assert.equal(disclosure.message_body, "Good question! These first texts are automated to help me get your info quickly, but I'm a real person and I read every conversation. Want me to text you personally?\n\nReply STOP to opt out");
-    assert.equal((disclosure.message_body.match(/Reply STOP/g) || []).length, 1);
+    assert.equal(disclosure.message_body, "These texts use AI with my approved replies. If you'd prefer a personal reply, I'll pause the automated messages and follow up myself.");
+    assert.equal((disclosure.message_body.match(/Reply STOP/g) || []).length, 0);
     assert.equal(select(db, "submission_notifications").length, 0);
     const yes = { providerMessageId: "identity-yes", text: "yes please", from: "+14195550100" };
     // Even a reply overlapping the pending disclosure must honor the human request.
@@ -471,7 +472,7 @@ test("reply branches and exact website pricing progress to audited signup withou
   }
   const correction = nextMetaResponse({ lead, text: "actually 3 dogs", confirmationSent: true });
   assert.equal(correction.state.details.number_of_dogs, 3); assert.equal(correction.state.expected, "confirm");
-  assert.equal(correction.response, "Hi ExampleLead, this is Craig with Ohio Pet Waste Pros. Thanks for clarifying. I have you down for 3 dogs in ZIP 43615 with weekly service. Did I get that right?\n\nReply STOP to opt out");
+  assert.equal(correction.response, "Thanks for clarifying. Just to make sure I have it right, you have 3 dogs in ZIP 43615 and are looking for weekly service. Did I get that right?");
   assert.doesNotMatch(correction.response, /automated confirmation|[\u2013\u2014]/i);
 });
 
@@ -525,12 +526,12 @@ test("signed Meta → YardOps → Airtable → Quo → reply integration, retrie
     assert.equal((await api.quoPost(signedQuo("yes"))).status, 200);
     assert.equal((await api.quoPost(signedQuo("yes"))).status, 200);
     await processMetaConfirmations(env, { now: noon });
-    assert.equal(sends.length, 2); assert.match(sends[1].content, /How large/);
+    assert.equal(sends.length, 2); assert.match(sends[1].content, /About how big/);
     assert.equal(select(db, "meta_reply_decisions").length, 1);
     assert.equal(select(db, "meta_sms_jobs").filter((job) => job.purpose === "follow_up" && job.status === "queued").length, 0);
     const snapshotAt = new Date().toISOString();
     db.sqlite.prepare(`INSERT INTO airtable_cockpit_snapshots(snapshot_key,payload,status,captured_at) VALUES ('business_cockpit',?,'success',?)`).run(JSON.stringify({ opwp: { customers: [{ fields: { Status: "Active", ZIP: "43615", "Service Day": "Tuesday" } }] } }), snapshotAt);
-    for (const [text, id, pattern] of [["A", "yard", /last thoroughly cleared/], ["about 1 month", "cleaned", /\$105\.00 per month/], ["yes", "accept", /street address/], ["123 Maple Street, Toledo", "address", /audit the current route/]]) {
+    for (const [text, id, pattern] of [["A", "yard", /last thoroughly cleaned up/], ["about 1 month", "cleaned", /\$105\.00 per month/], ["yes", "accept", /address for the service/], ["123 Maple Street, Toledo", "address", /check the route and confirm/]]) {
       assert.equal((await api.quoPost(signedQuo(text, id))).status, 200);
       await processMetaConfirmations(env, { now: noon });
       assert.match(sends.at(-1).content, pattern);

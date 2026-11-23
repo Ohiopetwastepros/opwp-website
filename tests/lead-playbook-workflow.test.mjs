@@ -19,6 +19,7 @@ const adminBundle = await build({stdin: {contents: "export * from './lib/lead-pl
 const admin = await import('data:text/javascript;base64,' + Buffer.from(adminBundle.outputFiles[0].text).toString('base64'));
 const noon = new Date('2026-11-19T17:00:00Z');
 const env = {LEAD_PLAYBOOK_ENABLED: 'true', LEAD_PLAYBOOK_LINK_SECRET: 'fabricated-test-secret-not-production-123456', LEAD_PLAYBOOK_CRAIG_CELL: '+14195550199'};
+const emptyCustomerDirectory = async () => ({ok: true, complete: true, rows: []});
 async function fixture() {
   const db = leadTestDatabase(), id = crypto.randomUUID(), conversationId = crypto.randomUUID(), inboundId = crypto.randomUUID();
   db.sqlite.prepare("INSERT INTO submissions(id,kind,source,name,email,phone,payload) VALUES (?,'partial_quote','website','Casey Example','casey@example.test','4195550100','{}')").run(id);
@@ -53,12 +54,25 @@ test('review capabilities bind body and draft, expire in 30 minutes and consume 
 });
 test('explicit review sends once using fake sender and updates state and unedited approval statistics', async () => {
   const {db, draft, conversationId} = await fixture(); let sends = 0;
-  const sender = async (_db, _env, _lead, body) => { sends++; assert.ok(body.endsWith('\n\nReply STOP to opt out')); return {provider_message_id: 'ACfakeapproved'}; };
+  const sender = async (_db, _env, _lead, body) => { sends++; assert.doesNotMatch(body, /Reply STOP to opt out|Text STOP to unsubscribe/i); return {provider_message_id: 'ACfakeapproved'}; };
   const result = await api.actOnPlaybookDraft(db, env, draft.id, {action: 'approve'}, 'owner', {sender, now: noon});
   assert.equal(result.status, 'sent'); assert.equal(sends, 1);
   assert.equal(db.sqlite.prepare('SELECT stage FROM lead_playbook_state WHERE conversation_id=?').get(conversationId).stage, 'confirm_details_sent');
   assert.equal(db.sqlite.prepare("SELECT approvals FROM lead_playbook_intent_stats WHERE intent='confirm_yes'").get().approvals, 1);
   await assert.rejects(() => api.actOnPlaybookDraft(db, env, draft.id, {action: 'approve'}, 'owner', {sender, now: noon})); assert.equal(sends, 1);
+});
+
+test('reviewed SMS may use the full 1000-character body without reserving footer space', async () => {
+  const {db, draft} = await fixture();
+  const body = draft.body + ' ' + 'x'.repeat(999 - draft.body.length);
+  let sent;
+  const result = await api.actOnPlaybookDraft(db, env, draft.id, {action: 'edit_send', body}, 'owner', {
+    sender: async (_db, _env, _lead, value) => {sent = value;return {provider_message_id: 'ACfullbody'};}, now: noon,
+  });
+  assert.equal(result.status, 'sent');
+  assert.equal(sent, body);
+  assert.equal(sent.length, 1000);
+  assert.doesNotMatch(sent, /Reply STOP to opt out|Text STOP to unsubscribe/);
 });
 test('concurrent approval claims cannot duplicate a provider call', async () => {
   const {db, draft} = await fixture(); let sends = 0;
@@ -124,7 +138,7 @@ test('Sona, Craig ownership, suppressions and paused settings block sending', as
 test('edited approval records only redacted learning candidates and counts edits', async () => {
   const {db, draft} = await fixture();
   const canonical = draft.body.replace(/\s*Reply STOP to opt out\s*$/, '').trim();
-  await api.actOnPlaybookDraft(db, env, draft.id, {action: 'edit_send', body: 'Hi Casey Example! ' + canonical + ' Your email is casey@example.test.'}, 'owner', {sender: async () => ({provider_message_id: 'ACedited'}), now: noon});
+  await api.actOnPlaybookDraft(db, env, draft.id, {action: 'edit_send', body: 'Hi Casey Example, ' + canonical + ' Your email is casey@example.test.'}, 'owner', {sender: async () => ({provider_message_id: 'ACedited'}), now: noon});
   const row = db.sqlite.prepare("SELECT * FROM playbook_candidates WHERE source='approved_edit'").get();
   assert.ok(row); assert.doesNotMatch(row.answer_redacted, /Casey Example|casey@example.test|4195550100/);
   assert.equal(db.sqlite.prepare("SELECT edits FROM lead_playbook_intent_stats WHERE intent='confirm_yes'").get().edits, 1);
@@ -139,7 +153,7 @@ test('candidate review promotes to approved library with automatic sending off a
   db.sqlite.prepare("INSERT INTO playbook_candidates(id,kind,intent,question_redacted,proposed_template) VALUES (?,'qa','question_contract','Is there a contract?','It is month to month, cancel anytime.')").run(id);
   const result = await api.reviewPlaybookCandidate(db, env, id, {action: 'approve'}, 'owner');
   const row = db.sqlite.prepare('SELECT * FROM lead_answer_library WHERE answer_key=?').get(result.answerKey);
-  assert.equal(row.approval_status, 'approved'); assert.equal(row.auto_send_allowed, 0); assert.ok(row.answer_template.endsWith('\n\nReply STOP to opt out'));
+  assert.equal(row.approval_status, 'approved'); assert.equal(row.auto_send_allowed, 0); assert.doesNotMatch(row.answer_template, /Reply STOP to opt out|Text STOP to unsubscribe/i);
   const bad = crypto.randomUUID(); db.sqlite.prepare("INSERT INTO playbook_candidates(id,kind,intent,question_redacted,proposed_template) VALUES (?,'qa','question_contract','Question','$15 upfront')").run(bad);
   await assert.rejects(() => api.reviewPlaybookCandidate(db, env, bad, {action: 'approve'}, 'owner'), /policy violations/);
 });
@@ -186,6 +200,7 @@ test('body-hash binding and twelve-hour expiry reject stale reviews without send
 });
 test('notification transport is separately gated and deduplicated using a fake provider', async () => {
   const {db, draft} = await fixture(); let calls = 0;
+  db.sqlite.prepare("UPDATE lead_reply_drafts SET reason='custom_pricing' WHERE id=?").run(draft.id);
   const fetcher = async (_url, request) => { calls++; const payload = JSON.parse(request.body); assert.equal(payload.to[0], '+14195550199'); assert.ok(payload.content.includes('/admin/playbook/d/')); return Response.json({data: {id: 'ACnotify'}}); };
   assert.equal((await api.notifyPlaybookDraft(db, env, draft.id, {fetcher, now: noon})).enabled, false);
   const configured = {...env, LEAD_PLAYBOOK_NOTIFY_ENABLED: 'true', QUO_API_KEY: 'fake', QUO_FROM_NUMBER: '+14195550188'};
@@ -204,7 +219,7 @@ test('verified approved templates automatically send once overnight without coun
   db.sqlite.prepare("UPDATE lead_conversations SET automation_mode='approved' WHERE id=?").run(conversationId);
   db.sqlite.exec("UPDATE lead_automation_settings SET human_review_required=0");
   const configured={...env,LEAD_PLAYBOOK_AUTO_SEND_ENABLED:'true'};
-  const options={now:new Date('2026-11-20T02:00:00Z'),sender:async(_db,_env,_lead,_body,actor,automated)=>{sends++;assert.equal(automated,true);assert.match(actor,/playbook-automatic/);return {provider_message_id:'automatic-template'};}};
+  const options={now:new Date('2026-11-20T02:00:00Z'),loadCustomerDirectory:emptyCustomerDirectory,sender:async(_db,_env,_lead,_body,actor,automated)=>{sends++;assert.equal(automated,true);assert.match(actor,/playbook-automatic/);return {provider_message_id:'automatic-template'};}};
   assert.equal((await api.sendVerifiedPlaybookDraft(db,configured,draft.id,options)).status,'sent');
   assert.equal((await api.sendVerifiedPlaybookDraft(db,configured,draft.id,options)).status,'sent');
   assert.equal(sends,1);assert.equal(db.sqlite.prepare("SELECT approvals FROM lead_playbook_intent_stats WHERE intent='confirm_yes'").get().approvals,0);
@@ -217,7 +232,7 @@ test('uncertain automatic sends never retry and nonapproved replies stay pending
   db.sqlite.prepare('UPDATE lead_reply_drafts SET confidence=0 WHERE id=?').run(draft.id);
   assert.equal((await api.sendVerifiedPlaybookDraft(db,configured,draft.id,{sender:async()=>{sends++;}})).status,'pending');
   db.sqlite.prepare('UPDATE lead_reply_drafts SET confidence=1 WHERE id=?').run(draft.id);
-  const options={sender:async()=>{sends++;throw new Error('Fabricated provider response loss');}};
+  const options={loadCustomerDirectory:emptyCustomerDirectory,sender:async()=>{sends++;throw new Error('Fabricated provider response loss');}};
   assert.equal((await api.sendVerifiedPlaybookDraft(db,configured,draft.id,options)).status,'failed');
   assert.equal((await api.sendVerifiedPlaybookDraft(db,configured,draft.id,options)).status,'failed');assert.equal(sends,1);
 });
@@ -225,8 +240,59 @@ test('automatic send rechecks ownership after its durable claim',async()=>{
   const {db,draft,conversationId}=await fixture();let sends=0;
   db.sqlite.prepare("UPDATE lead_conversations SET automation_mode='approved' WHERE id=?").run(conversationId);db.sqlite.exec("UPDATE lead_automation_settings SET human_review_required=0");
   const batch=db.batch;db.batch=async statements=>{const result=await batch(statements);if(db.sqlite.prepare('SELECT status FROM lead_reply_drafts WHERE id=?').get(draft.id).status==='sending')db.sqlite.prepare("UPDATE lead_conversations SET owner='sona' WHERE id=?").run(conversationId);return result;};
-  const result=await api.sendVerifiedPlaybookDraft(db,{...env,LEAD_PLAYBOOK_AUTO_SEND_ENABLED:'true'},draft.id,{sender:async()=>{sends++;}});
+  const result=await api.sendVerifiedPlaybookDraft(db,{...env,LEAD_PLAYBOOK_AUTO_SEND_ENABLED:'true'},draft.id,{loadCustomerDirectory:emptyCustomerDirectory,sender:async()=>{sends++;}});
   assert.equal(result.status,'failed');assert.equal(sends,0);
+});
+
+test('persisted pending drafts cannot auto-enroll an existing customer', async () => {
+  for (const matchedPath of ['/api/v1/clients/active', '/api/v1/clients/active_no_subscription', 'unverified']) {
+    const {db, draft, conversationId} = await fixture();
+    db.sqlite.prepare("UPDATE lead_conversations SET automation_mode='approved' WHERE id=?").run(conversationId);
+    db.sqlite.exec('UPDATE lead_automation_settings SET human_review_required=0');
+    let sends = 0;
+    const result = await api.sendVerifiedPlaybookDraft(db, {...env, LEAD_PLAYBOOK_AUTO_SEND_ENABLED: 'true'}, draft.id, {
+      loadCustomerDirectory: async path => matchedPath === 'unverified' ? {ok: false, complete: false, rows: []} : {ok: true, complete: true, rows: path === matchedPath ? [{cell_phone_number: '+14195550100'}] : []},
+      sender: async () => {sends++; return {provider_message_id: 'must-not-send'};},
+    });
+    assert.equal(result.status, 'pending');
+    assert.equal(result.needsReview, true);
+    assert.equal(sends, 0);
+    const stored = db.sqlite.prepare('SELECT status,send_claim,approved_at FROM lead_reply_drafts WHERE id=?').get(draft.id);
+    assert.equal(stored.status, 'pending');
+    assert.equal(stored.send_claim, null);
+    assert.equal(stored.approved_at, null);
+  }
+});
+
+test('ownership handback does not reactivate a superseded customer draft', async () => {
+  const {db, draft, conversationId} = await fixture();
+  db.sqlite.prepare("UPDATE lead_conversations SET owner='craig',automation_mode='approved' WHERE id=?").run(conversationId);
+  db.sqlite.exec('UPDATE lead_automation_settings SET human_review_required=0');
+  await api.setPlaybookOwner(db, env, conversationId, 'backend');
+  let sends = 0;
+  const result = await api.sendVerifiedPlaybookDraft(db, {...env, LEAD_PLAYBOOK_AUTO_SEND_ENABLED: 'true'}, draft.id, {
+    loadCustomerDirectory: async () => ({ok: true, complete: true, rows: [{cell_phone_number: '+14195550100'}]}),
+    sender: async () => {sends++; return {provider_message_id: 'must-not-send'};},
+  });
+  assert.equal(result.status, 'superseded');
+  assert.equal(sends, 0);
+  assert.equal(db.sqlite.prepare('SELECT send_claim FROM lead_reply_drafts WHERE id=?').get(draft.id).send_claim, null);
+});
+
+test('automatic drafts recheck customer membership after claiming and before a provider call', async () => {
+  const {db, draft, conversationId} = await fixture();
+  db.sqlite.prepare("UPDATE lead_conversations SET automation_mode='approved' WHERE id=?").run(conversationId);
+  db.sqlite.exec('UPDATE lead_automation_settings SET human_review_required=0');
+  let reads = 0, sends = 0;
+  const result = await api.sendVerifiedPlaybookDraft(db, {...env, LEAD_PLAYBOOK_AUTO_SEND_ENABLED: 'true'}, draft.id, {
+    loadCustomerDirectory: async () => ({ok: true, complete: true, rows: ++reads > 2 ? [{phone_number: '+14195550100'}] : []}),
+    sender: async () => {sends++; return {provider_message_id: 'must-not-send'};},
+  });
+  assert.equal(result.status, 'failed');
+  assert.equal(result.needsReview, true);
+  assert.equal(reads, 4);
+  assert.equal(sends, 0);
+  assert.equal(db.sqlite.prepare('SELECT rejection_reason FROM lead_reply_drafts WHERE id=?').get(draft.id).rejection_reason, 'policy_changed_before_send');
 });
 test('controlled rollout blocks draft creation and queue delegation for an unapproved customer',async()=>{
   const {db,draft,conversationId,id,inboundId,decision}=await fixture();db.sqlite.prepare('DELETE FROM lead_reply_drafts WHERE id=?').run(draft.id);

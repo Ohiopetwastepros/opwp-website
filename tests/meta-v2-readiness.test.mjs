@@ -3,13 +3,15 @@ import assert from 'node:assert/strict';
 import { leadTestDatabase } from './helpers/lead-inbox-fixture.mjs';
 import { normalizeMetaLead } from '../lib/meta-leads.mjs';
 import { mapMetaAnswers } from '../lib/meta-lead-policy.mjs';
-import { storeMetaLead, processMetaConfirmations, queueMetaCadence } from '../lib/meta-lead-workflow.mjs';
+import { storeMetaLead, processMetaConfirmations as processMetaConfirmationsWithDirectory, queueMetaCadence } from '../lib/meta-lead-workflow.mjs';
 import { controlledLeadRecipientAllowed, controlledLeadTestRecipient } from '../lib/lead-rollout-policy.mjs';
 import { formatCustomerSms } from '../lib/customer-sms.mjs';
 
 const approvedPhone = '+14195550100';
 const otherPhone = '+14195550102';
 const overnight = new Date('2026-11-21T06:00:00Z');
+const emptyCustomerDirectory = async () => ({ok: true, complete: true, rows: []});
+const processMetaConfirmations = (env, options = {}) => processMetaConfirmationsWithDirectory(env, {loadCustomerDirectory: emptyCustomerDirectory, ...options});
 function fixture() {
   const db = leadTestDatabase();
   db.sqlite.exec(`INSERT INTO meta_automation_releases VALUES ('fixture-live','org-opwp','meta-confirmation-v2','fixture-owner','fixture-only approval',datetime('now','-1 minute'),NULL);
@@ -47,10 +49,10 @@ test('controlled rollout accepts exactly one configured recipient and fails clos
   assert.equal(controlledLeadRecipientAllowed({ LEAD_AUTOMATION_CONTROLLED_TEST_ONLY: 'true', META_TEST_RECIPIENTS: approvedPhone }, '(419) 555-0100'), true);
 });
 
-test('SMS punctuation is ASCII and STOP appears once after exactly one blank line', () => {
+test('SMS punctuation is ASCII and legacy opt-out footers are removed', () => {
   const body = formatCustomerSms('It\u2019s \u201cCraig\u201d \u2014 a quote\u2026 Reply STOP to opt out.');
-  assert.equal(body, 'It\'s "Craig" - a quote...\n\nReply STOP to opt out');
-  assert.equal((body.match(/Reply STOP to opt out/g) || []).length, 1);
+  assert.equal(body, 'It\'s "Craig" - a quote...');
+  assert.equal((body.match(/Reply STOP to opt out/g) || []).length, 0);
 });
 
 test('Meta v2 confirms instantly overnight with playbook on, records backend authorship and seeds the conversation', async () => {
@@ -64,7 +66,7 @@ test('Meta v2 confirms instantly overnight with playbook on, records backend aut
   assert.equal(calls.length, 1);
   assert.equal(calls[0].from, '+14192622371');
   assert.deepEqual(calls[0].to, [approvedPhone]);
-  assert.match(calls[0].content, /I have you down for 2 dogs.*Did I get that right\?\n\nReply STOP to opt out$/);
+  assert.match(calls[0].content, /Just to make sure I have it right, you have 2 dogs.*Did I get that right\?\n\nReply STOP to opt out$/);
   const state = db.sqlite.prepare('SELECT * FROM lead_playbook_state WHERE submission_id=?').get(saved.id);
   assert.equal(state.stage, 'confirm_details_sent');
   assert.equal(JSON.parse(state.state_json).meta_confirmation_sent, true);
@@ -85,6 +87,44 @@ test('controlled Meta selection does not consume or cancel another recipient ahe
   assert.equal(result.sent, 1); assert.equal(calls, 1);
   const held = db.sqlite.prepare('SELECT status,attempted_at FROM meta_sms_jobs WHERE submission_id=?').get(other.id);
   assert.equal(held.status, 'queued'); assert.equal(held.attempted_at, null);
+});
+
+test('ordinary existing customers never receive an automatic initial lead confirmation', async () => {
+  for (const matchedPath of ['/api/v1/clients/active', '/api/v1/clients/active_no_subscription', 'unverified']) {
+    const {db, env} = fixture();
+    const saved = await lead(db, env);
+    let sends = 0;
+    const result = await processMetaConfirmations(env, {now: overnight,
+      loadCustomerDirectory: async path => matchedPath === 'unverified' ? {ok: false, complete: false, rows: []} : {ok: true, complete: true, rows: path === matchedPath ? [{cell_phone_number: approvedPhone}] : []},
+      fetcher: async () => {sends++; throw new Error('Existing customers must stay held');},
+    });
+    assert.equal(result.sent, 0);
+    assert.equal(sends, 0);
+    const held = db.sqlite.prepare('SELECT status,block_reason,attempted_at,provider_message_id FROM meta_sms_jobs WHERE submission_id=?').get(saved.id);
+    assert.equal(held.status, 'blocked');
+    assert.equal(held.block_reason, matchedPath === 'unverified' ? 'customer_directory_unverified' : 'existing_customer');
+    assert.equal(held.attempted_at, null);
+    assert.equal(held.provider_message_id, null);
+    assert.equal(db.sqlite.prepare('SELECT count(*) n FROM lead_messages').get().n, 0);
+    assert.equal(db.sqlite.prepare('SELECT count(*) n FROM lead_playbook_state').get().n, 0);
+  }
+});
+
+test('initial confirmation rechecks customer membership after claiming without contacting Quo', async () => {
+  const {db, env} = fixture();
+  const saved = await lead(db, env);
+  let reads = 0, sends = 0;
+  const result = await processMetaConfirmations(env, {now: overnight,
+    loadCustomerDirectory: async () => ({ok: true, complete: true, rows: ++reads > 2 ? [{cell_phone_number: approvedPhone}] : []}),
+    fetcher: async () => {sends++; throw new Error('Customer status changed before send');},
+  });
+  assert.equal(result.sent, 0);
+  assert.equal(reads, 4);
+  assert.equal(sends, 0);
+  const held = db.sqlite.prepare('SELECT status,block_reason,attempted_at FROM meta_sms_jobs WHERE submission_id=?').get(saved.id);
+  assert.equal(held.status, 'blocked');
+  assert.equal(held.block_reason, 'existing_customer');
+  assert.equal(held.attempted_at, null);
 });
 
 test('an existing unadvanced intro can accept confirmation with the exact prior-state transition guard', async () => {

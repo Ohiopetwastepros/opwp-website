@@ -13,9 +13,9 @@ import { REVIEW_REQUEST_TEMPLATES, renderReviewRequestTemplate, reviewRequestTem
 
 test("review SMS preserves the approved wording and uses only the customer's first name", () => {
   assert.equal(buildReviewRequestSms({ firstName: "Alex Example", tech: "Tony B" }),
-    "Hey Alex, thanks for choosing Ohio Pet Waste Pros for your cleanup! Here's who took care of your yard today. If you have a minute, an honest Google review would mean a lot. You can leave one here: https://g.page/r/CXzwhf5RzsotEAE/review\n\nThank you!\n\nReply STOP to opt out");
-  assert.equal(REVIEW_REQUEST_TEMPLATE_VERSION, "review-request-v4");
-  assert.equal(reviewRequestTemplateVersion("initial-cleanup"), "review-request-initial-cleanup-v4");
+    "Hey Alex, thanks for choosing Ohio Pet Waste Pros for your cleanup! Here's who took care of your yard today. If you have a minute, an honest Google review would mean a lot. You can leave one here: https://g.page/r/CXzwhf5RzsotEAE/review\n\nThank you!");
+  assert.equal(REVIEW_REQUEST_TEMPLATE_VERSION, "review-request-v5");
+  assert.equal(reviewRequestTemplateVersion("initial-cleanup"), "review-request-initial-cleanup-v5");
   const sms = buildReviewRequestSms({ firstName: "Jo\u2019Anne Example", tech: "Craig Bridgman" });
   assert.match(sms, /^Hey Jo'Anne,/);
   assert.equal(/[^\x20-\x7e\n]/.test(sms), false);
@@ -27,7 +27,7 @@ test("Sweep & Go technician variations map to public page slugs without guessed 
   for (const [input, slug] of [["Tony B", "tony"], ["Tony", "tony"], ["TONY B.", "tony"], ["Chad", "craig"], ["Chad B", "craig"], ["Craig Bridgman", "craig"], ["craig", "craig"], ["", "craig"], ["Unknown Tech", "craig"], ["Chadwick", "craig"], ["team", "craig"]]) {
     assert.equal(reviewTechSlug(input), slug, input);
     assert.equal(reviewPageUrl(input), `${REVIEW_SITE_ORIGIN}/review/${slug}/`);
-    assert.equal(buildReviewRequestSms({ firstName: "Alex", tech: input }).split("\n").at(-1), "Reply STOP to opt out");
+    assert.doesNotMatch(buildReviewRequestSms({ firstName: "Alex", tech: input }), /Reply STOP to opt out|Text STOP to unsubscribe/i);
   }
 });
 
@@ -97,23 +97,22 @@ test("backup email has the tech image, honest-review wording, Google button, own
   assert.throws(() => buildReviewRequestEmail({ unsubscribeUrl: "https://attacker.example/unsubscribe" }), /secure OPWP/);
 });
 
-test("initial-cleanup SMS uses the exact approved inline Google URL, smile and final STOP line", () => {
+test("initial-cleanup SMS uses the exact approved inline Google URL, smile and no opt-out footer", () => {
   const previewToken = createReviewPreviewToken();
   const sms = buildReviewRequestSms({ template: "initial-cleanup", firstName: "Craig Bridgman", tech: "Tony B", previewToken });
-  assert.equal(sms, "Hi Craig, this is Craig with Ohio Pet Waste Pros. Thanks for letting Tony take care of your yard! If you were happy with the cleanup, would you take a minute to leave us a Google review? It really helps our small family business grow. You can leave one here: https://g.page/r/CXzwhf5RzsotEAE/review 😃\n\nReply STOP to opt out");
-  assert.equal(sms.split("\n").at(-1), "Reply STOP to opt out");
+  assert.equal(sms, "Hi Craig, this is Craig with Ohio Pet Waste Pros. Thanks for letting Tony take care of your yard! If you were happy with the cleanup, would you take a minute to leave us a Google review? It really helps our small family business grow. You can leave one here: https://g.page/r/CXzwhf5RzsotEAE/review 😃");
+  assert.doesNotMatch(sms, /Reply STOP to opt out|Text STOP to unsubscribe/i);
   assert.deepEqual(sms.match(/https?:\/\/\S+/g), [REVIEW_URL]);
   assert.doesNotMatch(sms, /\{\{|\}\}|[\u2013\u2014\u2018\u2019\u201c\u201d]|five.star|5.star/i);
   assert.equal(sms.replace("😃", "").match(/[^\x20-\x7e\n]/), null);
 });
 
-test("both SMS templates keep their sole Google URL inline and STOP last with or without a preview", () => {
+test("both SMS templates keep their sole Google URL inline without an opt-out footer, with or without a preview", () => {
   for (const template of ["standard", "initial-cleanup"]) for (const previewToken of [undefined, createReviewPreviewToken()]) {
     const sms = buildReviewRequestSms({ template, firstName: "Alex", tech: "Tony", previewToken });
     const lines = sms.split("\n");
-    assert.equal(lines.at(-1), "Reply STOP to opt out", template);
-    assert.equal(lines.at(-2), "", template);
-    assert.ok(sms.endsWith("\n\nReply STOP to opt out"), template);
+    assert.doesNotMatch(sms, /Reply STOP to opt out/, template);
+    assert.doesNotMatch(sms, /Reply STOP to opt out|Text STOP to unsubscribe/i, template);
     assert.equal(lines.filter(line => line === REVIEW_URL).length, 0, template);
     assert.ok(lines[0].includes(`You can leave one here: ${REVIEW_URL}`), template);
     assert.deepEqual(sms.match(/https?:\/\/\S+/g), [REVIEW_URL], template);
@@ -134,7 +133,7 @@ test("named templates substitute first name, technician and review URL without c
   assert.throws(() => renderReviewRequestTemplate("initial-cleanup", { firstName: "Alex" }), /Missing review request placeholder: techName/);
   assert.throws(() => buildReviewRequestSms({ template: "missing" }), /Unknown review request template/);
   for (const [name, template] of Object.entries(REVIEW_REQUEST_TEMPLATES)) {
-    assert.ok(template.sms.endsWith("\n\nReply STOP to opt out"));
+    assert.doesNotMatch(template.sms, /Reply STOP to opt out|Text STOP to unsubscribe/i);
     assert.equal(template.sms.split("\n").includes("{{reviewLink}}"), false);
     assert.doesNotMatch(JSON.stringify(template), /[\u2013\u2014\u2018\u2019\u201c\u201d]|five.star|5.star/i);
     assert.equal(reviewRequestTemplateVersion(name), template.version);

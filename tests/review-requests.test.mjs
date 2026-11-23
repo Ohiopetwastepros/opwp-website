@@ -158,7 +158,7 @@ test('review ledger keeps Tony or Craig while messages use Google and email keep
       const email = f.sends.find(send => send.channel === 'email').options;
       const token = f.rows()[0].request_id;
       const pageUrl = content.reviewRequestPageUrl(token);
-      assert.equal(sms.split('\n').at(-1), 'Reply STOP to opt out');
+      assert.doesNotMatch(sms, /Reply STOP to opt out|Text STOP to unsubscribe/i);
       assert.ok(sms.split('\n')[0].includes(`You can leave one here: ${content.REVIEW_URL}`));
       assert.ok(email.text.includes(content.REVIEW_URL));
       assert.ok(!sms.includes(pageUrl) && !email.text.includes(pageUrl));
@@ -178,7 +178,7 @@ test('a refreshed unsupported technician prepares a Craig preview under the same
     job.assigned_to_name = 'Chad';
     assert.equal((await f.run()).sent, 2);
     assert.ok(f.rows().every(row => row.page_slug === 'craig'));
-    assert.equal(f.sends.find(send => send.channel === 'sms').options.content.split('\n').at(-1), 'Reply STOP to opt out');
+    assert.doesNotMatch(f.sends.find(send => send.channel === 'sms').options.content, /Reply STOP to opt out|Text STOP to unsubscribe/i);
     assert.ok(f.sends.find(send => send.channel === 'email').options.html.includes(content.reviewRequestImageUrl(f.rows()[0].request_id)));
     assert.ok(f.previews.every(preview => content.reviewTechSlug(preview.tech) === 'craig'));
   } finally { f.sqlite.close(); }
@@ -203,7 +203,7 @@ test('different review requests keep unique opaque email images while sharing th
       assert.ok(email[0].options.text.includes(content.REVIEW_URL));
       assert.ok(!email[0].options.text.includes(link));
     }
-    assert.ok(f.sends.filter(send => send.channel === 'sms').every(send => send.options.content.split('\n').at(-1) === 'Reply STOP to opt out' && send.options.content.split('\n')[0].includes(`You can leave one here: ${content.REVIEW_URL}`)));
+    assert.ok(f.sends.filter(send => send.channel === 'sms').every(send => !/Reply STOP to opt out/i.test(send.options.content) && send.options.content.split('\n')[0].includes(`You can leave one here: ${content.REVIEW_URL}`)));
   } finally { f.sqlite.close(); }
 });
 
@@ -303,7 +303,7 @@ test('an empty sanitized preview name uses the direct Google link and existing g
     await f.queue();
     f.beforePreview(() => null);
     assert.equal((await f.run()).sent, 2);
-    assert.equal(f.sends.find(send => send.channel === 'sms').options.content.split('\n').at(-1), 'Reply STOP to opt out');
+    assert.doesNotMatch(f.sends.find(send => send.channel === 'sms').options.content, /Reply STOP to opt out|Text STOP to unsubscribe/i);
     const email = f.sends.find(send => send.channel === 'email').options;
     assert.ok(email.text.includes(content.REVIEW_URL));
     assert.ok(email.html.includes(`${content.REVIEW_SITE_ORIGIN}${content.REVIEW_TECHS.tony.ogImage}`));
@@ -360,7 +360,7 @@ test('eligible initial completion sends both channels once and reserves the cust
     assert.deepEqual(f.sends.map(send => send.channel).sort(), ['email', 'sms']);
     const sms = f.sends.find(send => send.channel === 'sms').options.content;
     assert.match(sms, /^Hey Jordan,/);
-    assert.ok(sms.endsWith('\n\nReply STOP to opt out'));
+    assert.doesNotMatch(sms, /Reply STOP to opt out|Text STOP to unsubscribe/i);
     assert.ok(sms.split('\n')[0].includes(`You can leave one here: ${content.REVIEW_URL}`));
     const email = f.sends.find(send => send.channel === 'email').options;
     assert.match(email.headers['List-Unsubscribe'], /https:\/\/www\.ohiopetwastepros\.com\/api\/review-requests\/unsubscribe\/\?token=/);

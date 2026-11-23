@@ -123,7 +123,7 @@ test('retest CLI approves the new job with the original job present and sends ex
   assert.equal(f.result().previewVerification.jpeg1200x630, true);
   assert.equal(f.result().previewVerification.personalizedOgTagPresent, true);
   assert.equal(f.result().previewVerification.noImageRobotsTag, true);
-  assert.equal(f.result().smsBody.split('\n').at(-1), 'Reply STOP to opt out');
+  assert.doesNotMatch(f.result().smsBody, /Reply STOP to opt out|Text STOP to unsubscribe/i);
   assert.ok(f.result().smsBody.split('\n')[0].includes(`You can leave one here: ${REVIEW_URL}`));
   assert.doesNotMatch(f.result().smsBody, /ohiopetwastepros\.com\/review\//);
   assert.equal(f.commands.filter(args => args[1] === 'd1').length, 3, 'absence checked before approval and immediately before POST');

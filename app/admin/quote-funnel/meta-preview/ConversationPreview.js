@@ -29,7 +29,7 @@ export default function ConversationPreview() {
     if (!sample.consent || !text.trim()) return;
     const result = nextMetaResponse({ lead: sample.lead, state, text: text.trim().slice(0, 500), confirmationSent: true });
     setState(result.state);
-    setMessages((current) => [...current, { direction: "inbound", body: text.trim().slice(0, 500) }, ...(result.response ? [{ direction: "outbound", body: `${result.response}${result.response.includes("Reply STOP") ? "" : " Reply STOP to opt out."}` }] : [])]);
+    setMessages((current) => [...current, { direction: "inbound", body: text.trim().slice(0, 500) }, ...(result.response ? [{ direction: "outbound", body: result.response }] : [])]);
     setReply("");
   }
   const suggestions = state.expected === "yard" ? ["A", "B", "unsure"] : state.expected === "cleaned" ? ["about 1 month", "2 months ago", "never"] : state.expected === "address" ? ["123 Example Street, Toledo"] : state.expected === "dogs" ? ["2 dogs"] : state.expected === "frequency" ? ["weekly"] : ["yes", "actually 3 dogs", "STOP"];
