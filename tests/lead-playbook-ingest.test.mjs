@@ -149,7 +149,7 @@ test('a submitted website question is preserved as an inbound and uncertain repl
   db.sqlite.prepare("UPDATE submissions SET payload=? WHERE id='lead'").run(JSON.stringify({follow_up_consent:true,pending_quote_question:'Can you explain a special yard situation?'}));
   await preparePlaybookIntros(db,{...env,LEAD_PLAYBOOK_AUTO_SEND_ENABLED:'true'},{loadCustomerDirectory:emptyDirectory,sender:async()=>{throw new Error('Uncertain text must not auto-send');}});
   const draft=db.sqlite.prepare('SELECT * FROM lead_reply_drafts').get();
-  assert.equal(draft.status,'pending');assert.equal(draft.template_key,null);assert.equal(draft.confidence,0);assert.match(draft.body,/Craig review your question/);assert.doesNotMatch(draft.body,/saw that you filled out/);
+  assert.equal(draft.status,'pending');assert.equal(draft.template_key,null);assert.equal(draft.confidence,0);assert.equal(draft.body,"Thanks for your message. I'll review your question and text you personally.");assert.doesNotMatch(draft.body,/saw that you filled out|Craig review your question/);
   assert.equal(db.sqlite.prepare("SELECT body FROM lead_messages WHERE direction='inbound'").get().body,'Can you explain a special yard situation?');
 });
 test('verified Facebook replies automatically send overnight while unknown questions produce pending drafts',async()=>{
@@ -173,17 +173,23 @@ test('changed and out-of-area addresses cannot inherit a previously audited rout
   for(const source of ['workspace','meta'])for(const address of ['124 Test Street','999 Remote Road Columbus OH 43215']){
     const db=database();seedAuditedRoute(db,source);
     const result=await processPlaybookInbound(db,env,{conversationId:'conv',submissionId:'lead',event:{...inbound,text:address}},{loadCustomerDirectory:emptyDirectory});
-    assert.equal(result.escalated,true);assert.equal(result.reason,'route_day_requires_confirmation');
     assert.equal(db.sqlite.prepare('SELECT count(*) n FROM lead_reply_drafts').get().n,1);
-    assert.equal(result.draft.status,'pending');assert.equal(result.draft.template_key,null);assert.doesNotMatch(result.draft.body,/\$|schedule for/);
+    assert.equal(result.draft.status,'pending');assert.doesNotMatch(result.draft.body,/\$|schedule for/);
     const state=JSON.parse(result.draft.state_json);assert.equal(state.details.address,address);
+    if(address.includes('Columbus')){
+      assert.match(result.draft.body,/don't service Columbus|do not service Columbus/i);
+      assert.equal(state.stage,'closed_lost');assert.notEqual(state.quote?.day,'Friday');
+    }else{
+      assert.equal(result.escalated,true);assert.equal(result.reason,'route_day_requires_confirmation');
+      assert.equal(result.draft.template_key,null);
+    }
   }
 });
 test('an audited route remains usable only for the same normalized service address',async()=>{
   for(const source of ['workspace','meta']){
     const db=database();seedAuditedRoute(db,source);
     const result=await processPlaybookInbound(db,env,{conversationId:'conv',submissionId:'lead',event:{...inbound,text:'123 TEST STREET.'}},{loadCustomerDirectory:emptyDirectory});
-    assert.equal(result.draft.template_key,'quote_recurring');assert.match(result.draft.body,/schedule for Friday\./);
+    assert.equal(result.draft.template_key,'quote_recurring');assert.equal(JSON.parse(result.draft.slots_json).day,'Friday');assert.match(result.draft.body,/\$95 per month/);
   }
 });
 test('a rotated workspace handoff key invalidates the retained route audit',async()=>{

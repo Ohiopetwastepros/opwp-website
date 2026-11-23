@@ -18,7 +18,6 @@ export const cities = [
   { slug: "dog-poop-removal-curtice-oh", city: "Curtice", state: "Ohio", stateAbbr: "OH", zips: "43412", lat: 41.6231, lng: -83.3702 },
   { slug: "dog-poop-removal-delta-oh", city: "Delta", state: "Ohio", stateAbbr: "OH", zips: "43515", lat: 41.5734, lng: -84.0066 },
   { slug: "dog-poop-removal-dunbridge-oh", city: "Dunbridge", state: "Ohio", stateAbbr: "OH", zips: "43414", lat: 41.4181, lng: -83.5763 },
-  { slug: "dog-poop-removal-genoa-oh", city: "Genoa", state: "Ohio", stateAbbr: "OH", zips: "43416", lat: 41.5183, lng: -83.3585 },
   { slug: "dog-poop-removal-neapolis-oh", city: "Neapolis", state: "Ohio", stateAbbr: "OH", zips: "43547", lat: 41.4561, lng: -83.8488 },
   { slug: "dog-poop-removal-tontogany-oh", city: "Tontogany", state: "Ohio", stateAbbr: "OH", zips: "43565", lat: 41.4267, lng: -83.7544 },
   { slug: "dog-poop-removal-walbridge-oh", city: "Walbridge", state: "Ohio", stateAbbr: "OH", zips: "43465", lat: 41.587, lng: -83.5022 },
@@ -30,4 +29,30 @@ export const cities = [
 
 export function getCity(slug) {
   return cities.find((c) => c.slug === slug);
+}
+
+const cityByZip = new Map(cities.flatMap((entry) =>
+  entry.zips.split(",").map((zip) => [zip.trim(), entry])
+));
+
+export function getCityByZip(zip) {
+  const match = /^(\d{5})(?:-\d{4})?$/.exec(String(zip ?? "").trim());
+  return match ? cityByZip.get(match[1]) : undefined;
+}
+
+// Monroe can refer to the wider Michigan area. Its city ZIPs are unambiguous.
+const declinedCityByZip = {
+  "43416": "Elmore", "43430": "Genoa", "43420": "Fremont", "45840": "Findlay",
+  "48161": "Monroe", "48162": "Monroe",
+};
+// A street such as Fremont Pike can be in a served city.
+const declinedCityName = /\b(Elmore|Genoa|Fremont|Findlay|Fostoria|Columbus)\b(?!\s+(?:pike|rd|road|st|street|ave|avenue|dr|drive|ln|lane|ct|court|blvd|boulevard|way|hwy|highway)\b)/i;
+
+export function declinedServiceCity(text) {
+  const message = String(text ?? "");
+  for (const zip of message.match(/\b\d{5}\b/g) || []) {
+    if (declinedCityByZip[zip]) return declinedCityByZip[zip];
+  }
+  const name = declinedCityName.exec(message)?.[1];
+  return name ? name[0].toUpperCase() + name.slice(1).toLowerCase() : "";
 }

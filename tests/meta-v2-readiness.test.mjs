@@ -66,7 +66,7 @@ test('Meta v2 confirms instantly overnight with playbook on, records backend aut
   assert.equal(calls.length, 1);
   assert.equal(calls[0].from, '+14192622371');
   assert.deepEqual(calls[0].to, [approvedPhone]);
-  assert.match(calls[0].content, /I have you down for 2 dogs.*Did I get that right\?\n\nReply STOP to opt out$/);
+  assert.match(calls[0].content, /Just to make sure I have it right, you have 2 dogs.*Did I get that right\?\n\nReply STOP to opt out$/);
   const state = db.sqlite.prepare('SELECT * FROM lead_playbook_state WHERE submission_id=?').get(saved.id);
   assert.equal(state.stage, 'confirm_details_sent');
   assert.equal(JSON.parse(state.state_json).meta_confirmation_sent, true);

@@ -138,7 +138,7 @@ test('Sona, Craig ownership, suppressions and paused settings block sending', as
 test('edited approval records only redacted learning candidates and counts edits', async () => {
   const {db, draft} = await fixture();
   const canonical = draft.body.replace(/\s*Reply STOP to opt out\s*$/, '').trim();
-  await api.actOnPlaybookDraft(db, env, draft.id, {action: 'edit_send', body: 'Hi Casey Example! ' + canonical + ' Your email is casey@example.test.'}, 'owner', {sender: async () => ({provider_message_id: 'ACedited'}), now: noon});
+  await api.actOnPlaybookDraft(db, env, draft.id, {action: 'edit_send', body: 'Hi Casey Example, ' + canonical + ' Your email is casey@example.test.'}, 'owner', {sender: async () => ({provider_message_id: 'ACedited'}), now: noon});
   const row = db.sqlite.prepare("SELECT * FROM playbook_candidates WHERE source='approved_edit'").get();
   assert.ok(row); assert.doesNotMatch(row.answer_redacted, /Casey Example|casey@example.test|4195550100/);
   assert.equal(db.sqlite.prepare("SELECT edits FROM lead_playbook_intent_stats WHERE intent='confirm_yes'").get().edits, 1);
@@ -200,6 +200,7 @@ test('body-hash binding and twelve-hour expiry reject stale reviews without send
 });
 test('notification transport is separately gated and deduplicated using a fake provider', async () => {
   const {db, draft} = await fixture(); let calls = 0;
+  db.sqlite.prepare("UPDATE lead_reply_drafts SET reason='custom_pricing' WHERE id=?").run(draft.id);
   const fetcher = async (_url, request) => { calls++; const payload = JSON.parse(request.body); assert.equal(payload.to[0], '+14195550199'); assert.ok(payload.content.includes('/admin/playbook/d/')); return Response.json({data: {id: 'ACnotify'}}); };
   assert.equal((await api.notifyPlaybookDraft(db, env, draft.id, {fetcher, now: noon})).enabled, false);
   const configured = {...env, LEAD_PLAYBOOK_NOTIFY_ENABLED: 'true', QUO_API_KEY: 'fake', QUO_FROM_NUMBER: '+14195550188'};

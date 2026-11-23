@@ -90,7 +90,7 @@ for (const [label, seed] of [
     await f.intake();
     assert.equal((await f.flush()).sent, 1);
     assert.equal(countFooters(f.sent[0]), 0);
-    assert.match(f.sent[0], /Thanks for filling out our Facebook form/);
+    assert.match(f.sent[0], /Just to make sure I have it right/);
   });
 }
 
