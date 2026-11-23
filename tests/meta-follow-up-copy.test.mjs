@@ -1,19 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { metaFollowUpDrafts } from "../lib/meta-conversation.mjs";
+import { META_RESPONSES, metaFollowUpDrafts, metaWebsiteQuote, nextMetaResponse } from "../lib/meta-conversation.mjs";
+import {countCraigSentences,validateCraigReply} from '../lib/craig-voice.mjs';
 
 const messages = [
-  "Did you see my confirmation? I can send your price and help get you on the schedule. Would you like me to send it over?",
-  "I can help with your quote and check for an open route day this week. Would you like to get started?",
-  "Just checking in one last time. If you'd like service now or down the road, reply here anytime. I'm happy to help.",
+  "Just checking back in to see if you had any questions about getting started?",
+  "Were you still interested in having us take care of the yard? No pressure either way, just let me know!",
+  "I'll leave it with you for now. We're here if you need us, just reply anytime.",
 ];
 
-function checkDrafts(name, opener) {
+function checkDrafts(name, safeName) {
   const drafts = metaFollowUpDrafts(name);
   assert.deepEqual(drafts.map(({ step, day }) => ({ step, day })), [
     { step: 1, day: 1 }, { step: 2, day: 3 }, { step: 3, day: 7 },
   ]);
-  assert.deepEqual(drafts.map(({ body }) => body), messages.map((message) => `${opener} ${message}`));
+  const hey=`Hey${safeName?` ${safeName}`:''}`;
+  assert.deepEqual(drafts.map(({ body }) => body),[
+    `${hey}, this is Craig with Ohio Pet Waste Pros. ${messages[0]}`,
+    `${hey}, Craig with Ohio Pet Waste Pros here. ${messages[1]}`,
+    messages[2],
+  ]);
   for (const { body } of drafts) {
     assert.match(body, /^[\x00-\x7f]+$/);
     assert.doesNotMatch(body, /[\u2013\u2014]/);
@@ -21,19 +27,42 @@ function checkDrafts(name, opener) {
     assert.doesNotMatch(body, /Reply STOP to opt out/);
     assert.equal(body.split("\n").length, 1);
     assert.ok(body.length < 230);
+    assert.ok(countCraigSentences(body)<=3);
+    assert.deepEqual(validateCraigReply(body,{step:'follow_up'}),[]);
   }
 }
 
 test("Meta follow-ups use Jason's first name and Craig's exact copy", () => {
-  checkDrafts("Jason Example", "Hello Jason, this is Craig with Ohio Pet Waste Pros.");
+  checkDrafts("Jason Example", "Jason");
 });
 
 for (const name of [undefined, "", null, "123", "Jason! Example", "<script> Example", "A".repeat(41), "---"]) {
   test(`Meta follow-ups omit unusable name ${JSON.stringify(name)}`, () => {
-    checkDrafts(name, "Hello, this is Craig with Ohio Pet Waste Pros.");
+    checkDrafts(name, "");
   });
 }
 
 test("Meta follow-ups keep the safe-name check and ASCII apostrophes", () => {
-  checkDrafts("O\u2019Neil Example", "Hello O'Neil, this is Craig with Ohio Pet Waste Pros.");
+  checkDrafts("O\u2019Neil Example", "O'Neil");
+});
+
+test('legacy Meta prompts and quote copy follow the same short Craig voice rules',()=>{
+  for(const body of Object.values(META_RESPONSES)) {
+    assert.deepEqual(validateCraigReply(body,{step:'booking'}),[],body);
+    assert.doesNotMatch(body,/\bCraig\b/,'Customer replies speak as Craig rather than about him');
+  }
+  for(const clean_up_frequency of ['Weekly','One Time']){
+    const quote=metaWebsiteQuote({number_of_dogs:2,zip:'43615',clean_up_frequency,yard_size_tier:'tiny',last_cleaned:'one_month'});
+    const templateKey = clean_up_frequency === 'One Time' ? 'quote_one_time' : 'quote_recurring';
+    assert.equal(countCraigSentences(quote.text),clean_up_frequency === 'One Time' ? 5 : 4);
+    assert.deepEqual(validateCraigReply(quote.text,{step:'quote',templateKey}),[]);
+    assert.equal(quote.basis.source,'app/free-quote/pricing.js');
+    assert.doesNotMatch(quote.text,/\bCraig\b/);
+  }
+});
+
+test('render validation blocks prohibited raw reply text before it can become Meta customer copy',()=>{
+  const lead={number_of_dogs:2,zip:'43615',clean_up_frequency:'Weekly'};
+  assert.throws(()=>nextMetaResponse({lead,text:'What is included?',staticAnswer:'We handle poop for you.'}),/forbidden_waste_slang/);
+  assert.throws(()=>nextMetaResponse({lead,text:'What is included?',staticAnswer:'First. Second. Third. Fourth.'}),/sentence_count/);
 });

@@ -4,7 +4,7 @@ import { classifyMetaReply } from "../lib/meta-lead-policy.mjs";
 import { META_RESPONSES, metaWebsiteQuote, nextMetaResponse } from "../lib/meta-conversation.mjs";
 
 const lead = { name: "Example Lead", number_of_dogs: 2, zip: "43615", clean_up_frequency: "Weekly" };
-const disclosure = "Good question! These first texts are automated to help me get your info quickly, but I'm a real person and I read every conversation. Want me to text you personally?";
+const disclosure = "These texts use AI with my approved replies. If you'd prefer a personal reply, I'll pause the automated messages and follow up myself.";
 
 test("Meta identity questions get Craig's exact ASCII disclosure without depending on the static answer library", () => {
   assert.equal(META_RESPONSES.human_help, disclosure);

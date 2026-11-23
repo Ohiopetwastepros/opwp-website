@@ -1,3 +1,4 @@
+import {verifiedTextSafety} from "./helpers/airtable-text-safety-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { leadTestDatabase } from './helpers/lead-inbox-fixture.mjs';
@@ -11,7 +12,7 @@ const approvedPhone = '+14195550100';
 const otherPhone = '+14195550102';
 const overnight = new Date('2026-11-21T06:00:00Z');
 const emptyCustomerDirectory = async () => ({ok: true, complete: true, rows: []});
-const processMetaConfirmations = (env, options = {}) => processMetaConfirmationsWithDirectory(env, {loadCustomerDirectory: emptyCustomerDirectory, ...options});
+const processMetaConfirmations = (env, options = {}) => processMetaConfirmationsWithDirectory(env, {textSafety: verifiedTextSafety, loadCustomerDirectory: emptyCustomerDirectory, ...options});
 function fixture() {
   const db = leadTestDatabase();
   db.sqlite.exec(`INSERT INTO meta_automation_releases VALUES ('fixture-live','org-opwp','meta-confirmation-v2','fixture-owner','fixture-only approval',datetime('now','-1 minute'),NULL);
@@ -66,7 +67,7 @@ test('Meta v2 confirms instantly overnight with playbook on, records backend aut
   assert.equal(calls.length, 1);
   assert.equal(calls[0].from, '+14192622371');
   assert.deepEqual(calls[0].to, [approvedPhone]);
-  assert.match(calls[0].content, /I have you down for 2 dogs.*Did I get that right\?\n\nReply STOP to opt out$/);
+  assert.match(calls[0].content, /Just to make sure I have it right, you have 2 dogs.*Did I get that right\?\n\nReply STOP to opt out$/);
   const state = db.sqlite.prepare('SELECT * FROM lead_playbook_state WHERE submission_id=?').get(saved.id);
   assert.equal(state.stage, 'confirm_details_sent');
   assert.equal(JSON.parse(state.state_json).meta_confirmation_sent, true);

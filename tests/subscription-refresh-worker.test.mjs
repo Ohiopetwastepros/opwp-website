@@ -134,7 +134,7 @@ test("daily reconciliation fills customer profile and active subscription fields
             Status: "Active",
             "SNG Client ID": "rcl_amanda",
             Frequency: "Twice Weekly",
-            Address: "633 state st unit 55, Elmore, Ohio 43416",
+            Address: "123 Example St Unit 4, Sylvania, Ohio 43560",
           },
         }],
       });
@@ -146,7 +146,7 @@ test("daily reconciliation fills customer profile and active subscription fields
   const active = [{
     client: "rcl_amanda",
     client_name: "Amanda Example",
-    address: "633 state st unit 55, Elmore, Ohio 43416",
+    address: "123 Example St Unit 4, Sylvania, Ohio 43560",
     cleanup_frequency: "two_times_a_week",
     service_days: "Monday, Friday",
   }];
@@ -161,9 +161,9 @@ test("daily reconciliation fills customer profile and active subscription fields
     const fields = writes.find((write) => write.method === "PATCH").body.records[0].fields;
     assert.deepEqual(fields, {
       Type: "Residential",
-      Address: "633 state st unit 55",
-      City: "Elmore",
-      ZIP: "43416",
+      Address: "123 Example St Unit 4",
+      City: "Sylvania",
+      ZIP: "43560",
       "Number of Dogs": 1,
       "Subscription Name": "Regular Plan - 1d-2xW",
       "MRR ($)": 192,
