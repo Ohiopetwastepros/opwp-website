@@ -66,6 +66,7 @@ worker-configuration.d.ts
 /docs/golive/cancel-stale-queue-*.sql
 /docs/golive/*dry-run*.md
 /docs/golive/*transcript*.md
+/docs/golive/*render*.md
 /docs/golive/golive-report-*.md
 
 # Local secrets, caches and private operational reports
