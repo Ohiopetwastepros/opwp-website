@@ -5,6 +5,7 @@ import test from 'node:test';
 import {build} from 'esbuild';
 import {leadTestDatabase} from './helpers/lead-inbox-fixture.mjs';
 import {CRAIG_TEMPLATES} from '../lib/craig-voice.mjs';
+import {reply} from './fixtures/lead-craig-signup.mjs';
 
 const CUSTOMER = '+14195550100';
 const OTHER = '+14195550101';
@@ -19,6 +20,7 @@ export {POST as quoPost} from './app/api/webhooks/quo-messages/route.js';
 export {getLeadRecord,setLeadAutomation,runScheduledYardOps} from './lib/lead-assistant.js';
 export {readInboxRow,inboxVersion,saveInboxChange} from './lib/lead-inbox-store.js';
 export {processMetaConfirmations} from './lib/meta-lead-workflow.mjs';
+export {runScheduledQuoteFollowUps} from './lib/quote-follow-up-delivery.js';
 export {listPlaybookWorkspace} from './lib/lead-playbook-service.js';
 export {readPlaybookLink} from './lib/lead-playbook-links.mjs';`;
 const output = await build({stdin: {contents: entry, resolveDir: process.cwd()}, bundle: true, write: false,
@@ -138,7 +140,7 @@ async function fixture(t, {confirmationUncertain = false, ownerPhone = OWNER_PHO
     return response.json();
   }
   const state = id => JSON.parse(db.sqlite.prepare('SELECT state_json FROM lead_playbook_state WHERE submission_id=?').get(id).state_json);
-  return {db, env, customerSms, ownerSms, ownerEmails, directoryReads, meta, inbound, state};
+  return {db, env, customerSms, ownerSms, ownerEmails, directoryReads, meta, inbound, state,airtable};
 }
 
 test('signed Meta and Quo handlers drive the approved playbook once through owner route review, weekly quote and signup handoff', async t => {
@@ -342,4 +344,68 @@ test('a signed customer reply on the shared owner phone remains in the inbox aft
   assert.equal(f.db.sqlite.prepare('SELECT delivery_status FROM lead_messages WHERE provider_message_id=?').get(acknowledgement.provider_message_id).delivery_status, 'delivered');
   assert.deepEqual(f.db.sqlite.prepare('SELECT owner,owner_event_id FROM lead_conversations WHERE submission_id=?').get(saved.id), before);
   assert.equal(before.owner, 'backend');
+});
+
+test('signed webhooks run Craig signup, skip known facts, and dedupe provider messages and ready notices',async t=>{
+  const f=await fixture(t);
+  const modelResults=new Map();
+  let calls=0;
+  Object.assign(f.env,{
+    LEAD_CRAIG_SIGNUP_ENABLED:'true',LEAD_CONVERSATION_V2_ENABLED:'true',
+    LEAD_CLASSIFIER_ENABLED:'true',LEAD_CLASSIFIER_KILL_SWITCH:'false',
+    LEAD_PLAYBOOK_NOTIFY_CHANNELS:'email',
+    AI:{async run(_model,request){
+      calls++;
+      assert.ok(request.text.format.schema.properties.intents.items.enum.includes('provide_signup_detail'));
+      const input=request.input.at(-1).content;
+      const result=modelResults.get(input);
+      assert.ok(result,input);
+      return {response:result};
+    }},
+  });
+  f.db.sqlite.exec("UPDATE meta_automation_releases SET policy_version='meta-craig-signup-v1'");
+  const saved=await f.meta('craig-signup-fixture');
+  assert.match(f.customerSms[0].content,/Thanks for filling out our form!.*weekly service\?/);
+  await f.meta('craig-signup-fixture');
+  assert.equal(f.customerSms.length,1);
+
+  const step=async (turn, id, check)=>{
+    modelResults.set(turn.text,turn.classification);
+    const before=f.customerSms.length;
+    await f.inbound(turn.text,id);
+    assert.equal(f.customerSms.length,before+1,id);
+    assert.match(f.customerSms.at(-1).content,check);
+    await f.inbound(turn.text,id);
+    assert.equal(f.customerSms.length,before+1,id+' duplicate');
+  };
+  await step(reply("Yes, that's correct. What's the quote?",['confirm_yes','question_price'],{},{confirms_details:'yes'}),'craig-rate',/\$105 per month/);
+  await step(reply('yeah that works! 2 weeks and 123 Sample Street, gate left and unlocked',['confirm_yes','address_given'],{lastCleaned:'2 weeks',address:'123 Sample Street',gateSide:'left',gateLock:'unlocked'},{confirms_details:'yes'}),'craig-gap',/\$30 to \$37/);
+  await step(reply('sign me up',['ready_to_sign_up']),'craig-signup',/outdoor trash can/);
+  await step(reply('haul away please. dogs are fine with strangers',undefined,{disposal:'haul_away',dogBehavior:'comfortable'}),'craig-details',/When would you like to get started/);
+  await step(reply('next month',undefined,{startPreference:'next month'}),'craig-finish',/follow up once your account has been created/);
+  assert.equal(calls,5,'Duplicate signed receipts did not invoke the classifier');
+  assert.equal(f.state(saved.id).craigSignup.readyForAccountSetup,true);
+  assert.equal(f.db.sqlite.prepare('SELECT next_action FROM growth_leads WHERE submission_id=?').get(saved.id).next_action,'Ready for account setup');
+  assert.equal(f.ownerEmails.length,1);
+  assert.match(f.ownerEmails[0].html,/123 Sample Street.*customer@example.test.*Gate lock: unlocked.*Preferred start: next month/s);
+  await api.runScheduledYardOps(f.env);
+  const records=f.airtable.records.get('tblxniDSLBZdba6Z7');
+  assert.equal(records.length,1);
+  assert.equal(records[0].fields.Notes,'Ready for account setup');
+  assert.equal(records[0].fields.Converted,undefined);
+  assert.equal(records[0].fields['Linked Customer'],undefined);
+  const beforeStop=f.customerSms.length;
+  await f.inbound('STOP and how much is it','craig-stop');
+  await f.inbound('yes','craig-suppressed');
+  assert.equal(f.customerSms.length,beforeStop);
+  assert.equal(calls,5);
+  assert.equal(f.db.sqlite.prepare("SELECT count(*) n FROM lead_suppressions WHERE reason='opted_out'").get().n,1);
+  assert.equal((await api.runScheduledQuoteFollowUps(f.env)).attempted,0);
+});
+
+test('old Meta approval cannot authorize the Craig signup opener',async t=>{
+  const f=await fixture(t);
+  Object.assign(f.env,{LEAD_CRAIG_SIGNUP_ENABLED:'true',LEAD_CONVERSATION_V2_ENABLED:'true'});
+  await f.meta('craig-unapproved-fixture');
+  assert.equal(f.customerSms.length,0);
 });
