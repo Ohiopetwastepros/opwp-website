@@ -119,3 +119,39 @@ test('the real Meta confirmation sender accepts its early callback without a hum
   await processMetaConfirmations(config,options);assert.equal(calls,1);
   const job=db.sqlite.prepare('SELECT status,provider_message_id FROM meta_sms_jobs WHERE submission_id=?').get(submissionId);assert.equal(job.status,'sent');assert.equal(job.provider_message_id,'early-meta-provider');
 });
+test('a customer reply provider-ID conflict pauses and quarantines without retrying the SMS',async t=>{
+  const f=await structuredThread(t,{notifications:false}),priorFetch=globalThis.fetch;
+  f.env.AI.run=async()=>({response:JSON.stringify(structuredClassification(['question_price'],{extracted:{dogs:2,frequency:'once_a_week'}}))});
+  let calls=0;
+  t.mock.method(globalThis,'fetch',async(input,options={})=>{
+    const url=new URL(String(input));
+    if(url.href!=='https://api.openphone.com/v1/messages'||options.method!=='POST')return priorFetch(input,options);
+    calls++;const message=JSON.parse(options.body);f.customer.push(message.content);
+    await recordPlaybookQuoEvent(f.db,f.env,{...event(message.content,'callback-claimed-provider'),from:f.env.QUO_FROM_NUMBER,userId:'fixture-craig-user',userIds:['fixture-craig-user']});
+    return Response.json({data:{id:'different-response-provider'}});
+  });
+  const reply=await f.inbound('how much weekly 2 dogs?',structuredClassification(['question_price']));
+  assert.equal(calls,1);assert.equal(reply.draft.status,'failed');assert.equal(reply.draft.provider_message_id,'callback-claimed-provider');
+  assert.deepEqual({...f.db.sqlite.prepare('SELECT owner,automation_mode FROM lead_conversations WHERE id=?').get(f.conversationId)},{owner:'craig',automation_mode:'paused'});
+  await f.inbound('can i pay check?',structuredClassification(['question_payment']));assert.equal(calls,1);
+});
+test('a Meta confirmation provider-ID conflict becomes unknown and cannot retry automatically',async t=>{
+  const db=leadTestDatabase();t.after(()=>db.sqlite.close());
+  const {storeMetaLead,processMetaConfirmations}=await import('../lib/meta-lead-workflow.mjs');
+  db.sqlite.prepare("UPDATE lead_automation_settings SET assistant_enabled=1,human_review_required=0").run();
+  db.sqlite.prepare("INSERT INTO meta_automation_releases(id,organization_id,policy_version,approved_by,evidence,approved_at) VALUES ('fixture-conflict-release','org-opwp','meta-confirmation-v2-test','fixture','Offline test only',datetime('now','-1 minute'))").run();
+  const config={...env,DB:db,META_AUTOMATION_ENABLED:'false',META_TEST_APPROVAL_ID:'fixture-conflict-release',META_TEST_FORM_IDS:'fixture-form',QUO_API_KEY:'fixture',QUO_HUMAN_USER_IDS:'fixture-human',
+    META_APPROVED_SMS_FORMS:JSON.stringify({'fixture-form':{pageId:'fixture-page',consentField:'sms_consent',version:'fixture-disclosure',disclosure:'Fixture automated quote texts. Reply STOP to opt out.'}})};
+  const fields={full_name:'Test Lead Craig',phone_number:'+14192620424',zip_code:'43551',number_of_dogs:'2',service_frequency:'weekly',contact_preference:'text',sms_consent:'yes'};
+  const stored=await storeMetaLead(db,config,{id:'fixture-conflict-meta',form_id:'fixture-form',created_time:new Date().toISOString(),field_data:Object.entries(fields).map(([name,value])=>({name,values:[value]}))},{leadId:'fixture-conflict-meta',formId:'fixture-form',pageId:'fixture-page'});
+  let calls=0;
+  const options={submissionId:stored.id,textSafety:async()=>({verified:true,doNotText:false}),fetcher:async(_url,request)=>{
+    calls++;const message=JSON.parse(request.body);await recordPlaybookQuoEvent(db,config,event(message.content,'meta-callback-claimed'));
+    return Response.json({data:{id:'meta-different-response'}});
+  }};
+  const result=await processMetaConfirmations(config,options);assert.equal(result.sent,0);assert.equal(calls,1);
+  const job=db.sqlite.prepare('SELECT status,provider_message_id FROM meta_sms_jobs WHERE submission_id=?').get(stored.id);
+  assert.equal(job.status,'unknown');assert.equal(job.provider_message_id,'meta-callback-claimed');
+  assert.deepEqual({...db.sqlite.prepare('SELECT owner,automation_mode FROM lead_conversations WHERE submission_id=?').get(stored.id)},{owner:'craig',automation_mode:'paused'});
+  await processMetaConfirmations(config,options);assert.equal(calls,1);
+});

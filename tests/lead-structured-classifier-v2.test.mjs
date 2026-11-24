@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {classifyPlaybookIntent,structuredOptOut,buildClassifierProviderRequest,classifierResponseJson} from '../lib/lead-playbook-classifier.mjs';
+import {classifyPlaybookIntent,structuredOptOut,buildClassifierProviderRequest,classifierResponseJson,classifierLiteralGroundingErrors} from '../lib/lead-playbook-classifier.mjs';
 import {CLASSIFIER_JSON_SCHEMA,CLASSIFIER_PROVIDER_SCHEMA,STRUCTURED_INTENTS,classifierMessages,validateStructuredClassifierResult} from '../lib/lead-playbook-classifier-schema.mjs';
 import {LEAD_CONVERSATION_FIXTURE,CLASSIFIER_FIXTURE_CONTEXT,compareClassifierFixture,compareSemanticClassifierFixture} from './fixtures/lead-conversation-messages-v2.mjs';
 import {leadTestDatabase} from './helpers/lead-inbox-fixture.mjs';
@@ -20,7 +20,7 @@ test('fixture contract survives strict model JSON decoding without dropping mult
     const candidate=valid({...row.expected,extracted:row.expected.extracted||{},corrections:row.expected.corrections||{},owner_reason:row.expected.owner_reason||'none'});
     const result=await classifyPlaybookIntent(row.text,CLASSIFIER_FIXTURE_CONTEXT,{env,usageStore,provider:async request=>{assert.equal(request.text.format.type,'json_schema');assert.deepEqual(request.text.format.schema,CLASSIFIER_PROVIDER_SCHEMA);return {response:JSON.stringify(candidate)};}});
     assert.deepEqual(compareClassifierFixture(row,result),[],row.id);
-    assert.equal(usageStore.calls,structuredOptOut(row.text)?0:1,row.id);
+    assert.equal(usageStore.calls,structuredOptOut(row.text)?0:row.expected.intents.includes('off_playbook')?2:1,row.id);
   }
 });
 test('V2 uses the LLM first even for perfect affirmatives, obvious FAQs and ambiguous SMS',async()=>{
@@ -89,4 +89,39 @@ test('Workers AI GPT-OSS adapter bounds reasoning/output and ignores private rea
   const json=JSON.stringify(valid());
   assert.equal(classifierResponseJson({output:[{type:'reasoning',content:[{text:'private reasoning not retained'}]},{type:'message',content:[{type:'output_text',text:json}]}]}),json);
   const legacy=buildClassifierProviderRequest('@cf/meta/llama-3.3-70b-instruct-fp8-fast',[]);assert.equal(legacy.max_tokens,700);assert.equal(legacy.temperature,0);
+});
+test('literal fact validation accepts case/whitespace only and never guesses a city correction',()=>{
+  assert.deepEqual(classifierLiteralGroundingErrors(valid({extracted:{city:' Elmore '}}),'do you service ELMORE?'),[]);
+  assert.deepEqual(classifierLiteralGroundingErrors(valid({extracted:{city:'Elmajor'},corrections:{name:'Unknown'}}),'Elmore'),['extracted.city','corrections.name']);
+});
+test('one durably budgeted LLM repair replaces ungrounded literal facts and keeps both call receipts',async()=>{
+  const db=leadTestDatabase();let calls=0;
+  const result=await classifyPlaybookIntent('Do you service Elmore?',{}, {env,db,provider:async request=>{
+    calls++;if(calls===2){const envelope=JSON.parse(request.input.at(-1).content);assert.equal(envelope.original_sms,'Do you service Elmore?');assert.deepEqual(envelope.validation_errors,['extracted.city']);}
+    return {response:valid({intents:['question_service_area'],extracted:{city:calls===1?'Elmajor':'Elmore'}})};
+  }});
+  assert.equal(calls,2);assert.equal(result.extracted.city,'Elmore');assert.equal(result.callIds.length,2);assert.equal(result.repairOfCallId,result.callIds[0]);assert.equal(result.groundingRepaired,true);
+  assert.deepEqual(db.sqlite.prepare('SELECT status FROM lead_classifier_calls ORDER BY rowid').all().map(row=>row.status),['invalid','completed']);
+});
+test('a second ungrounded response fails safely without looping or copying context facts',async()=>{
+  const usageStore=store();
+  const result=await classifyPlaybookIntent('Where do you service?',{}, {env,usageStore,provider:async()=>({response:valid({intents:['question_service_area'],extracted:{city:'Inventedville'}})})});
+  assert.equal(usageStore.calls,2);assert.equal(result.reason,'classifier_grounding_failed');assert.equal(result.fallbackReply,true);assert.deepEqual(result.extracted,{});
+});
+test('off-playbook review distinguishes accidental personal text while preserving real unsupported requests',async()=>{
+  for(const [text,repaired]of [['did you get the game controller',valid({intents:['unclear']})],['Can you repair our fence?',valid({intents:['off_playbook'],needs_owner:true,owner_reason:'off_playbook'})]]){
+    let calls=0;const result=await classifyPlaybookIntent(text,{}, {env,usageStore:store(),provider:async()=>({response:++calls===1?valid({intents:['off_playbook'],needs_owner:true,owner_reason:'off_playbook'}):repaired})});
+    assert.equal(calls,2);assert.deepEqual(result.intents,repaired.intents);assert.equal(result.needs_owner,repaired.needs_owner);
+  }
+});
+test('repair shares the daily cap and never makes an unbudgeted extra provider call',async()=>{
+  const db=leadTestDatabase();let calls=0;
+  const result=await classifyPlaybookIntent('Elmore?',{}, {env:{...env,LEAD_CLASSIFIER_DAILY_CAP:'1'},db,provider:async()=>{calls++;return {response:valid({intents:['question_service_area'],extracted:{city:'Elmajor'}})};}});
+  assert.equal(calls,1);assert.equal(result.reason,'classifier_daily_cap');assert.equal(result.callIds.length,1);assert.equal(db.sqlite.prepare('SELECT status FROM lead_classifier_calls').get().status,'invalid');
+});
+test('optional owner-policy audit failure preserves a grounded safe owner request, never an invented literal fact',async()=>{
+  let calls=0;const db=leadTestDatabase();
+  const result=await classifyPlaybookIntent('Can you repair my fence?',{}, {env,db,provider:async()=>{if(++calls===1)return {response:valid({intents:['off_playbook'],needs_owner:true,owner_reason:'off_playbook'})};throw Object.assign(Error('classifier_timeout'),{code:'classifier_timeout'});}});
+  assert.equal(calls,2);assert.equal(result.needs_owner,true);assert.deepEqual(result.intents,['off_playbook']);assert.equal(result.policyReviewFallback,true);assert.equal(result.reason,'classifier_policy_review_fallback');assert.equal(result.callIds.length,2);
+  assert.deepEqual(db.sqlite.prepare('SELECT status FROM lead_classifier_calls ORDER BY rowid').all().map(row=>row.status),['completed','failed']);
 });
