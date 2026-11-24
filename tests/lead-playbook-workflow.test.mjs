@@ -1,3 +1,4 @@
+import {withVerifiedTextSafety} from "./helpers/airtable-text-safety-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -11,7 +12,7 @@ import {createPlaybookLink, readPlaybookLink, playbookHash} from '../lib/lead-pl
 import {processPlaybookMirror, queuePlaybookMirrorStatement} from '../lib/lead-playbook-mirror.mjs';
 import {controlledLeadRecipientAllowed} from '../lib/lead-rollout-policy.mjs';
 const bundle = await build({stdin: {contents: "export * from './lib/lead-playbook-service.js';", resolveDir: process.cwd()}, bundle: true, platform: 'node', format: 'esm', write: false, plugins: [{name: 'fake-provider', setup(builder) { builder.onResolve({filter: /^\.\/lead-assistant$/}, () => ({path: 'provider', namespace: 'fixture'})); builder.onLoad({filter: /.*/, namespace: 'fixture'}, () => ({contents: "export async function sendLeadMessage(){throw new Error('Real sends forbidden in tests');}", loader: 'js'})); }}]});
-const api = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const api = withVerifiedTextSafety(await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64')));
 const adminBundle = await build({stdin: {contents: "export * from './lib/lead-playbook-admin.js';", resolveDir: process.cwd()}, bundle: true, platform: 'node', format: 'esm', write: false, plugins: [{name: 'admin-boundary', setup(builder) {
   builder.onResolve({filter: /^(next\/headers|\.\/(?:admin-auth|cloudflare|db|rate-limit))$/}, args => ({path: args.path, namespace: 'boundary'}));
   builder.onLoad({filter: /.*/, namespace: 'boundary'}, args => ({contents: args.path === 'next/headers' ? 'export const headers=async()=>new Headers();' : args.path === './admin-auth' ? 'export const verifyAdminRequest=async()=>({authorized:globalThis.__playbookBoundary.authorized,email:"owner@example.test"});' : args.path === './cloudflare' ? 'export const getRuntimeEnv=()=>globalThis.__playbookBoundary.env;' : args.path === './db' ? 'export const getDb=()=>globalThis.__playbookBoundary.db;' : 'export const checkRateLimit=async()=>({allowed:true});export const rateLimitResponse=()=>Response.json({}, {status:429});', loader: 'js'}));
@@ -138,7 +139,7 @@ test('Sona, Craig ownership, suppressions and paused settings block sending', as
 test('edited approval records only redacted learning candidates and counts edits', async () => {
   const {db, draft} = await fixture();
   const canonical = draft.body.replace(/\s*Reply STOP to opt out\s*$/, '').trim();
-  await api.actOnPlaybookDraft(db, env, draft.id, {action: 'edit_send', body: 'Hi Casey Example! ' + canonical + ' Your email is casey@example.test.'}, 'owner', {sender: async () => ({provider_message_id: 'ACedited'}), now: noon});
+  await api.actOnPlaybookDraft(db, env, draft.id, {action: 'edit_send', body: 'Hi Casey Example, ' + canonical + ' Your email is casey@example.test.'}, 'owner', {sender: async () => ({provider_message_id: 'ACedited'}), now: noon});
   const row = db.sqlite.prepare("SELECT * FROM playbook_candidates WHERE source='approved_edit'").get();
   assert.ok(row); assert.doesNotMatch(row.answer_redacted, /Casey Example|casey@example.test|4195550100/);
   assert.equal(db.sqlite.prepare("SELECT edits FROM lead_playbook_intent_stats WHERE intent='confirm_yes'").get().edits, 1);
@@ -200,6 +201,7 @@ test('body-hash binding and twelve-hour expiry reject stale reviews without send
 });
 test('notification transport is separately gated and deduplicated using a fake provider', async () => {
   const {db, draft} = await fixture(); let calls = 0;
+  db.sqlite.prepare("UPDATE lead_reply_drafts SET reason='custom_pricing' WHERE id=?").run(draft.id);
   const fetcher = async (_url, request) => { calls++; const payload = JSON.parse(request.body); assert.equal(payload.to[0], '+14195550199'); assert.ok(payload.content.includes('/admin/playbook/d/')); return Response.json({data: {id: 'ACnotify'}}); };
   assert.equal((await api.notifyPlaybookDraft(db, env, draft.id, {fetcher, now: noon})).enabled, false);
   const configured = {...env, LEAD_PLAYBOOK_NOTIFY_ENABLED: 'true', QUO_API_KEY: 'fake', QUO_FROM_NUMBER: '+14195550188'};

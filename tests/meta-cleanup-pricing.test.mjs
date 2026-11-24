@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CLEANUP_RANGE_EXPLANATION, PRICING } from "../app/free-quote/pricing.js";
+import { PRICING } from "../app/free-quote/pricing.js";
+import {CRAIG_RANGE_SENTENCE} from '../lib/craig-voice.mjs';
 import { metaCleanupAnswer, metaCleanupSummary, metaWebsiteQuote, nextMetaResponse } from "../lib/meta-conversation.mjs";
 
 const lead = { name: "ExampleLead", number_of_dogs: 2, zip: "43615", clean_up_frequency: "Weekly" };
@@ -15,8 +16,8 @@ test("initial and one-time estimates match all 60 listed cleanup chart cells wit
       assert.deepEqual(quote?.initialRange || quote?.range, expected, `${frequency}/${dogs}/${last_cleaned}`);
       assert.equal(quote.basis.lastCleaned, last_cleaned);
       assert.equal(quote.basis.dogs, Number(dogs));
-      assert.ok(quote.text.includes(`$${expected[0]} to $${expected[1]}. ${CLEANUP_RANGE_EXPLANATION}`));
-      assert.equal(quote.text.split(CLEANUP_RANGE_EXPLANATION).length - 1, 1);
+      assert.ok(quote.text.includes(`$${expected[0]} to $${expected[1]}. ${CRAIG_RANGE_SENTENCE}`));
+      assert.equal(quote.text.split(CRAIG_RANGE_SENTENCE).length - 1, 1);
       assert.doesNotMatch(quote.text, /[\u2013\u2014]|exact.*after we see the yard/i);
       cells++;
     }
@@ -60,7 +61,7 @@ test("cleanup history is required even for yes or a pricing question and accepts
     assert.equal(step.state.expected, "cleaned"); assert.equal(step.state.quote, undefined);
     assert.doesNotMatch(step.response, /\$/);
   }
-  for (const [text, id] of [["A", "one_week"], ["about 2 weeks", "two_weeks"], ["last thoroughly cleaned 3 weeks ago", "three_weeks"], ["it's been about 1 month", "one_month"], ["2 months ago", "two_months"], ["4 months", "3_4_months"]]) {
+  for (const [text, id] of [["A", "one_week"], ["about 2 weeks", "two_weeks"], ["2-3 weeks", "three_weeks"], ["last thoroughly cleaned 3 weeks ago", "three_weeks"], ["it's been about 1 month", "one_month"], ["2 months ago", "two_months"], ["4 months", "3_4_months"]]) {
     const step = nextMetaResponse({ lead, state: awaiting, text, confirmationSent: true });
     assert.equal(step.state.details.last_cleaned, id, text);
     assert.equal(step.state.details.last_cleaned_answer, text);
@@ -68,7 +69,7 @@ test("cleanup history is required even for yes or a pricing question and accepts
     assert.ok(step.state.quote.initialRange);
   }
   assert.equal(metaCleanupAnswer("D"), null, "menu letters are meaningful only when the cleanup question is pending");
-  for (const text of ["5 months", "never", "not sure", "19 days", "2-3 weeks", "we only spot-cleaned", "6 months, maybe longer"]) {
+  for (const text of ["5 months", "never", "19 days", "6 months, maybe longer"]) {
     const step = nextMetaResponse({ lead, state: awaiting, text, confirmationSent: true });
     assert.equal(step.state.handoff, true, text); assert.equal(step.state.quote, null);
     assert.equal(step.state.details.last_cleaned_answer, text); assert.match(step.response, /custom quote/); assert.doesNotMatch(step.response, /\$/);

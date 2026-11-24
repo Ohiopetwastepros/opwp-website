@@ -111,6 +111,23 @@ test("worker check rejects imported processors with no call, including the repor
   assert.doesNotThrow(() => checkQuoteFollowUpWorker(patched));
 });
 
+test("worker check requires every processor and an actual call inside the ten-minute guard", () => {
+  assert.throws(() => checkQuoteFollowUpWorker(fixture), /missing required processor import runScheduledQuoteFollowUps/);
+  const patched = patchQuoteFollowUpWorker(fixture);
+  for (const name of processors) {
+    const removedImport = patched.replace(new RegExp(`^import \\{ ${name} \\} from [^\\n]+\\n`, "m"), "");
+    assert.throws(() => checkQuoteFollowUpWorker(removedImport), new RegExp(`missing required processor import ${name}`));
+    const commentOnly = patched.replace(`${name}(env)`, `Promise.resolve(/* ${name}(env) */)`);
+    assert.throws(() => checkQuoteFollowUpWorker(commentOnly), new RegExp(`imports ${name} but never calls it on the \\*/10 schedule`));
+    const outsideSchedule = patched.replace(`${name}(env)`, "Promise.resolve()")
+      .replace("async scheduled(controller, env, ctx) {", `async scheduled(controller, env, ctx) { ctx.waitUntil(${name}(env));`);
+    assert.throws(() => checkQuoteFollowUpWorker(outsideSchedule), new RegExp(`imports ${name} but never calls it`));
+  }
+  assert.throws(() => checkQuoteFollowUpWorker(patched.replaceAll('controller.cron === "*/10 * * * *"', 'controller.cron === "5 * * * *"')), /never calls it on the \*\/10 schedule/);
+  const commentedGuard = patched.replace('if (controller.cron === "*/10 * * * *") ctx.waitUntil(', 'if (controller.cron === "5 * * * *") ctx.waitUntil(/* if (controller.cron === "*/10 * * * *") ctx.waitUntil( */');
+  assert.throws(() => checkQuoteFollowUpWorker(commentedGuard), /never calls it on the \*\/10 schedule/);
+});
+
 test("the actual build patch chain installs and validates follow-ups on an OpenNext fixture", async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "opwp-quote-worker-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));

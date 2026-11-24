@@ -16,6 +16,7 @@ test('lead sender blocks an unapproved recipient before database work or provide
   let providerCalls = 0;
   const api = vm.runInNewContext(source('lead-assistant.js') + '\n({sendLeadMessage,sendQuoSms});', {
     URL, controlledLeadRecipientAllowed, normalizePhone,
+    readAirtableTextSafety: async () => { throw new Error('Text safety must not run before the controlled-recipient gate.'); },
     outboundFetch: async () => { providerCalls++; return Response.json({data: {id: 'fixture-receipt'}}); },
   });
   const db = {prepare() { throw new Error('Database must not be touched before the recipient gate.'); }};

@@ -12,6 +12,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { playbookEnabled } from "@/lib/lead-playbook.mjs";
 import { quoLearningScope } from "@/lib/playbook-ownership.mjs";
 import { recordPlaybookQuoEvent } from "@/lib/lead-playbook-ingest";
+import {handleWinbackReceipt} from '@/lib/winback-runtime.mjs';
 
 export const dynamic = "force-dynamic";
 const responseHeaders = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
@@ -44,6 +45,7 @@ export async function POST(request) {
     if (!scope.learningOnly) {
       await recordQuoDelivery(db, body);
       await recordFoodCollectionDelivery(db, body);
+      await handleWinbackReceipt(db, env, body);
     }
     if (event && playbookEnabled(env)) await recordPlaybookQuoEvent(db, env, event);
     return Response.json({ ok: true, accepted: 1 }, { headers: responseHeaders });

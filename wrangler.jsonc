@@ -77,7 +77,14 @@
     "META_TEST_APPROVAL_ID": "meta-test-2026-11-18",
     "META_TEST_RECIPIENTS": "+14192620424",
     "META_TEST_FORM_IDS": "1725121795904553",
-    "META_APPROVED_SMS_FORMS": "{\"1725121795904553\":{\"pageId\":\"617929208074485\",\"consentField\":\"text_message_consent\",\"disclosure\":\"Can we text you your quote? By choosing Yes, you agree Ohio Pet Waste Pros may send texts, including automated texts, about your quote and service to the number above. Consent isn't required to buy. Msg and data rates may apply. Reply STOP to opt out.\",\"version\":\"fb-consent-2026-11-18\"}}"
+    "META_APPROVED_SMS_FORMS": "{\"1725121795904553\":{\"pageId\":\"617929208074485\",\"consentField\":\"text_message_consent\",\"disclosure\":\"Can we text you your quote? By choosing Yes, you agree Ohio Pet Waste Pros may send texts, including automated texts, about your quote and service to the number above. Consent isn't required to buy. Msg and data rates may apply. Reply STOP to opt out.\",\"version\":\"fb-consent-2026-11-18\"}}",
+    "WINBACK_ENABLED": "false",
+    "WINBACK_SEND_ENABLED": "false",
+    "WINBACK_AUTOREPLY_ENABLED": "false",
+    "WINBACK_KILL_SWITCH": "true",
+    "WINBACK_STORAGE_READY": "false",
+    "WINBACK_CAMPAIGN_ID": "",
+    "WINBACK_SNG_PAUSED_PATH": ""
   },
   "observability": {
     "enabled": true,
