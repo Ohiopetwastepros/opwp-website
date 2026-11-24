@@ -1,5 +1,6 @@
 import Link from "next/link";
 import GalleryCarousel from "@/components/GalleryCarousel";
+import { localBusinessId } from "@/lib/site";
 
 export const metadata = {
   title: { absolute: "Dog Poop Removal Toledo, OH | Ohio Pet Waste Pros" },
@@ -31,36 +32,12 @@ export const metadata = {
   },
 };
 
-const localBusinessJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "LocalBusiness",
-  "@id": "https://www.ohiopetwastepros.com/#business",
-  name: "Ohio Pet Waste Pros",
-  image: "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
-  description:
-    "Family-owned dog poop removal and pet waste cleanup serving Toledo, Sylvania, Perrysburg and Southeast Michigan.",
-  telephone: "+14192622371",
-  email: "Craig@ohiopetwastepros.com",
-  url: "https://www.ohiopetwastepros.com/",
-  priceRange: "$$",
-  address: { "@type": "PostalAddress", addressLocality: "Holland", addressRegion: "OH", addressCountry: "US" },
-  areaServed: ["Toledo OH", "Sylvania OH", "Perrysburg OH", "Maumee OH", "Holland OH", "Whitehouse OH", "Waterville OH", "Monclova OH", "Rossford OH", "Oregon OH", "Ottawa Hills OH", "Temperance MI", "Lambertville MI", "Bedford Township MI"],
-  geo: { "@type": "GeoCoordinates", latitude: 41.6217, longitude: -83.7141 },
-  knowsAbout: ["pet waste removal service", "pooper scooper service", "dog poop removal", "dog waste removal", "yard sanitizing and deodorizing"],
-  openingHoursSpecification: [
-    { "@type": "OpeningHoursSpecification", dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], opens: "08:00", closes: "18:00" },
-    { "@type": "OpeningHoursSpecification", dayOfWeek: "Saturday", opens: "09:00", closes: "14:00" },
-  ],
-  sameAs: ["https://www.facebook.com/profile.php?id=61575239054687", "https://www.instagram.com/ohio.pet.waste.pros.llc"],
-  aggregateRating: { "@type": "AggregateRating", ratingValue: "5.0", reviewCount: "159" },
-};
-
 const websiteJsonLd = {
   "@context": "https://schema.org",
   "@type": "WebSite",
   name: "Ohio Pet Waste Pros",
   url: "https://www.ohiopetwastepros.com/",
-  publisher: { "@id": "https://www.ohiopetwastepros.com/#business" },
+  publisher: { "@id": localBusinessId },
 };
 
 const faqJsonLd = {
@@ -105,7 +82,6 @@ export default function HomePage() {
   return (
     <div style={{ fontFamily: "'Hanken Grotesk',sans-serif", color: "#1C2A33" }}>
       <style>{`@keyframes opwp-reviews { from { transform: translateX(0); } to { transform: translateX(-50%); } }`}</style>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
 

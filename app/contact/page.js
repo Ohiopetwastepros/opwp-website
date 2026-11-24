@@ -1,3 +1,5 @@
+import { localBusinessId, site } from "@/lib/site";
+
 export const metadata = {
   title: {
     absolute: "Contact Ohio Pet Waste Pros | Free Dog Poop Removal Quote in Toledo",
@@ -14,7 +16,7 @@ export const metadata = {
     description:
       "Call or text (419) 262-2371, or request a free dog waste removal quote online.",
     images: [
-      "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
+      site.url + site.logoPath,
     ],
   },
 };
@@ -23,33 +25,7 @@ const contactJsonLd = {
   "@context": "https://schema.org",
   "@type": "ContactPage",
   name: "Contact Ohio Pet Waste Pros",
-  mainEntity: {
-    "@type": "LocalBusiness",
-    name: "Ohio Pet Waste Pros",
-    telephone: "+14192622371",
-    email: "Craig@ohiopetwastepros.com",
-    address: {
-      "@type": "PostalAddress",
-      addressLocality: "Holland",
-      addressRegion: "OH",
-      addressCountry: "US",
-    },
-    areaServed: "Greater Toledo, OH and SE Michigan",
-    openingHoursSpecification: [
-      {
-        "@type": "OpeningHoursSpecification",
-        dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-        opens: "09:00",
-        closes: "18:00",
-      },
-      {
-        "@type": "OpeningHoursSpecification",
-        dayOfWeek: "Saturday",
-        opens: "09:00",
-        closes: "14:00",
-      },
-    ],
-  },
+  mainEntity: { "@id": localBusinessId },
 };
 
 const methodCard = {
@@ -284,8 +260,8 @@ export default function ContactPage() {
                       lineHeight: 1.5,
                     }}
                   >
-                    <strong>Mon–Fri</strong> 9:00am–6:00pm &nbsp;·&nbsp;{" "}
-                    <strong>Sat</strong> 9:00am–2:00pm &nbsp;·&nbsp;{" "}
+                    {site.hours}<br />
+                    {site.seasonalHours}<br />
                     <strong>Sun</strong> closed
                   </div>
                 </div>

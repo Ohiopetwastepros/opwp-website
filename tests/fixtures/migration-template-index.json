@@ -59,6 +59,7 @@
     "0056_dog_food_inventory_costs.sql",
     "0057_unified_field_app.sql",
     "0058_routing_provider_controls.sql",
-    "0059_routing_provider_pacing.sql"
+    "0059_routing_provider_pacing.sql",
+    "0070_staff_shift_mapping.sql"
   ]
 }

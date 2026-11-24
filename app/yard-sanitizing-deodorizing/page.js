@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { localBusinessId, site } from "@/lib/site";
 
 export const metadata = {
   title: "Yard Sanitizing & Deodorizing in Toledo, Sylvania & Perrysburg | Ohio Pet Waste Pros",
@@ -14,7 +15,7 @@ export const metadata = {
     url: "https://www.ohiopetwastepros.com/yard-sanitizing-deodorizing/",
     siteName: "Ohio Pet Waste Pros",
     images: [
-      "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
+      site.url + site.logoPath,
     ],
   },
   twitter: { card: "summary_large_image" },
@@ -28,12 +29,7 @@ const serviceJsonLd = {
   "@context": "https://schema.org",
   "@type": "Service",
   serviceType: "Yard sanitizing and deodorizing",
-  provider: {
-    "@type": "LocalBusiness",
-    name: "Ohio Pet Waste Pros",
-    telephone: "+14192622371",
-    areaServed: "Greater Toledo, OH and SE Michigan",
-  },
+  provider: { "@id": localBusinessId },
   areaServed: ["Toledo OH", "Sylvania OH", "Perrysburg OH", "Maumee OH", "Holland OH"],
   description:
     "Pet-safe yard sanitizing and deodorizing that neutralizes odor and reduces bacteria after dog waste removal. Available as an add-on to weekly, bi-weekly and one-time service.",

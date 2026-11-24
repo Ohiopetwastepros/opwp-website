@@ -1,3 +1,4 @@
+import { localBusinessId, site } from "@/lib/site";
 import Link from "next/link";
 
 export const metadata = {
@@ -15,7 +16,7 @@ export const metadata = {
     url: "https://www.ohiopetwastepros.com/one-time-yard-cleanup/",
     siteName: "Ohio Pet Waste Pros",
     images: [
-      "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
+      site.url + site.logoPath,
     ],
   },
   twitter: { card: "summary_large_image" },
@@ -29,12 +30,7 @@ const serviceJsonLd = {
   "@context": "https://schema.org",
   "@type": "Service",
   serviceType: "One-time dog waste cleanup",
-  provider: {
-    "@type": "LocalBusiness",
-    name: "Ohio Pet Waste Pros",
-    telephone: "+14192622371",
-    areaServed: "Greater Toledo, OH and SE Michigan",
-  },
+  provider: { "@id": localBusinessId },
   areaServed: ["Toledo OH", "Sylvania OH", "Perrysburg OH", "Maumee OH", "Holland OH"],
   description:
     "A thorough one-time or spring dog waste cleanup to reset a built-up yard, with double-bagging and a gate photo. No contracts.",

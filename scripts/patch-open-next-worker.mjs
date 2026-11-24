@@ -53,9 +53,16 @@ ${importMarker}
 if (!source.includes("legacyHostRedirect")) {
   const fetchMarker = "async fetch(request, env, ctx) {";
   if (!source.includes(fetchMarker)) throw new Error("OpenNext fetch marker was not found; legacy-host routing was not installed.");
-  source = 'import { legacyHostRedirect } from "../lib/legacy-host-redirect.mjs";\n' + source.replace(fetchMarker, `${fetchMarker}
+  source = 'import { apexHostRedirect, legacyHostRedirect } from "../lib/legacy-host-redirect.mjs";\n' + source.replace(fetchMarker, `${fetchMarker}
+        const apexRedirect = apexHostRedirect(request);
+        if (apexRedirect) return apexRedirect;
         const legacyRedirect = legacyHostRedirect(request);
-        if (legacyRedirect) return legacyRedirect;`);
+        if (legacyRedirect) {
+            const asset = await env.ASSETS.fetch(request);
+            if (asset.status !== 404) return asset;
+            await asset.body?.cancel();
+            return legacyRedirect;
+        }`);
   await fs.writeFile(workerPath, source);
 }
 

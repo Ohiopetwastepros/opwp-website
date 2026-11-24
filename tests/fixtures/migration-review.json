@@ -3895,6 +3895,19 @@
           "encoded_literals_reviewed": []
         }
       ]
+    },
+    {
+      "file": "0070_staff_shift_mapping.sql.template",
+      "sha256": "0a1dc71fe8462300902609f2a90c6a6f40e068eea3c0e3745a259ec60f5306de",
+      "statements": [
+        {
+          "ordinal": 1,
+          "kind": "INSERT",
+          "classification": "fabricated test-only staff mapping; production identity and provider ID stay private",
+          "quoted_literals_reviewed": 5,
+          "encoded_literals_reviewed": []
+        }
+      ]
     }
   ]
 }

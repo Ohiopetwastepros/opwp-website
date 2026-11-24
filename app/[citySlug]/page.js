@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import CityPage from "@/components/CityPage";
 import { cities, getCity } from "@/data/cities";
-import { site } from "@/lib/site";
+import { localBusinessId, site } from "@/lib/site";
 
 export function generateStaticParams() {
   // Only city slugs — static routes (about, blog, etc.) take priority.
@@ -26,7 +26,7 @@ export async function generateMetadata({ params }) {
       description: `Reliable, family-owned dog waste removal serving ${c.city}, ${c.state} and the Greater Toledo area.`,
       url,
       siteName: "Ohio Pet Waste Pros",
-      images: ["https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png"],
+      images: [site.url + site.logoPath],
     },
     twitter: { card: "summary_large_image" },
     other: {
@@ -48,19 +48,7 @@ export default async function Page({ params }) {
     "@type": "Service",
     serviceType: "Dog poop removal",
     name: `Dog Poop Removal in ${c.city}, ${c.stateAbbr}`,
-    provider: {
-      "@type": "LocalBusiness",
-      "@id": "https://www.ohiopetwastepros.com/#business",
-      name: "Ohio Pet Waste Pros",
-      image: "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
-      telephone: "+14192622371",
-      email: "Craig@ohiopetwastepros.com",
-      url: "https://www.ohiopetwastepros.com/",
-      priceRange: "$$",
-      address: { "@type": "PostalAddress", addressLocality: "Holland", addressRegion: "OH", addressCountry: "US" },
-      sameAs: ["https://www.facebook.com/profile.php?id=61575239054687", "https://www.instagram.com/ohio.pet.waste.pros.llc"],
-      aggregateRating: { "@type": "AggregateRating", ratingValue: "5.0", reviewCount: "159" },
-    },
+    provider: { "@id": localBusinessId },
     areaServed: {
       "@type": "City",
       name: `${c.city}, ${c.state}`,

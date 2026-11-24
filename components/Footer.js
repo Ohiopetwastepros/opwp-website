@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { site } from "@/lib/site";
 
 export default function Footer() {
   return (
@@ -57,6 +58,9 @@ export default function Footer() {
             <a href="tel:419-262-2371" style={{ textDecoration: "none", color: "#fff", fontFamily: "var(--font-bricolage)", fontWeight: 700, fontSize: 18 }}>419-262-2371</a>
             <a href="mailto:Craig@ohiopetwastepros.com" style={{ textDecoration: "none", color: "#aebecd" }}>Craig@ohiopetwastepros.com</a>
             <span style={{ color: "#9fb1c2" }}>Based in Holland, OH</span>
+            <span style={{ color: "#9fb1c2", lineHeight: 1.55 }}>
+              {site.hours}<br />{site.seasonalHours}
+            </span>
             <span style={{ color: "#9fb1c2", lineHeight: 1.55 }}>Serving Toledo, Sylvania, Perrysburg, Maumee, Holland, Whitehouse &amp; SE Michigan</span>
           </div>
         </div>
