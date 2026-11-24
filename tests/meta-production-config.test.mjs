@@ -16,7 +16,7 @@ test('production Meta verification permits only Craig while cadence and win-back
   assert.equal(vars.META_AUTOMATION_ENABLED, 'false');
   assert.equal(vars.META_TEST_RECIPIENTS, '+14192620424');
   assert.equal(vars.META_TEST_FORM_IDS, '1725121795904553');
-  assert.equal(vars.META_TEST_APPROVAL_ID, 'meta-test-2026-11-23-craig-one-test');
+  assert.equal(vars.META_TEST_APPROVAL_ID, 'meta-test-conversation-2026-11-23-craig');
   assert.equal(vars.LEAD_AUTOMATION_CONTROLLED_TEST_ONLY, 'true');
   assert.equal(vars.LEAD_PLAYBOOK_NOTIFY_ENABLED, 'false');
   assert.equal(vars.META_CADENCE_ENABLED, 'false');

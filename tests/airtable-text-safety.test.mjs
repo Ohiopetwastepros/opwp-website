@@ -104,6 +104,82 @@ test("STOP durably updates existing records first and reports missing Meta Text 
   assert.ok(f.calls.every((c) => c.method !== "POST"));
 });
 
+test("Craig's Meta test STOP updates only Meta Leads and leaves his real Customers record unchanged", async () => {
+  for (const testMode of ["true"]) {
+    const f = fixture(), before = structuredClone(f.rows[AIRTABLE_TEXT_SAFETY_TABLES[0]]);
+    const result = await syncAirtableTextStatus({...env, META_TEST_MODE: testMode}, {phone, doNotText: true, status: "Asked to stop", note: "Test STOP", at: "2026-11-23T23:30:00Z", eventId: "mock-test-stop"}, {fetcher: f.fetcher});
+    assert.equal(result.verified, true);
+    assert.equal(result.scope, "meta_leads_test_only");
+    assert.deepEqual(result.records, [{tableId: AIRTABLE_TEXT_SAFETY_TABLES[1], id: recordId("m")}]);
+    assert.deepEqual(f.rows[AIRTABLE_TEXT_SAFETY_TABLES[0]], before);
+    assert.equal(f.rows[AIRTABLE_TEXT_SAFETY_TABLES[1]][0].fields[ids.blocked], true);
+    assert.equal(f.rows[AIRTABLE_TEXT_SAFETY_TABLES[1]][0].fields[ids.status], "Asked to stop");
+    const writes = f.calls.filter(call => call.method !== "GET");
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].method, "PATCH");
+    assert.ok(writes[0].url.pathname.includes(AIRTABLE_TEXT_SAFETY_TABLES[1]));
+    assert.deepEqual(Object.keys(writes[0].body.fields).sort(), [ids.blocked, ids.status, ids.notes].sort());
+    assert.ok(f.calls.some(call => call.method === "GET" && call.url.pathname.endsWith(AIRTABLE_TEXT_SAFETY_TABLES[0])), "Customers must still be read for permission");
+  }
+});
+
+test("live mode still propagates Craig's STOP to both source-owned tables", async () => {
+  for (const testMode of [undefined, false, "false"]) {
+    const f = fixture();
+    const result = await syncAirtableTextStatus({...env, META_TEST_MODE: testMode}, {phone, doNotText: true, status: "Asked to stop", note: "STOP", at: "2026-11-23T23:30:00Z"}, {fetcher: f.fetcher});
+    assert.equal(result.verified, true);
+    assert.equal(result.scope, undefined);
+    assert.equal(result.records.length, 2);
+    for (const table of AIRTABLE_TEXT_SAFETY_TABLES) assert.equal(f.rows[table][0].fields[ids.blocked], true);
+  }
+});
+
+test("the test write exception never applies to another phone, even when configured as the test recipient", async () => {
+  const other = "+14195550123";
+  const records = Object.fromEntries(AIRTABLE_TEXT_SAFETY_TABLES.map((tableId, index) => [tableId, [{id: recordId(index ? "m" : "c"), fields: {[ids.phone]: other, [ids.status]: "OK", [ids.notes]: "Existing note"}}]]));
+  const f = fixture({records});
+  const result = await syncAirtableTextStatus({...env, META_TEST_MODE: "true", META_TEST_RECIPIENTS: other}, {phone: other, doNotText: true, status: "Asked to stop", note: "STOP", at: "2026-11-23T23:30:00Z"}, {fetcher: f.fetcher});
+  assert.equal(result.verified, true);
+  assert.equal(result.scope, undefined);
+  assert.equal(result.records.length, 2);
+  assert.equal(f.calls.filter(call => call.method === "PATCH").length, 2);
+});
+
+test("Craig's Meta test continues to honor Do Not Text on the read-only Customers record", async () => {
+  const f = fixture({records: {[AIRTABLE_TEXT_SAFETY_TABLES[0]]: [{id: recordId("c"), fields: {[ids.phone]: phone, [ids.blocked]: true, [ids.status]: "Asked to stop", [ids.notes]: "Existing customer opt-out"}}]}});
+  const result = await readAirtableTextSafety({...env, META_TEST_MODE: "true"}, phone, {fetcher: f.fetcher});
+  assert.equal(result.verified, true);
+  assert.equal(result.doNotText, true);
+  assert.equal(result.reason, "airtable_do_not_text");
+  assert.ok(result.records.some(record => record.tableId === AIRTABLE_TEXT_SAFETY_TABLES[0] && record.doNotText));
+  assert.ok(f.calls.every(call => call.method === "GET"));
+});
+
+test("Craig's test cannot report a mirrored STOP when only his real Customers record matches", async () => {
+  const f = fixture({records: {[AIRTABLE_TEXT_SAFETY_TABLES[1]]: []}});
+  const before = structuredClone(f.rows[AIRTABLE_TEXT_SAFETY_TABLES[0]]);
+  const result = await syncAirtableTextStatus({...env, META_TEST_MODE: "true"}, {phone, doNotText: true, status: "Asked to stop", note: "Test STOP", at: "2026-11-23T23:30:00Z"}, {fetcher: f.fetcher});
+  assert.equal(result.verified, false);
+  assert.equal(result.partial, false);
+  assert.equal(result.scope, "meta_leads_test_only");
+  assert.equal(result.reason, "airtable_contact_not_found");
+  assert.deepEqual(result.records, []);
+  assert.deepEqual(f.rows[AIRTABLE_TEXT_SAFETY_TABLES[0]], before);
+  assert.ok(f.calls.every(call => call.method === "GET"));
+});
+
+test("Craig's test still reports missing Meta notes after writing only Meta opt-out flags", async () => {
+  const f = fixture({missingMetaNotes: true}), before = structuredClone(f.rows[AIRTABLE_TEXT_SAFETY_TABLES[0]]);
+  const result = await syncAirtableTextStatus({...env, META_TEST_MODE: "true"}, {phone, doNotText: true, status: "Asked to stop", note: "Test STOP", at: "2026-11-23T23:30:00Z"}, {fetcher: f.fetcher});
+  assert.equal(result.verified, false);
+  assert.equal(result.partial, true);
+  assert.equal(result.scope, "meta_leads_test_only");
+  assert.deepEqual(result.reasons, ["airtable_text_status_notes_missing"]);
+  assert.equal(result.records.length, 1);
+  assert.deepEqual(f.rows[AIRTABLE_TEXT_SAFETY_TABLES[0]], before);
+  assert.equal(f.calls.filter(call => call.method === "PATCH").length, 1);
+});
+
 test("status sync appends dated notes, verifies readback, and does not duplicate an event", async () => {
   const f = fixture(); const command = { phone, doNotText: true, status: "Opted out in Quo", note: "Provider opt-out", at: "2026-11-23T23:30:00Z", eventId: "mock-provider-event" };
   const first = await syncAirtableTextStatus(env, command, { fetcher: f.fetcher });

@@ -112,6 +112,42 @@ test("confirmation storage, mocked Quo delivery and message history preserve the
   assert.equal(select(db, "lead_messages").find((message) => message.provider_message_id === "copy-preserved-sms").body, expected);
 });
 
+test("Craig's test confirmation retains a separate STOP footer across storage, refresh and send despite contact history", async () => {
+  const db = database(); approve(db);
+  db.sqlite.exec(`INSERT INTO meta_automation_releases VALUES ('craig-test','org-opwp','meta-confirmation-v2-test','fixture-owner','Mock test only',datetime('now','-1 minute'),NULL);
+    INSERT INTO submissions(id,kind,source,status,phone,payload) VALUES ('prior-craig','question','website','deleted','+14192620424','{}');`);
+  const env = {...environment(db, false), META_TEST_MODE:'true', META_TEST_APPROVAL_ID:'craig-test', META_TEST_RECIPIENTS:'+14192620424', META_TEST_FORM_IDS:'form-1', META_CADENCE_ENABLED:'false', LEAD_PLAYBOOK_ENABLED:'true', LEAD_AUTOMATION_CONTROLLED_TEST_ONLY:'true'};
+  const lead = await storeMetaLead(db, env, form('craig-footer', {full_name:'Test Lead Craig',phone_number:'+14192620424',zip_code:'43551'}), event('craig-footer'));
+  let job = select(db,'meta_sms_jobs')[0];
+  assert.match(job.message_body,/\n\nReply STOP to opt out$/);
+  db.sqlite.prepare("UPDATE meta_sms_jobs SET message_body='Legacy body' WHERE id=?").run(job.id);
+  await refreshPendingMetaConfirmations(db,{submissionId:lead.id,env});
+  job = select(db,'meta_sms_jobs')[0];
+  assert.match(job.message_body,/\n\nReply STOP to opt out$/);
+  const sent=[];
+  const result=await processMetaConfirmations(env,{submissionId:lead.id,loadCustomerDirectory(){assert.fail('Craig test does not query the customer directory');},fetcher:async (_url,request)=>{
+    const payload=JSON.parse(request.body);assert.deepEqual(payload.to,['+14192620424']);sent.push(payload.content);return Response.json({data:{id:'mock-craig-footer'}});
+  }});
+  assert.equal(result.sent,1);
+  assert.equal(sent.length,1);
+  assert.match(sent[0],/\n\nReply STOP to opt out$/);
+  assert.equal((sent[0].match(/STOP/g)||[]).length,1);
+  assert.doesNotMatch(sent[0],/[\u2013\u2014]/);
+  assert.equal(db.sqlite.prepare("SELECT status FROM submissions WHERE id='prior-craig'").get().status,'deleted','Prior history stays intact');
+  db.sqlite.close();
+});
+
+test("test-mode footer override does not apply to live Craig or another test recipient", async () => {
+  for (const [phone,testMode] of [['+14192620424','false'],['+14195550100','true']]) {
+    const db=database();
+    db.sqlite.prepare("INSERT INTO submissions(id,kind,source,status,phone,payload) VALUES ('earlier','question','website','deleted',?,'{}')").run(phone);
+    const env={...environment(db,false),META_TEST_MODE:testMode,META_TEST_RECIPIENTS:phone,META_TEST_FORM_IDS:'form-1'};
+    await storeMetaLead(db,env,form('repeat',{phone_number:phone}),event('repeat'));
+    assert.doesNotMatch(select(db,'meta_sms_jobs')[0].message_body,/STOP/);
+    db.sqlite.close();
+  }
+});
+
 test("pending confirmation copy refresh never sends, releases, or rewrites attempted and sent history", async () => {
   const db = database(), env = environment(db, false);
   const statuses = ["queued", "blocked", "sending", "sent", "delivered", "failed", "unknown", "cancelled"];

@@ -148,11 +148,11 @@ test("bounded affirmative variants also confirm signup identity without dropping
   assert.equal(decision.state.details.trashLocation, "by the garage");
 });
 
-test("an exactly scoped controlled-test Meta affirmative advances once despite an existing-customer match", async t => {
+test("Craig's test-mode Meta affirmative advances once despite an existing-customer match", async t => {
   for (const matchedDirectory of ["/api/v1/clients/active", "/api/v1/clients/active_no_subscription"]) {
     const db = leadTestDatabase();
     t.after(() => db.sqlite.close());
-    const phone = "+14195550100", business = "+14195550188", stateJson = JSON.stringify(initial);
+    const phone = "+14192620424", business = "+14195550188", stateJson = JSON.stringify(initial);
     const consent = {valid: true, formId: 'affirmative-form', pageId: 'affirmative-page', field: 'sms_consent', answer: 'yes', version: 'fixture-v1', disclosure: 'Fixture consent', capturedAt: '2026-11-21T15:00:00Z'};
     db.sqlite.prepare(`INSERT INTO submissions(id,kind,source,status,name,phone,email,payload)
       VALUES ('affirmative-lead','question','facebook','new',?,?,?,?)`)
@@ -171,8 +171,7 @@ test("an exactly scoped controlled-test Meta affirmative advances once despite a
     const directoryReads = [], customerSends = [];
     const env = {LEAD_PLAYBOOK_ENABLED: "true", LEAD_PLAYBOOK_AUTO_SEND_ENABLED: "true",
       LEAD_AUTOMATION_CONTROLLED_TEST_ONLY: "true", META_TEST_RECIPIENTS: phone,
-      META_TEST_FORM_IDS: 'affirmative-form',
-      LEAD_PLAYBOOK_CUSTOMER_TEST_EXCEPTION: JSON.stringify({approvalId: 'affirmative-approved-test', approvedBy: 'fixture-owner', approvedAt: '2026-11-21T16:00:00Z', expiresAt: '2026-11-21T18:00:00Z', organizationId: 'org-opwp', submissionId: 'affirmative-lead', conversationId: 'affirmative-thread', phone, formId: 'affirmative-form', metaLeadId: 'affirmative-meta-lead'}),
+      META_TEST_FORM_IDS: 'affirmative-form', META_TEST_MODE: 'true',
       LEAD_PLAYBOOK_CRAIG_CELL: phone, QUO_FROM_NUMBER: business,
       LEAD_CLASSIFIER_ENABLED: "true", AI: {run() {modelCalls++; assert.fail("An exact affirmative must not call a model");}}};
     const event = {providerMessageId: "affirmative-provider-message", direction: "inbound", from: phone, to: business,

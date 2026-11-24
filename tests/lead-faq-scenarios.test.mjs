@@ -350,7 +350,7 @@ test('FAQ 31 | offering a check is fine, but insisting on cash goes to staff', a
   const f = await faqThread(t);
   recurringQuote(await f.inbound('How much?'), 95, 48, 58);
   const payment = await f.inbound("The quote looks good. I'll be home so you can just take a check. Or I can pay cash if that's easier.");
-  answered(payment, /check/i, /(?:don.t|do not|no longer|cannot|can.t) (?:take|accept) cash|cash (?:isn.t|is not|is no longer) accepted/i, setup);
+  answered(payment, /check/i, /cash.*(?:offline.*owner|owner.*offline)/i, setup);
   const cash = await f.inbound('I insist on paying cash. I can only use cash.');
   escalated(f, cash, {reason: /cash|payment/i, quotePrices: [95, 48, 58]});
   assert.doesNotMatch(cash.body, /(?:leave|bring) (?:me |us )?(?:the )?cash|cash (?:works|is fine)/i);
