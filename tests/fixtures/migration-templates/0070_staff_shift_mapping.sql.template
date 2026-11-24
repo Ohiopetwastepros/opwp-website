@@ -1,2 +1,0 @@
-INSERT OR IGNORE INTO staff_integration_mappings (id,display_name,role,sng_employee_id,route_eligible,status)
-VALUES ('fixture-overflow-map','Overflow Example','technician','900004',1,'active');

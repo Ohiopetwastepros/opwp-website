@@ -45,10 +45,38 @@ test("missing hours or values suppress affected totals without suppressing a val
 });
 
 test("eligible shift-only time counts, and the cutoff excludes unfinished days", () => {
-  const result = buildRoutePerformance({ jobs: [job(staffPrivate.primaryName, (fixtureRouteDate(11))), job(staffPrivate.primaryName, (fixtureRouteDate(14)), 900)], shifts: [shift(staffPrivate.primaryName, (fixtureRouteDate(11))), shift(staffPrivate.primaryName, (fixtureRouteDate(12)), 120), shift(staffPrivate.primaryName, (fixtureRouteDate(14)), 60)], throughDate: (fixtureRouteDate(13)) });
+  const result = buildRoutePerformance({ jobs: [job(staffPrivate.primaryName, (fixtureRouteDate(11))), job(staffPrivate.primaryName, (fixtureRouteDate(14)), 900)], shifts: [shift(staffPrivate.primaryName, (fixtureRouteDate(11))), shift(staffPrivate.primaryName, (fixtureRouteDate(12)), 120), shift(staffPrivate.primaryName, (fixtureRouteDate(14)), 60)], throughDate: (fixtureRouteDate(13)), technicians: [{ name: staffPrivate.primaryName, hourlyTarget: 100 }] });
   assert.equal(result.totals.clockedHours, 8);
   assert.equal(result.totals.revenuePerClockedHour, 75);
   assert.equal(result.totals.gapToTarget, 200);
+});
+
+test("an active new technician contributes hours and uses their own target in mixed reports", () => {
+  const date = fixtureRouteDate(11);
+  const newTech = { name: "Overflow Example", status: "active", employeeId: "900004", hourlyTarget: 80 };
+  const technicians = [newTech,
+    { name: staffPrivate.primaryName, status: "active", hourlyTarget: 120 },
+    { name: staffPrivate.reliefName, status: "active", hourlyTarget: 120 },
+  ];
+  const input = {
+    jobs: [job(staffPrivate.primaryName, date, 110), job(newTech.name, date, 150), job(staffPrivate.reliefName, date, 900)],
+    shifts: [shift(staffPrivate.primaryName, date, 60), shift(newTech.name, date, 120), shift(staffPrivate.reliefName, date, 120)],
+  };
+  const result = buildRoutePerformance({ ...input, technicians });
+  const overflow = result.technicians.find(row => row.name === newTech.name);
+  assert.equal(overflow.clockedHours, 2);
+  assert.equal(overflow.revenuePerClockedHour, 75);
+  assert.equal(overflow.target, 80);
+  assert.equal(overflow.gapToTarget, 10);
+  assert.equal(result.totals.revenue, 260);
+  assert.equal(result.totals.clockedHours, 3);
+  assert.equal(result.weeks[0].target, 93.33);
+  assert.equal(result.weeks[0].gapToTarget, 20);
+
+  const missing = buildRoutePerformance({ ...input, technicians: [{ ...newTech, hourlyTarget: null }, ...technicians.slice(1)] });
+  assert.equal(missing.totals.revenuePerClockedHour, 86.67);
+  assert.equal(missing.totals.target, null);
+  assert.equal(missing.totals.gapToTarget, null);
 });
 
 test("invalid shifts and an empty dataset never produce a passing benchmark", () => {
