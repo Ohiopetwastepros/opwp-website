@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CLEANUP_RANGE_EXPLANATION, PRICING, YARD_TIERS, calcLocalQuote, formatCleanupRange, haulAwayPrice, isInArea } from "@/app/free-quote/pricing";
+import { CLEANUP_RANGE_EXPLANATION, PRICING, YARD_TIERS, isInArea } from "@/app/free-quote/pricing";
+import { CRAIG_RATES, craigCleanupRange, craigRangeText, craigRate, craigServiceAddonPrice } from "@/lib/lead-craig-pricing.mjs";
 import { BILLING_VISITS_PER_MONTH, callGuideProration } from "@/lib/call-guide-proration.mjs";
 import { formatLeadPhone } from "@/lib/lead-inbox.mjs";
 import PropertyMap from "./PropertyMap";
@@ -37,7 +38,7 @@ function money(value, minimumFractionDigits = 2) {
 }
 
 function range(value) {
-  return value ? formatCleanupRange(value) : "Custom review";
+  return value ? craigRangeText(value) : "Custom review";
 }
 
 function formatInvoiceRange(value) {
@@ -138,16 +139,22 @@ export default function NewClientCallGuide({ googleMapsKey, routeEndpoint = "/ap
   const quote = useMemo(() => {
     const tier=YARD_TIERS.find(y=>y.id===form.yardSize),plan=PRICING.frequencies.find(f=>f.id===form.frequency);
     const unknownSavedIntake=onSaveDraft&&(!isInArea(form.zip)||!tier||['unsure','xlarge'].includes(tier.id)||!plan||Number(form.dogs)>5||Number(form.dogs)>plan.maxDogs||(form.frequency==='one_time'&&addons.some(id=>PRICING.addons.find(a=>a.id===id)?.charge==='monthly')));
-    return form.dogs&&form.frequency&&form.lastCleaned&&!unknownSavedIntake?calcLocalQuote({dogs:form.dogs,frequency:form.frequency,lastCleaned:form.lastCleaned}):{monthly:null,initialRange:null,oneTimeRange:null};
+    if (!form.dogs || !form.frequency || !form.lastCleaned || unknownSavedIntake) return { monthly: null, initialRange: null, oneTimeRange: null };
+    return {
+      monthly: craigRate(form.frequency, form.dogs),
+      initialRange: craigCleanupRange('initial', form.lastCleaned, form.dogs),
+      oneTimeRange: craigCleanupRange('one_time', form.lastCleaned, form.dogs),
+    };
   }, [form.dogs,form.frequency,form.lastCleaned,form.yardSize,form.zip,addons,onSaveDraft]);
   const yard = YARD_TIERS.find((item) => item.id === form.yardSize);
   const selectedAddons = PRICING.addons.filter((item) => addons.includes(item.id));
-  const addonPrice = (item) => item.id === "haul_away" ? haulAwayPrice(Number(form.dogs)) : item.price;
+  const addonPrice = (item) => craigServiceAddonPrice(item.id, form.dogs);
   const monthlyAddonTotal = selectedAddons.filter((item) => item.charge === "monthly").reduce((sum, item) => sum + addonPrice(item), 0);
   const perTreatmentTotal = selectedAddons.filter((item) => item.charge === "per_treatment").reduce((sum, item) => sum + addonPrice(item), 0);
   const billingVisits = BILLING_VISITS_PER_MONTH[form.frequency] || 1;
   const addonPerVisit = (item) => item.charge === "monthly" ? addonPrice(item) / billingVisits : addonPrice(item);
-  const monthlyTotal = quote.monthly == null || yard?.upcharge === null ? null : quote.monthly + (yard?.upcharge || 0) + monthlyAddonTotal;
+  const needsYardReview = Boolean(yard && yard.id !== 'tiny');
+  const monthlyTotal = quote.monthly == null || needsYardReview ? null : quote.monthly + monthlyAddonTotal;
   const recurringPerCleanup = monthlyTotal == null ? null : monthlyTotal / billingVisits;
   const selectedCleanupRate = recurringPerCleanup == null ? null : recurringPerCleanup + perTreatmentTotal;
   const cleanupRange = form.frequency === "one_time" ? quote.oneTimeRange : quote.initialRange;
@@ -296,7 +303,8 @@ export default function NewClientCallGuide({ googleMapsKey, routeEndpoint = "/ap
             <div><span>Initial cleanup estimate</span><strong>{range(cleanupRange)}</strong></div>
           </div>
           {cleanupRange ? <small className={styles.quoteCaveat}>{CLEANUP_RANGE_EXPLANATION}</small> : null}
-          {!form.yardSize && form.frequency !== "one_time" ? <small className={styles.quoteCaveat}>Select the yard size to finalize the displayed recurring price. The current amount uses no yard-size adjustment.</small> : null}
+          {!form.yardSize && form.frequency !== "one_time" ? <small className={styles.quoteCaveat}>Select the yard size to confirm whether the displayed base rate applies.</small> : null}
+          {needsYardReview && form.frequency !== "one_time" ? <small className={styles.quoteCaveat}>Confirm the yard adjustment before quoting a final recurring rate.</small> : null}
           <div className={styles.addons}><span>Optional add-ons · selections update every total immediately</span>{PRICING.addons.filter((item) => !item.id.startsWith("food_")).map((item) => <label key={item.id}><input type="checkbox" checked={addons.includes(item.id)} onChange={() => toggleAddon(item.id)} /><span><strong>{item.name}</strong><small>{money(addonPrice(item))} {item.charge === "monthly" ? "/ month" : item.charge === "per_treatment" ? "/ treatment" : "one time"}</small><small className={styles.addonVisitRate}>{item.charge === "monthly" ? `${money(addonPerVisit(item))} per visit at ${FREQUENCY_NAMES[form.frequency] || "selected"} frequency` : item.charge === "per_treatment" ? `${money(addonPerVisit(item))} on each treated visit` : `${money(addonPerVisit(item))} on the one-time visit`}</small></span></label>)}</div>
         </Panel>
 
@@ -383,7 +391,7 @@ export default function NewClientCallGuide({ googleMapsKey, routeEndpoint = "/ap
           <div className={styles.priceRows}>
             {form.frequency !== "one_time" ? <>
               <div><span>Base monthly service</span><b>{money(quote.monthly)}</b></div>
-              <div><span>Yard adjustment</span><b>{yard?.upcharge == null ? (yard ? "Custom" : "Pending") : money(yard.upcharge)}</b></div>
+              <div><span>Yard adjustment</span><b>{needsYardReview ? "Office review" : yard ? "Included in base rate" : "Pending"}</b></div>
               {selectedAddons.map((item) => <div key={item.id}><span>{item.name}{item.charge === "monthly" ? " / month" : " / treatment"}</span><b>{money(addonPrice(item))}</b></div>)}
               <div className={styles.total}><span>Ongoing monthly total</span><b>{money(monthlyTotal)}</b></div>
               <div className={styles.perCleanup}><span>Effective rate per cleanup</span><b>{money(selectedCleanupRate)}</b></div>
@@ -394,7 +402,7 @@ export default function NewClientCallGuide({ googleMapsKey, routeEndpoint = "/ap
             </> : <><div className={styles.total}><span>One-time cleanup estimate</span><b>{range(quote.oneTimeRange)}</b></div>{selectedAddons.map((item) => <div key={item.id}><span>{item.name}</span><b>{money(addonPrice(item))}</b></div>)}<div><span>Mock invoice total</span><b>{formatInvoiceRange(invoiceRange)}</b></div></>}
           </div>
           <Script>{form.frequency === "one_time" ? `Based on ${form.dogs} dog${form.dogs === "1" ? "" : "s"} and the current buildup, the one-time cleanup estimate is ${formatInvoiceRange(invoiceRange)} with the selected add-ons.` : `For ${form.dogs} dog${form.dogs === "1" ? "" : "s"} with ${FREQUENCIES[form.frequency]} service, the ongoing rate is ${money(monthlyTotal)} per month. That works out to ${money(selectedCleanupRate)} per cleanup with the selected add-ons. The estimated first invoice is ${formatInvoiceRange(invoiceRange)}.`}{rangeExplanation}</Script>
-          <details className={styles.priceTable}><summary>View current pricing tables</summary>{Object.entries(PRICING.monthly).map(([frequency, rows]) => <div key={frequency}><strong>{FREQUENCY_NAMES[frequency]}</strong><p>{Object.entries(rows).filter(([,value]) => value != null).map(([dogs, value]) => `${dogs} dog${dogs === "1" ? "" : "s"}: ${money(value)}`).join(" · ")}</p></div>)}<div><strong>Selected buildup</strong><p>{LAST_CLEANED_NAMES[form.lastCleaned]} · initial {range(PRICING.initialCleanup[form.lastCleaned]?.[Number(form.dogs)])} · one-time {range(calcLocalQuote({ dogs: form.dogs, frequency: "one_time", lastCleaned: form.lastCleaned }).oneTimeRange)}</p></div></details>
+          <details className={styles.priceTable}><summary>View current pricing tables</summary>{Object.entries(CRAIG_RATES).map(([frequency, rows]) => <div key={frequency}><strong>{FREQUENCY_NAMES[frequency]}</strong><p>{rows.map((value, index) => `${index + 1} dog${index === 0 ? "" : "s"}: ${money(value)}`).join(" · ")}</p></div>)}<div><strong>Selected buildup</strong><p>{LAST_CLEANED_NAMES[form.lastCleaned]} · initial {range(craigCleanupRange('initial', form.lastCleaned, form.dogs))} · one-time {range(craigCleanupRange('one_time', form.lastCleaned, form.dogs))}</p></div></details>
         </Panel>
 
         <Panel eyebrow="Completion check" title={missing.length ? "Still needed" : "Ready to finish"}>

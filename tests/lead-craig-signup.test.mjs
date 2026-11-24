@@ -9,7 +9,7 @@ import {goldenConversations,leads,reply,messyMessages} from './fixtures/lead-cra
 
 function customerCopy(body) {
   assert.ok((body.match(/\?/g)||[]).length<=1,body);
-  assert.doesNotMatch(body,/[\u2013\u2014]|\$\d+\.\d+|\bthe owner\b|have Craig|doggie door|\/api\/onboard|(?:be there|come|arrive) (?:at|by) \d/i);
+  assert.doesNotMatch(body,/[\u2013\u2014]|\bthe owner\b|have Craig|doggie door|\/api\/onboard|(?:be there|come|arrive) (?:at|by) \d/i);
 }
 const cfg=(phase,expected,details={},extra={})=>({craigSignup:{phase,expected,details:{...leads.weekly,...details},...extra}});
 const give=(text,extracted)=>reply(text,undefined,extracted);
@@ -55,7 +55,7 @@ for(const [number,name,verify] of scenarios)test('Craig scenario '+number+': '+n
 
 for (const scenario of goldenConversations) test('golden conversation: '+scenario.name,()=>{
   const opener=buildCraigMetaOpener(scenario.lead);
-  assert.match(opener,/\n\nReply STOP to opt out$/);
+  assert.match(opener,/\n\nReply to opt out:\nSTOP$/);
   assert.equal((opener.match(/\?/g)||[]).length,1);
   const {output,state}=drive(scenario.lead,scenario.turns);
   assert.equal(state.readyForAccountSetup,true,JSON.stringify(output.map(v=>v.body)));
@@ -122,18 +122,51 @@ test('unanswered gibberish twice, recovery after handoff, and STOP before any ot
   assert.equal(compose({...yes,paused:true}).body,'');
 });
 
-test('proposed prices and existing Airtable Notes marker are exact and idempotent',()=>{
+test('verified pricing and Airtable signup status are exact and idempotent',()=>{
   assert.deepEqual(CRAIG_RATES,{twice_a_week:[175,190,225,245,275,305,335],once_a_week:[95,105,120,130,140,150,160],every_other_week:[72,80,92],once_a_month:[55,65]});
   assert.deepEqual(CRAIG_CLEANUP.initial.two_months,[[60,70],[70,80],[80,90],[90,110],[120,140]]);
   assert.deepEqual(CRAIG_CLEANUP.one_time.one_week[0],[27.72,37.5]);
   assert.deepEqual(CRAIG_ADDONS,{sanitization:35,recurringSanitization:30,deodorization:25,haulAway:21,haulAwayLarge:31,frontYard:21,dogFood:59});
   const row={meta_lead_id:'test-1',next_action:'Ready for account setup'};
-  const fields=metaAirtableFields(row,{Notes:'Manual note'});
-  assert.equal(fields.Notes,'Manual note\nReady for account setup');
+  const fields=metaAirtableFields(row,{Notes:'Manual note','Lead Status':'Quoted'});
+  assert.equal(fields['Lead Status'],'Ready for account setup');
+  assert.equal(fields.Notes,undefined);
   assert.equal(fields.Converted,undefined);
-  assert.equal(metaAirtableFields(row,{Notes:fields.Notes}).Notes,undefined);
+  assert.equal(metaAirtableFields(row,fields)['Lead Status'],undefined);
+  assert.equal(metaAirtableFields({...row,status:'converted'},fields)['Lead Status'],'Signed up');
+  assert.equal(metaAirtableFields({...row,outcome_reason:'opted_out'}, {'Lead Status':'Replied'})['Lead Status'],undefined);
   assert.ok(CRAIG_SIGNUP_PROVIDER_SCHEMA.properties.intents.items.enum.includes('question_billing'));
   assert.ok(!CLASSIFIER_PROVIDER_SCHEMA.properties.intents.items.enum.includes('question_billing'));
+});
+
+test('negative answers receive a neutral acknowledgment without consuming a gratitude opener', () => {
+  for (const message of ['ugh, 2 months', "it's bad, two months", 'it’s awful, 2 months']) {
+    const result=compose({...reply(message,['heavy_buildup']),state:cfg('gap','gap')});
+    assert.match(result.body,/^No worries! The initial cleanup would be \$70 to \$80/);
+    assert.equal(result.state.craigSignup.gratitudeIndex,undefined);
+  }
+  const decline=compose({...reply('nah',['decline_step']),state:cfg('sanitize','sanitize')});
+  assert.match(decline.body,/^No worries!/);
+  const plain=compose({...reply('two months'),state:cfg('gap','gap')});
+  assert.match(plain.body,/^Thank you!/);
+});
+
+test('Craig-only mode waits for confirmation before texting a rate and hands off discount requests', () => {
+  const early = compose({...reply('How much for 3 dogs?',['question_price'],{dogs:3}),lead:leads.weekly,controlledTest:true});
+  assert.doesNotMatch(early.body,/\$/);
+  assert.match(early.body,/Just to confirm/);
+  const confirmed = compose({...yes,lead:leads.weekly,state:early.state,controlledTest:true});
+  assert.match(confirmed.body,/\$105 per month/);
+  const accepted = compose({...reply('yes, two months',['confirm_yes'],{lastCleaned:'two months'}),lead:leads.weekly,state:confirmed.state,controlledTest:true});
+  assert.match(accepted.body,/How long has it been since/);
+  assert.doesNotMatch(accepted.body,/\$/);
+  const cleanup = compose({...reply("ugh, it's bad, two months",['heavy_buildup']),lead:leads.weekly,state:accepted.state,controlledTest:true});
+  assert.match(cleanup.body,/^No worries! The initial cleanup would be \$70 to \$80.*recommend a sanitization treatment/);
+  assert.equal((cleanup.body.match(/\$/g)||[]).length, 2);
+  customerCopy(cleanup.body);
+  const discount = compose({...reply('Can I get a discount?',['objection_price']),lead:leads.weekly,state:confirmed.state,controlledTest:true});
+  assert.doesNotMatch(discount.body,/\$|discount| off /i);
+  assert.deepEqual(discount.notifyReasons,['price_pushback']);
 });
 
 test('a requested add-on does not accept a recurring quote or repeat a known question',()=>{

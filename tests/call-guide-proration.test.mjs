@@ -7,6 +7,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CLEANUP_RANGE_EXPLANATION } from '../app/free-quote/pricing.js';
 import { callGuideProration } from '../lib/call-guide-proration.mjs';
+import { craigCleanupRange, craigRangeText, craigRate, craigServiceAddonPrice } from '../lib/lead-craig-pricing.mjs';
+import { composeCraigSignup } from '../lib/lead-craig-signup.mjs';
 
 const weekly = { frequency: 'once_a_week', startDate: '2026-10-07', serviceDay: 'Wednesday', monthlyTotal: 121 };
 
@@ -48,7 +50,7 @@ test('biweekly, twice-weekly, monthly and one-time service preserve their cadenc
   assert.equal(callGuideProration({ frequency: 'one_time' }).amount, 0);
 });
 
-test('office customer scripts explain whole-dollar cleanup ranges and preserve prorated invoice cents', async () => {
+test('the rendered call guide and texting bot agree on Sweep&Go prices and preserve invoice cents', async () => {
   const result = await build({
     entryPoints: ['app/office/NewClientCallGuide.js'], outdir: 'tmp', write: false,
     bundle: true, platform: 'node', format: 'cjs', jsx: 'automatic', loader: {'.js':'jsx'},
@@ -56,23 +58,52 @@ test('office customer scripts explain whole-dollar cleanup ranges and preserve p
   });
   const source = result.outputFiles.find((file) => file.path.endsWith('.js')).text;
   const Guide = runInNewContext(source + '\nmodule.exports.default', {require:createRequire(import.meta.url), module:{exports:{}}});
-  const render = (frequency, lastCleaned) => renderToStaticMarkup(createElement(Guide, {initialDraft:{
-    dogs:'2', frequency, lastCleaned, yardSize:'small', phone:'4195550100', startDate:'2026-11-04', serviceDay:'Wednesday',
+  const render = (frequency, lastCleaned, dogs = 2, yardSize = 'tiny') => renderToStaticMarkup(createElement(Guide, {initialDraft:{
+    dogs:String(dogs), frequency, lastCleaned, yardSize, phone:'4195550100', startDate:'2026-11-04', serviceDay:'Wednesday',
   }}));
   const welcome = (html) => decodeURIComponent(html.match(/href="sms:[^?"]+\?body=([^"]+)"/)[1]);
   const oneTime = render('one_time', 'one_month');
   const recurring = render('once_a_week', 'one_month');
   for (const html of [oneTime, recurring]) assert.ok(html.includes('The initial cleanup portion stays within the displayed range unless the actual yard condition requires approval for a different amount.'));
   for (const [message, range] of [
-    [welcome(recurring), '$58 to $70'],
-    [welcome(oneTime), '$80 to $110'],
-    [oneTime.match(/Let me read everything back[^<]+/)[0], '$80 to $110'],
+    [welcome(recurring), craigRangeText(craigCleanupRange('initial', 'one_month', 2))],
+    [welcome(oneTime), craigRangeText(craigCleanupRange('one_time', 'one_month', 2))],
+    [oneTime.match(/Let me read everything back[^<]+/)[0], craigRangeText(craigCleanupRange('one_time', 'one_month', 2))],
   ]) {
     assert.ok(message.includes(range));
     assert.equal(message.split(CLEANUP_RANGE_EXPLANATION).length - 1, 1);
     assert.doesNotMatch(message, /[\u2013\u2014]/);
   }
-  assert.match(recurring, /Subtotal<\/span><b>\$137\.68 to \$149\.68</);
+  assert.match(recurring, /Subtotal<\/span><b>\$127\.75 to \$137\.75</);
+  const botReply = (frequency, dogs, gap) => composeCraigSignup({
+    text: 'yes', classification: {intents:['confirm_yes']},
+    lead: {zip:'43551', frequency, dogs, lastCleaned:gap},
+    ...(gap ? {state:{craigSignup:{phase:'gap',expected:'gap'}}} : {}),
+  }).body;
+  for (const frequency of ['once_a_week','twice_a_week','every_other_week','once_a_month']) {
+    for (let dogs = 1; dogs <= 7; dogs++) {
+      const rate = craigRate(frequency, dogs);
+      if (rate == null) continue;
+      assert.ok(botReply(frequency, dogs).includes('$' + rate + ' per month'));
+      assert.ok(welcome(render(frequency, 'one_week', dogs)).includes('$' + rate + '.00/month'));
+    }
+  }
+  for (const [kind, frequency] of [['initial','once_a_week'],['one_time','one_time']]) {
+    for (const gap of ['one_week','two_weeks','three_weeks','one_month','two_months','3_4_months']) {
+      for (let dogs = 1; dogs <= 5; dogs++) {
+        const range = craigRangeText(craigCleanupRange(kind, gap, dogs));
+        assert.ok(botReply(frequency, dogs, gap).includes(range));
+        assert.ok(welcome(render(frequency, gap, dogs)).includes(range));
+      }
+    }
+  }
+  for (const [id, name] of [['sani_onetime','Sanitization - one time'],['sani_monthly','Sanitization - monthly'],
+    ['deodorize','Deodorization'],['front_yard','Add Front Yard Scooping'],['haul_away','Haul Away Service']]) {
+    for (const dogs of [2,3]) {
+      assert.ok(render('once_a_week', 'one_week', dogs).includes(name + '</strong><small>$' + craigServiceAddonPrice(id,dogs) + '.00'));
+    }
+  }
+  assert.match(render('once_a_week','one_month',2,'small'), /Yard adjustment<\/span><b>Office review</);
   const custom = welcome(render('one_time', '5_6_months'));
   assert.match(custom, /Custom review/);
   assert.equal(custom.includes(CLEANUP_RANGE_EXPLANATION), false);

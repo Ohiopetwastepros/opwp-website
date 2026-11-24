@@ -105,8 +105,8 @@ async function fixture(t, {confirmationUncertain = false, ownerPhone = OWNER_PHO
       }
       assert.deepEqual(payload.to, [CUSTOMER], 'Customer sends are restricted to the controlled recipient');
       assert.doesNotMatch(payload.content, /\[OPWP STAFF ALERT\]|\/admin\/playbook\/d\//);
-      if (customerSms.length === 0) assert.match(payload.content, /\n\nReply STOP to opt out$/);
-      else assert.doesNotMatch(payload.content, /Reply STOP to opt out|Text STOP to unsubscribe/i);
+      if (customerSms.length === 0) assert.match(payload.content, env.LEAD_CRAIG_SIGNUP_ENABLED === 'true' ? /\n\nReply to opt out:\nSTOP$/ : /\n\nReply STOP to opt out$/);
+      else assert.doesNotMatch(payload.content, /Reply STOP to opt out|Text STOP to unsubscribe|Reply to opt out:/i);
       assert.doesNotMatch(payload.content, /\bpoop\b|[\u2013\u2014]/i);
       customerSms.push(payload);
       if (confirmationUncertain && customerSms.length === 1) throw new Error('Fixture provider outcome unknown');
@@ -379,7 +379,7 @@ test('signed webhooks run Craig signup, skip known facts, and dedupe provider me
     assert.equal(f.customerSms.length,before+1,id+' duplicate');
   };
   await step(reply("Yes, that's correct. What's the quote?",['confirm_yes','question_price'],{},{confirms_details:'yes'}),'craig-rate',/\$105 per month/);
-  await step(reply('yeah that works! 2 weeks and 123 Sample Street, gate left and unlocked',['confirm_yes','address_given'],{lastCleaned:'2 weeks',address:'123 Sample Street',gateSide:'left',gateLock:'unlocked'},{confirms_details:'yes'}),'craig-gap',/\$30 to \$37/);
+  await step(reply('yeah that works! 2 weeks and 123 Sample Street, gate left and unlocked',['confirm_yes','address_given'],{lastCleaned:'2 weeks',address:'123 Sample Street',gateSide:'left',gateLock:'unlocked'},{confirms_details:'yes'}),'craig-gap',/\$30\.02 to \$37/);
   await step(reply('sign me up',['ready_to_sign_up']),'craig-signup',/outdoor trash can/);
   await step(reply('haul away please. dogs are fine with strangers',undefined,{disposal:'haul_away',dogBehavior:'comfortable'}),'craig-details',/When would you like to get started/);
   await step(reply('next month',undefined,{startPreference:'next month'}),'craig-finish',/follow up once your account has been created/);
@@ -391,7 +391,8 @@ test('signed webhooks run Craig signup, skip known facts, and dedupe provider me
   await api.runScheduledYardOps(f.env);
   const records=f.airtable.records.get('tblxniDSLBZdba6Z7');
   assert.equal(records.length,1);
-  assert.equal(records[0].fields.Notes,'Ready for account setup');
+  assert.equal(records[0].fields['Lead Status'],'Ready for account setup');
+  assert.equal(records[0].fields.Notes,undefined);
   assert.equal(records[0].fields.Converted,undefined);
   assert.equal(records[0].fields['Linked Customer'],undefined);
   const beforeStop=f.customerSms.length;
