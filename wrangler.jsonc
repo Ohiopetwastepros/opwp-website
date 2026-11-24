@@ -6,6 +6,7 @@
   "compatibility_date": "2026-08-28",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  "ai": { "binding": "AI" },
   "preview_urls": false,
   "routes": [
     {
@@ -41,7 +42,17 @@
     "APP_ENV": "production",
     "LEAD_PLAYBOOK_ENABLED": "true",
     "LEAD_PLAYBOOK_AUTO_SEND_ENABLED": "true",
-    "LEAD_PLAYBOOK_NOTIFY_ENABLED": "false",
+    "LEAD_PLAYBOOK_NOTIFY_ENABLED": "true",
+    "LEAD_PLAYBOOK_NOTIFY_CHANNELS": "sms",
+    "LEAD_CONVERSATION_V2_ENABLED": "true",
+    "LEAD_CLASSIFIER_ENABLED": "true",
+    "LEAD_CLASSIFIER_PROVIDER": "workers_ai",
+    "LEAD_CLASSIFIER_MODEL": "@cf/openai/gpt-oss-120b",
+    "LEAD_CLASSIFIER_DAILY_CAP": "100",
+    "LEAD_CLASSIFIER_TIMEOUT_MS": "12000",
+    "LEAD_CLASSIFIER_KILL_SWITCH": "false",
+    "LEAD_REPLY_WATCHDOG_ENABLED": "true",
+    "LEAD_REPLY_WATCHDOG_SECONDS": "60",
     "LEAD_AUTOMATION_CONTROLLED_TEST_ONLY": "true",
     "META_CADENCE_ENABLED": "false",
     "FOOD_SALES_NATIVE_ENABLED": "true",
@@ -74,7 +85,7 @@
     "META_AUTOMATION_ENABLED": "false",
     "META_AUTOMATION_APPROVAL_ID": "meta-live-2026-11-18",
     "META_TEST_MODE": "true",
-    "META_TEST_APPROVAL_ID": "meta-test-conversation-2026-11-23-craig",
+    "META_TEST_APPROVAL_ID": "meta-test-conversation-2-2026-11-23-craig",
     "META_TEST_RECIPIENTS": "+14192620424",
     "META_TEST_FORM_IDS": "1725121795904553",
     "META_APPROVED_SMS_FORMS": "{\"1725121795904553\":{\"pageId\":\"617929208074485\",\"consentField\":\"text_message_consent\",\"disclosure\":\"Can we text you your quote? By choosing Yes, you agree Ohio Pet Waste Pros may send texts, including automated texts, about your quote and service to the number above. Consent isn't required to buy. Msg and data rates may apply. Reply STOP to opt out.\",\"version\":\"fb-consent-2026-11-18\"}}",
@@ -91,6 +102,6 @@
     "head_sampling_rate": 1
   },
   "triggers": {
-    "crons": ["*/10 * * * *", "0 * * * *", "5 * * * *", "15 * * * *", "35 * * * *"]
+    "crons": ["* * * * *", "*/10 * * * *", "0 * * * *", "5 * * * *", "15 * * * *", "35 * * * *"]
   }
 }

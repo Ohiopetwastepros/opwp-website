@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkQuoteFollowUpWorker } from "./check-quote-follow-up-worker.mjs";
+import { checkQuoteFollowUpWorker, checkLeadReplyWatchdogWorker } from "./check-quote-follow-up-worker.mjs";
 
 export function patchQuoteFollowUpWorker(source) {
   const importMarker = "export default {";
@@ -62,6 +62,15 @@ export function patchQuoteFollowUpWorker(source) {
                 () => runScheduledPlaybook(env, controller.scheduledTime))
         );`);
   }
+  if (!source.includes('from "../lib/lead-reply-watchdog.mjs"')) source = source.replace(importMarker, `import { runLeadReplyWatchdog } from "../lib/lead-reply-watchdog.mjs";\n${importMarker}`);
+  if (!/\brunLeadReplyWatchdog\s*\(\s*env\b/.test(source)) {
+    source = source.replace(scheduledMarker, `${scheduledMarker}
+        if (controller.cron === "* * * * *") ctx.waitUntil(
+            runWithCloudflareRequestContext(new Request("https://opwp.internal/lead-reply-watchdog"), env, ctx,
+                () => runLeadReplyWatchdog(env, {now: new Date(controller.scheduledTime)}))
+        );`);
+  }
+  checkLeadReplyWatchdogWorker(source);
   return source;
 }
 

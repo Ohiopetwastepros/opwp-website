@@ -43,8 +43,24 @@ function closingOffset(code, start, open, close) {
   throw new Error("OpenNext scheduled processor block is incomplete.");
 }
 
+export function checkLeadReplyWatchdogWorker(source) {
+  if (!/import\s*\{[^}]*\brunLeadReplyWatchdog\b[^}]*\}\s*from\s*["']/.test(source)) throw new Error('Missing lead reply watchdog import.');
+  const code = source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\r\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/g,value=>value.replace(/[^\r\n]/g,' '));
+  const scheduled=/async\s+scheduled\s*\(\s*controller\s*,\s*env\s*,\s*ctx\s*\)\s*\{/.exec(code);
+  if(!scheduled)throw new Error('Missing scheduled handler for lead reply watchdog.');
+  const start=scheduled.index+scheduled[0].length-1,end=closingOffset(code,start,'{','}'),body=source.slice(start,end+1),bodyCode=code.slice(start,end+1);
+  const guard=/\bif\s*\(\s*controller\.cron\s*===\s*(["'])\* \* \* \* \*\1\s*\)\s*(?:\{\s*)?ctx\.waitUntil\s*\(/g;
+  for(const match of body.matchAll(guard)){
+    if(bodyCode.slice(match.index,match.index+2)!=='if')continue;
+    const open=match.index+match[0].length-1,close=closingOffset(bodyCode,open,'(',')');
+    if(/\brunLeadReplyWatchdog\s*\(\s*env\b/.test(bodyCode.slice(open,close+1)))return;
+  }
+  throw new Error('Lead reply watchdog is not invoked by the minute schedule.');
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const workerPath = new URL("../.open-next/worker.js", import.meta.url);
   checkQuoteFollowUpWorker(await fs.readFile(workerPath, "utf8"));
+  checkLeadReplyWatchdogWorker(await fs.readFile(workerPath, "utf8"));
   console.log("Scheduled quote follow-up worker calls verified.");
 }

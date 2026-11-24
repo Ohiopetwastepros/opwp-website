@@ -2,6 +2,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {leadName,leadContactName,formatLeadPhone,leadMilestone,inboxState,sortInbox,duplicateCandidates,LEAD_MILESTONES,CALL_RESULTS,CLOSED_REASONS,leadTime} from '@/lib/lead-inbox.mjs';
 import {mergeLeadThread} from '@/lib/lead-thread.mjs';
+import {initialLeadInboxSelection} from '@/lib/lead-inbox-link.mjs';
 import {leadSourceBucket} from '@/lib/growth-desk.mjs';
 import {findAnswerMatch} from '@/lib/lead-assistant.mjs';
 import {CLEANUP_RANGE_EXPLANATION,formatCleanupRange} from '@/app/free-quote/pricing';
@@ -23,8 +24,9 @@ function localInput(iso){const parts=Object.fromEntries(new Intl.DateTimeFormat(
 function easternDate(value){if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))throw new Error('Choose a valid reminder time.');const guess=Date.parse(value+'Z');for(const offset of [4,5]){const iso=new Date(guess+offset*3600000).toISOString();if(localInput(iso)===value)return iso;}throw new Error('That Eastern time does not exist. Choose another time.');}
 async function request(url,method='GET',body){const response=await fetch(url,{method,cache:'no-store',...(body?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.ok){const e=new Error(data.error||'The request could not be completed.');e.status=response.status;throw e;}return data;}
 
-export default function LeadInboxClient({initialLeads=[],initialAnswers=[],assistantSettings,initialHealth,googleMapsKey=''}){
-  const [leads,setLeads]=useState(initialLeads),[view,setView]=useState('attention'),[page,setPage]=useState('inbox'),[source,setSource]=useState('all'),[query,setQuery]=useState(''),[pipeline,setPipeline]=useState(false),[selectedId,setSelectedId]=useState(()=>sortInbox(initialLeads).find(l=>inboxState(l).view==='attention')?.id||''),[editor,setEditor]=useState(null),[dirty,setDirty]=useState(false),[busy,setBusy]=useState(false),[status,setStatus]=useState(''),[error,setError]=useState(''),[health,setHealth]=useState(initialHealth),[nextCursor,setNextCursor]=useState(initialLeads.length===100?'100':null),[loadedAt,setLoadedAt]=useState(new Date().toISOString()),[report,setReport]=useState(null),[reportDays,setReportDays]=useState(90),[createId,setCreateId]=useState('');
+export default function LeadInboxClient({initialLeads=[],initialLeadId='',initialAnswers=[],assistantSettings,initialHealth,googleMapsKey=''}){
+  const initialSelection=initialLeadInboxSelection(initialLeads,initialLeadId);
+  const [leads,setLeads]=useState(initialLeads),[view,setView]=useState(initialSelection.view),[page,setPage]=useState('inbox'),[source,setSource]=useState('all'),[query,setQuery]=useState(''),[pipeline,setPipeline]=useState(false),[selectedId,setSelectedId]=useState(initialSelection.id),[editor,setEditor]=useState(null),[dirty,setDirty]=useState(false),[busy,setBusy]=useState(false),[status,setStatus]=useState(''),[error,setError]=useState(''),[health,setHealth]=useState(initialHealth),[nextCursor,setNextCursor]=useState(initialLeads.length===100?'100':null),[loadedAt,setLoadedAt]=useState(new Date().toISOString()),[report,setReport]=useState(null),[reportDays,setReportDays]=useState(90),[createId,setCreateId]=useState('');
   const dirtyRef=useRef(false),inFlight=useRef(false);
   const [answers,setAnswers]=useState(initialAnswers),[settings,setSettings]=useState(assistantSettings);
   const [searchLimited,setSearchLimited]=useState(false);
