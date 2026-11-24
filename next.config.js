@@ -4,7 +4,8 @@ const { initOpenNextCloudflareForDev } = require("@opennextjs/cloudflare");
 
 // CI uses isolated synthetic bindings and must never need production cloud
 // credentials just to compile an AI-bound Worker.
-initOpenNextCloudflareForDev({remoteBindings: process.env.CI !== 'true'});
+const isCiBuild = process.env.CI === 'true' || process.env.CI === '1';
+initOpenNextCloudflareForDev({remoteBindings: !isCiBuild});
 
 // --- Old WordPress blog slugs -> new (shortened) blog slugs ---
 const blogRedirects = [
