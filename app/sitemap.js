@@ -21,7 +21,7 @@ const staticRoutes = [
 ];
 
 const sitemapEntry = (path, changeFrequency, priority) => ({
-  url: `${site.url}${path}/`,
+  url: new URL(`${path}/`, site.url).href,
   changeFrequency,
   priority,
 });
