@@ -27,6 +27,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Verify production messaging flags
+        run: node --test tests/production-messaging-flags.test.mjs
       - run: npm ci
       - run: node scripts/prepare-build-inputs.mjs --synthetic
       - run: npm run audit:production

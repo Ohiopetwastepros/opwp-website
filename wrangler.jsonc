@@ -60,7 +60,8 @@
     "AIRTABLE_LEADS_TABLE_ID": "tblCrdvGKkGobRWxL",
     "META_GRAPH_API_VERSION": "v26.0",
     "META_AUTOMATION_ENABLED": "false",
-    "META_TEST_MODE": "false"
+    "META_TEST_MODE": "true",
+    "WINBACK_ENABLED": "false"
   },
   "observability": {
     "enabled": true,
