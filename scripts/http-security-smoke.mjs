@@ -6,6 +6,14 @@ const requestOrigin = process.env.SMOKE_ORIGIN || base;
 const status = async (path, options = {}) => (await fetch(base + path, { redirect: "manual", ...options })).status;
 const jsonPost = (body, headers = {}) => ({ method: "POST", headers: { "content-type": "application/json", origin: requestOrigin, "sec-fetch-site": "same-origin", ...headers }, body: JSON.stringify(body) });
 
+const foodSales = await fetch(base + "/food-sales/", { redirect: "manual" });
+assert.equal(foodSales.status, 200, "/food-sales/ should serve the staff sign-in page");
+assert.match(await foodSales.text(), /YOUR INDIVIDUAL STAFF ACCESS/);
+for (const path of ["/api/food-sales/", "/api/food-sales/customers/"]) {
+  const result = await status(path);
+  assert.ok([401, 503].includes(result), path + " should reject unauthenticated requests; got " + result);
+}
+
 for (const path of ["/admin/", "/office/", "/field/"]) {
   const result = await status(path);
   assert.ok([302, 307, 308, 401].includes(result), path + " should be protected; got " + result);

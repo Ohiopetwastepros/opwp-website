@@ -1,0 +1,214 @@
+'use client';
+import {useEffect,useRef,useState} from 'react';
+import styles from './food-sales.module.css';
+import FoodCustomerDialog,{invitationLabel} from '@/components/FoodCustomerDialog';
+import FoodCustomerSearch from '@/components/FoodCustomerSearch';
+import {FOOD_SALE_CUSTOMER_TYPES,FOOD_RECEIPT_METHODS,MANUAL_FOOD_UNIT_PRICE_CENTS} from '@/lib/food-sale-intake.mjs';
+const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const money=cents=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format((cents||0)/100);
+const receiptPresets=[60,120,180];
+const receiptCents=amount=>/^\d+(\.\d{1,2})?$/.test(amount)&&Number.isSafeInteger(Math.round(Number(amount)*100))?Math.round(Number(amount)*100):null;
+const paymentStatus=(amount,total)=>amount>0?(total!=null&&amount>=total?'paid':'partial'):'unpaid';
+const blank=()=>({intakeVersion:3,saleDate:today(),saleCustomerType:'individual',saleNotes:'',paymentStatus:'unpaid',customerId:'',newCustomer:null,items:[],fulfillmentMethod:'pickup',fulfillmentStatus:'pending',billingProvider:'manual',includeTax:false,amount:'0.00',paymentMethod:'cash',paymentReference:'',paymentReceivedConfirmed:false,handoffConfirmed:false,receivedBy:'',handoffNote:'',addressId:'',deliveryAddress:{line1:'',city:'',state:'OH',postalCode:''}});
+async function request(url,body,method='POST',office=false) {
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
+  try {
+    const r=await fetch(url,{method:body?method:'GET',credentials:'same-origin',headers:office?{'X-Food-Office':'1'}:{},cache:'no-store',signal:controller.signal,...(body?{headers:{'Content-Type':'application/json',...(office?{'X-Food-Office':'1'}:{})},body:JSON.stringify(body)}:{})});
+    const data=await r.json();if(!r.ok)throw Object.assign(new Error(data.error||'Request failed.'),{status:r.status,uncertain:data.uncertain,definitive:data.definitive});return data;
+  }finally{clearTimeout(timer);}
+}
+export default function FoodSalesClient({embedded=false}) {
+  const call=async(url,body,method)=>{
+    // A response from before reauthentication cannot expire the new session.
+    const epoch=authEpoch.current;
+    try{return await request(url,body,method,embedded);}
+    catch(e){if(e.status===401&&epoch===authEpoch.current)setNeedsSignIn(true);throw e;}
+  };
+  const [customerOpen,setCustomerOpen]=useState(false),[customerEdit,setCustomerEdit]=useState(null),[customerVersion,setCustomerVersion]=useState(0),[customerLoading,setCustomerLoading]=useState(false),[searchResult,setSearchResult]=useState({query:'',customers:[]}),[searchBusy,setSearchBusy]=useState(false);
+  const [data,setData]=useState(null),[draft,setDraft]=useState(blank),[query,setQuery]=useState(''),[customer,setCustomer]=useState(null),[quote,setQuote]=useState(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState(''),[pending,setPending]=useState(null),[tab,setTab]=useState('sale'),[login,setLogin]=useState({email:'',password:''}),[loaded,setLoaded]=useState(false),[recentAction,setRecentAction]=useState(null);
+  const [setupToken,setSetupToken]=useState(''),[passwordSetup,setPasswordSetup]=useState({password:'',passwordConfirm:''});
+  const [showLoginPassword,setShowLoginPassword]=useState(false),[showSetupPasswords,setShowSetupPasswords]=useState(false);
+  const [needsSignIn,setNeedsSignIn]=useState(false);
+  useEffect(()=>{const match=/^#setup=([a-f0-9]{64})$/.exec(window.location.hash);if(match){setSetupToken(match[1]);window.history.replaceState(null,'',window.location.pathname+window.location.search);}},[]);
+  const member=useRef(null),searchVersion=useRef(0),notice=useRef(null),authEpoch=useRef(0);
+  useEffect(()=>{if(message||error)notice.current?.scrollIntoView({block:'nearest'});},[message,error]);
+  const set=(key,value)=>{
+    setDraft(d=>({...d,[key]:value}));
+    if(key==='billingProvider'||key==='includeTax')setQuote(null);
+  };
+  function changeQuantity(productId,quantity,limit) {
+    if(!Number.isSafeInteger(quantity))return;
+    const next=Math.min(limit,Math.max(0,quantity));
+    setDraft(d=>({...d,items:[...d.items.filter(i=>i.productId!==productId),...(next?[{productId,quantity:next}]:[])]}));
+    setQuote(null);
+  }
+  function changeAmount(amount) {
+    setDraft(d=>({...d,amount,paymentStatus:paymentStatus(receiptCents(amount),quote?.total),paymentReceivedConfirmed:false}));
+  }
+  async function refresh(q='') {
+    const epoch=authEpoch.current;
+    const d=await call('/api/food-sales/?q='+encodeURIComponent(q));
+    if(epoch!==authEpoch.current)return;
+    if(member.current&&member.current!==d.member.id){setDraft(blank());setCustomer(null);setQuote(null);setPending(null);setQuery('');setSearchResult({query:'',customers:[]});setCustomerOpen(false);setCustomerEdit(null);setRecentAction(null);setMessage('');setError('');}
+    setData(d);member.current=d.member.id;return d;
+  }
+  useEffect(()=>{refresh().catch(e=>{if(e.status!==401)setError(e.message);}).finally(()=>setLoaded(true));},[]);
+  useEffect(()=>{
+    if(!data?.member.id)return;
+    const key='opwp-food-sales:'+data.member.id;
+    try {
+      const saved=JSON.parse(sessionStorage.getItem(key+':draft')||'null');if(saved){setDraft({...blank(),...saved.draft,intakeVersion:3});setCustomer(saved.customer);}
+      const ref=JSON.parse(localStorage.getItem(key+':pending')||'null');
+      const payload=JSON.parse(sessionStorage.getItem(key+':payload')||'null');
+      if(ref)setPending({...ref,payload});
+    }catch{setError('This browser could not restore its draft. Check recent entries before starting another sale.');}
+  },[data?.member.id]);
+  useEffect(()=>{if(data?.member.id)try{sessionStorage.setItem('opwp-food-sales:'+data.member.id+':draft',JSON.stringify({draft,customer}));}catch{/* Saving is still server confirmed; no offline queue. */}},[draft,customer,data?.member.id]);
+  useEffect(()=>{
+    if(!data||needsSignIn)return;const version=++searchVersion.current;setSearchBusy(true);
+    const timer=setTimeout(()=>call('/api/food-sales/?q='+encodeURIComponent(query)).then(d=>{if(version===searchVersion.current){setData(d);setSearchResult({query,customers:d.customers});}}).catch(e=>{if(version===searchVersion.current)setError(e.message);}).finally(()=>{if(version===searchVersion.current)setSearchBusy(false);}),180);
+    return ()=>{clearTimeout(timer);searchVersion.current++;};
+  },[query,data?.member.id,needsSignIn]);
+  useEffect(()=>{if(!data?.member.id||needsSignIn||!draft.customerId)return;let cancelled=false;setCustomerLoading(true);call('/api/food-sales/customers/?id='+encodeURIComponent(draft.customerId)).then(d=>{if(!cancelled)setCustomer(d.customer);}).catch(e=>{if(!cancelled){setError(e.message);setCustomer(c=>c?{...c,intakeComplete:false}:c);}}).finally(()=>{if(!cancelled)setCustomerLoading(false);});return()=>{cancelled=true;};},[draft.customerId,data?.member.id,customerVersion,needsSignIn]);
+  function persist(payload) {
+    const key='opwp-food-sales:'+member.current,ref={commandId:payload.commandId};
+    // Store the exact retry payload before sending. If storage is unavailable,
+    // do not send a mutation with an unrecoverable submission identity.
+    sessionStorage.setItem(key+':payload',JSON.stringify(payload));localStorage.setItem(key+':pending',JSON.stringify(ref));setPending({...ref,payload});return ref;
+  }
+  function clearPending() {
+    const key='opwp-food-sales:'+member.current;sessionStorage.removeItem(key+':payload');localStorage.removeItem(key+':pending');setPending(null);
+  }
+  async function confirmed(result) {
+    clearPending();setMessage((result.orderNumber?`${result.orderNumber} saved. ${result.balanceCents!=null?money(result.balanceCents)+' remaining.':''}`:result.message||'Saved and confirmed.')+(result.needsAccountCreated?' Needs account created. The office must create the account.':''));
+    setDraft(blank());setQuote(null);setCustomer(null);setRecentAction(null);await refresh();
+  }
+  async function submit(payload) {
+    if(busy)return;setBusy(true);setError('');setMessage('');
+    // A rejected retry says nothing about an earlier request whose outcome was lost.
+    const hadUnknownOutcome=Boolean(pending&&!pending.rejected);
+    try {persist(payload);const d=await call('/api/food-sales/',payload);await confirmed(d.result);}
+    catch(e){const rejected=e.definitive&&!hadUnknownOutcome;if(rejected){const ref={commandId:payload.commandId,rejected:true};localStorage.setItem('opwp-food-sales:'+member.current+':pending',JSON.stringify(ref));setPending({...ref,payload});}setError(e.status===401?'Your session expired. Sign in again to check or retry this same submission. Your draft is kept on this device.':(rejected?'This attempt was rejected. ':'The save outcome is uncertain. ')+e.message+' Check this submission before starting another.');}
+    finally{setBusy(false);}
+  }
+  async function checkPending() {
+    setBusy(true);setError('');
+    try{const d=await call('/api/food-sales/?submission='+pending.commandId);if(d.saved)await confirmed(d.result);else setMessage('No committed save is visible for this ID. Retry the exact submission, or send its ID to the office if this tab no longer has the payload.');}
+    catch(e){setError(e.message);}finally{setBusy(false);}
+  }
+  async function releaseRejected() {
+    // A new ID is safe only after a definitive client-error response AND a
+    // server status lookup shows no committed result. Uncertain requests stay locked.
+    setBusy(true);try{const d=await call('/api/food-sales/?submission='+pending.commandId);if(d.saved)await confirmed(d.result);else if(pending.rejected){clearPending();setMessage('Rejected submission closed. Edit the draft and review the price again.');}else setError('Keep this ID until the office reconciles its outcome.');}catch(e){setError(e.message);}finally{setBusy(false);}
+  }
+  async function saveSale(event) {
+    event.preventDefault();if(!quote||pending)return;
+    const amount=receiptCents(draft.amount);if(amount==null){setError('Enter the actual amount received with up to two decimal places.');return;}
+    const {amount:unused,...fields}=draft;
+    await submit({...fields,action:'save',commandId:crypto.randomUUID(),quoteHash:quote.quoteHash,amountReceivedCents:amount,paymentStatus:paymentStatus(amount,quote.total)});
+  }
+  async function signIn(event) {
+    event.preventDefault();authEpoch.current++;setBusy(true);setError('');
+    const normalizedLogin={...login,email:login.email.trim().toLowerCase()};setLogin(normalizedLogin);
+    try{await call('/api/food-sales/session/',normalizedLogin);setLogin({email:'',password:''});setShowLoginPassword(false);await refresh();setNeedsSignIn(false);}catch(e){setError(e.message);}finally{setBusy(false);}
+  }
+  async function setStaffPassword(event){event.preventDefault();setBusy(true);setError('');try{const d=await call('/api/food-sales/session/',{action:'set_password',token:setupToken,...passwordSetup});setPasswordSetup({password:'',passwordConfirm:''});setShowSetupPasswords(false);setSetupToken('');setMessage(d.message);}catch(e){setError(e.message);}finally{setBusy(false);}}
+  async function signOut() {
+    setBusy(true);try{await call('/api/food-sales/session/',{},'DELETE');sessionStorage.removeItem('opwp-food-sales:'+member.current+':draft');setData(null);setDraft(blank());setCustomer(null);setQuote(null);setPending(null);setMessage('Signed out.');}catch(e){setError(e.message);}finally{setBusy(false);}
+  }
+  const amountCents=receiptCents(draft.amount),balance=quote?Math.max(0,quote.total-amountCents):null;
+  const overpayment=Boolean(quote&&amountCents>quote.total);
+  const manual=draft.billingProvider==='manual';
+  const customerReady=manual?customer?.contactComplete:customer?.intakeComplete;
+  const signedIn=Boolean(data&&!needsSignIn);
+  const saveBlockedReason=pending?'Check or retry the pending submission before starting another sale.':
+    busy?'Wait for the current request to finish before saving.':
+    data?.recordingEnabled===false?'New sale recording is paused. Contact the office before saving.':
+    data?.inventoryConfigured===false?'No verified bags are available to sell. Ask the office to verify usable stock.':
+    customerLoading?'Loading customer information...':
+    !draft.customerId&&!draft.newCustomer?'Choose an existing customer before saving.':
+    !customerReady?(data?.canEditCustomerIntake&&(data.office||customer?.canEditIntake)?'Use Edit customer information to complete the customer details before saving.':manual?'This customer needs a first name and last name. Ask the customer or office to complete their name before saving.':'Ask the customer or office to complete contact and delivery information before using Sweep & Go billing.'):
+    !draft.items.length?'Choose at least one bag before saving.':
+    !quote?'Select Review current price before saving.':
+    overpayment?'Amount collected exceeds the sale total. Check the bags and amount received.':'';
+  return <div className={`opwp-field-shell ${styles.shell}`}>
+    {signedIn&&data.canEditCustomerIntake&&customerOpen&&<FoodCustomerDialog customer={customerEdit} endpoint={data?.office?'/api/admin/dog-food/customers/':'/api/food-sales/customers/'} onClose={()=>setCustomerOpen(false)} onSaved={async(c,messages)=>{setCustomer(c);setDraft(d=>({...d,customerId:c.id,newCustomer:null,addressId:'',saleCustomerType:d.customerId===c.id?d.saleCustomerType:c.customer_type==='route_partner'?'route_partner':'individual'}));setQuote(null);setCustomerOpen(false);setCustomerEdit(null);setCustomerVersion(v=>v+1);setMessage('Customer saved. '+messages.map(m=>m.channel+': '+invitationLabel(m.status)).join('; '));await refresh();}}/>}
+    {!embedded&&<header className={styles.header}><a href='/food-sales/' className={styles.brand}><span className={styles.mark}>OP</span><span>OHIO PET WASTE PROS<small>Extreme Dog Fuel · Staff sales</small></span></a>{signedIn&&<button className={styles.quiet} onClick={signOut} disabled={busy}>Sign out</button>}</header>}
+    <div className={styles.content}>
+      {!signedIn?<section className={styles.login}>
+        <span className={styles.eyebrow}>{embedded?'OFFICE ACCESS':'YOUR INDIVIDUAL STAFF ACCESS'}</span><h1>Good food.<br/>One simple sale.</h1><p>Find or add a customer, update their information, and record a new dog-food sale.</p>
+        {loaded&&(embedded?<><h2>Office sign-in required</h2><p>Sign in to the management workspace again to continue. Your draft and pending submission are kept on this device.</p><a href='/admin/login/?next=%2Fadmin%2Fdog-food%2Frecord-sale%2F'>Sign in to the office</a></>:setupToken?<form onSubmit={setStaffPassword}>
+          <h2>Choose your password</h2><p>Use at least 12 characters, including one capital letter and one symbol. This link can be used once.</p>
+          <label>New password<input type={showSetupPasswords?'text':'password'} autoComplete='new-password' minLength={12} maxLength={256} required value={passwordSetup.password} onChange={e=>setPasswordSetup({...passwordSetup,password:e.target.value})}/></label>
+          <label>Confirm password<input type={showSetupPasswords?'text':'password'} autoComplete='new-password' minLength={12} maxLength={256} required value={passwordSetup.passwordConfirm} onChange={e=>setPasswordSetup({...passwordSetup,passwordConfirm:e.target.value})}/></label>
+          <label className={`${styles.check} ${styles.passwordVisibility}`}><input type='checkbox' checked={showSetupPasswords} onChange={e=>setShowSetupPasswords(e.target.checked)}/>Show passwords</label>
+          <button className={styles.primary} disabled={busy}>Set my password</button>
+        </form>:<form onSubmit={signIn}>
+          <label>Email<input type='email' autoComplete='username' autoCapitalize='none' spellCheck={false} required value={login.email} onChange={e=>setLogin({...login,email:e.target.value})} onBlur={()=>setLogin({...login,email:login.email.trim().toLowerCase()})}/></label>
+          <label>Password<input type={showLoginPassword?'text':'password'} maxLength={256} autoComplete='current-password' required value={login.password} onChange={e=>setLogin({...login,password:e.target.value})}/></label>
+          <label className={`${styles.check} ${styles.passwordVisibility}`}><input type='checkbox' checked={showLoginPassword} onChange={e=>setShowLoginPassword(e.target.checked)}/>Show password</label>
+          <button className={styles.primary} disabled={busy}>Sign in securely</button>
+        </form>)}
+        {!embedded&&<small>Access is provided by the office. Your session expires after 30 minutes of inactivity.</small>}
+      </section>:<>
+      <div className={styles.intro}><div><span className={styles.eyebrow}>EXTREME DOG FUEL</span><h1>{tab==='sale'?'Record a sale':'Your recent entries'}</h1><p>Signed in as <strong>{data.member.name}</strong></p></div><span className={styles.live}><i/>Shared customer & stock records</span></div>
+      <nav className={styles.tabs} aria-label='Food sales'><button aria-current={tab==='sale'?'page':undefined} onClick={()=>setTab('sale')}>New sale</button><button aria-current={tab==='recent'?'page':undefined} onClick={()=>setTab('recent')}>Recent entries <span>{data.recent.length}</span></button></nav>
+      <div ref={notice}>{message&&<div className={styles.notice} role='status'>{message}</div>}{error&&<div className={styles.error} role='alert'>{error}</div>}</div>
+      {data.recordingEnabled===false?<div className={styles.pending} role='status'><strong>New sale recording is paused.</strong><p>You can still review prices and existing entries. Check with the office before recording a new sale.</p></div>:data.inventoryConfigured===false&&<div className={styles.pending} role='status'><strong>No verified bags are available to sell.</strong><p>{data.stockBasis==='confirmed_count'?'The office needs to record a current count of usable bags for the formula being sold and confirm that stock is available.':'The office needs to verify usable stock before a new sale can be saved.'} You can still review existing entries.</p>{data.office&&<a href='/admin/dog-food/inventory/?tab=inventory'>Open Stock &amp; waste</a>}</div>}
+      {pending&&<section className={styles.pending} aria-label='Unconfirmed submission'><strong>Check this submission before another sale</strong><p>Its outcome is not yet confirmed on this device.</p><code>{pending.commandId}</code><div className={styles.actions}><button disabled={busy} onClick={checkPending}>Check save status</button>{pending.payload&&<button disabled={busy} onClick={()=>submit(pending.payload)}>Retry same submission</button>}{pending.rejected&&<button disabled={busy} onClick={releaseRejected}>Edit rejected draft</button>}</div></section>}
+      {tab==='sale'?<form onSubmit={saveSale} className={styles.saleForm}>
+        <fieldset disabled={busy||Boolean(pending)} className={styles.card}><legend><span>01</span>Sold to / customer information</legend>
+          {customer?<><div className={styles.selected}><div><strong>{customer.first_name} {customer.last_name}</strong><small>{[customer.email,customer.phone].filter(Boolean).join(' / ')||'Phone and email not recorded'}</small></div><button type='button' onClick={()=>{setCustomer(null);set('customerId','');}}>Change customer</button></div>{customerLoading?<p role='status'>Loading customer information...</p>:<div className={styles.customerDetails}><p>{customer.addresses?.[0]?customer.addresses[0].line1+', '+customer.addresses[0].city+', '+customer.addresses[0].state+' '+customer.addresses[0].postal_code:'No address on file'}</p><p>{customer.dog_count?customer.dog_count+' dogs':'Dog count not recorded'} | {String(customer.service_frequency||'Frequency not recorded').replaceAll('_',' ')} | {customer.preferred_fulfillment||'Handoff preference needed'}</p>{data.canEditCustomerIntake&&(data.office||customer.canEditIntake)?<button type='button' onClick={()=>{setCustomerEdit(customer);setCustomerOpen(true);}}>{customer.revision?'Review / edit customer information':'Edit customer information'}</button>:<p>This customer manages their portal profile. The customer or office must update their information.</p>}{!customerReady&&<p role='status'>{manual?'Add the customer first name and last name before saving the sale.':'Complete the customer contact and delivery information to use Sweep & Go billing.'}</p>}</div>}</>:<><FoodCustomerSearch value={query} onChange={setQuery} customers={searchResult.query===query?searchResult.customers:[]} loading={searchBusy||searchResult.query!==query} onSelect={c=>{setCustomer(c);setDraft(d=>({...d,customerId:c.id,newCustomer:null,addressId:''}));setQuote(null);}}/>{data.canEditCustomerIntake?<button type='button' className={styles.textButton} onClick={()=>{setCustomerEdit(null);setCustomerOpen(true);}}>+ Add a new customer</button>:<p className={styles.hint}>Contact the office for customer intake access.</p>}</>}
+
+        </fieldset>
+        <fieldset disabled={busy||Boolean(pending)} className={styles.card}><legend>Sale details</legend><div className={`${styles.grid} ${styles.saleDetailsGrid}`}><label>Sale Date<input type='date' required max={today()} value={draft.saleDate} onChange={e=>set('saleDate',e.target.value)}/></label><label>Customer Type<select required value={draft.saleCustomerType} onChange={e=>set('saleCustomerType',e.target.value)}>{FOOD_SALE_CUSTOMER_TYPES.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label></div><label>Sale notes<textarea maxLength={4000} value={draft.saleNotes} onChange={e=>set('saleNotes',e.target.value)} placeholder='Notes about this sale, special requests or collection instructions'/></label><p className={styles.hint}>Sale date records when the order was agreed. Stock moves when the handoff is recorded. Previously completed sales need historical reconciliation.</p></fieldset>
+        <fieldset disabled={busy||Boolean(pending)} className={styles.card}><legend><span>02</span>Product & bag quantity</legend>
+          <div className={styles.products}>{data.products.map(p=>{
+            const formula=`${p.color} ${p.formula_code}`;
+            const quantity=draft.items.find(i=>i.productId===p.id)?.quantity??0;
+            const usesCounts=data.stockBasis==='confirmed_count';
+            const limit=usesCounts?Math.min(100,Math.max(0,p.available??0)):100;
+            return <div key={p.id} className={styles.product}>
+              <img src={'/assets/edf/'+p.formula_code+'.webp'} alt='' width='36' height='55'/>
+              <span><strong>{p.color} · {p.formula_code}</strong><small>{p.name} · {p.bag_weight_lb} lb</small><b>{money(manual?MANUAL_FOOD_UNIT_PRICE_CENTS:p.retail_price_cents)} / bag</b>{usesCounts&&<small>{p.available==null?'Inventory not confirmed':`${Math.max(0,p.available)} bags available`}</small>}</span>
+              <div className={styles.quantityControls}>
+                <button type='button' aria-label={`Remove one ${formula} bag`} disabled={!quantity} onClick={()=>changeQuantity(p.id,quantity-1,limit)}>−</button>
+                <input aria-label={`${formula} quantity`} inputMode='numeric' type='number' min='0' max={limit} step='1' placeholder='0' disabled={!limit&&!quantity} value={quantity||''} onChange={e=>changeQuantity(p.id,Number(e.target.value),limit)}/>
+                <button type='button' aria-label={`Add one ${formula} bag`} disabled={quantity>=limit} onClick={()=>changeQuantity(p.id,quantity+1,limit)}>+</button>
+              </div>
+            </div>;
+          })}</div>
+          <p className={styles.hint}>{manual?'Manual sale price. Add tax only if it was charged.':'Catalog prices. Sales tax is included in the confirmed total.'}</p>
+        </fieldset>
+        <fieldset disabled={busy||Boolean(pending)} className={styles.card}><legend><span>03</span>Pickup or delivery</legend><div className={styles.grid}><label>Handoff method<select value={draft.fulfillmentMethod} onChange={e=>set('fulfillmentMethod',e.target.value)}><option value='pickup'>Pickup</option><option value='delivery'>Delivery</option></select></label><label>Handoff status<select value={draft.fulfillmentStatus} onChange={e=>set('fulfillmentStatus',e.target.value)}><option value='pending'>Pending</option><option value='completed'>Completed now</option></select></label></div>
+          {draft.fulfillmentMethod==='delivery'&&<><label>{manual?'Delivery address (optional)':'Customer address'}<select value={draft.addressId} onChange={e=>set('addressId',e.target.value)}><option value=''>Use saved address if available, or enter one below</option>{data.addresses.filter(a=>a.customer_id===draft.customerId).map(a=><option key={a.id} value={a.id}>{a.line1}, {a.city} {a.postal_code}</option>)}</select></label>{!draft.addressId&&<div className={styles.grid}>{[['line1','Street address'],['city','City'],['postalCode','Ohio ZIP']].map(([key,label])=><label key={key}>{label}<input value={draft.deliveryAddress[key]} onChange={e=>set('deliveryAddress',{...draft.deliveryAddress,[key]:e.target.value})}/></label>)}</div>}</>}
+          {draft.fulfillmentStatus==='completed'&&<><label>Received by<input required value={draft.receivedBy} onChange={e=>set('receivedBy',e.target.value)}/></label><label className={styles.check}><input type='checkbox' required checked={draft.handoffConfirmed} onChange={e=>set('handoffConfirmed',e.target.checked)}/>I confirm the bags were physically handed over.</label></>}
+        </fieldset>
+        <fieldset disabled={busy||Boolean(pending)} className={styles.card}><legend><span>04</span>Money actually received</legend>
+          <label>Payment Status<select required value={draft.paymentStatus} onChange={e=>{
+            const status=e.target.value;
+            setDraft(d=>({...d,paymentStatus:status,amount:status==='unpaid'?'0.00':status==='paid'&&quote?(quote.total/100).toFixed(2):d.amount,paymentReceivedConfirmed:false}));
+          }}><option value='unpaid'>Unpaid</option><option value='partial'>Partial payment</option><option value='paid'>Paid</option></select></label>
+          {manual&&<label className={styles.check}><input type='checkbox' checked={draft.includeTax} onChange={e=>set('includeTax',e.target.checked)}/>Add sales tax</label>}
+          <div className={styles.receiptPresets} role='group' aria-label='Amount collected presets'>
+            {receiptPresets.map(amount=><button key={amount} type='button' aria-pressed={amountCents===amount*100} onClick={()=>changeAmount(amount.toFixed(2))}>${amount}</button>)}
+          </div>
+          <div className={styles.grid}>
+            <label>Amount collected ($)<input type='text' inputMode='decimal' required value={draft.amount} onChange={e=>changeAmount(e.target.value)}/></label>
+            <label>Payment method<select value={draft.paymentMethod} onChange={e=>set('paymentMethod',e.target.value)}>{FOOD_RECEIPT_METHODS.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>
+          </div>
+          <p className={styles.hint}>Choose a preset or enter a different amount. Enter $0 for an unpaid sale.</p>
+          {draft.paymentMethod!=='cash'&&<label>Check number / transaction reference (no card numbers)<input required={amountCents>0} value={draft.paymentReference} onChange={e=>set('paymentReference',e.target.value)}/></label>}
+          {amountCents>0&&<label className={styles.check}><input type='checkbox' required checked={draft.paymentReceivedConfirmed} onChange={e=>set('paymentReceivedConfirmed',e.target.checked)}/>I confirm this amount was actually received.</label>}
+          <label>Who will collect any remaining balance?<select value={draft.billingProvider} onChange={e=>set('billingProvider',e.target.value)}><option value='manual'>Office / manual collection</option><option value='sweep_and_go'>Existing Sweep & Go billing</option></select></label>
+        </fieldset>
+        <section className={styles.summary}><div><span className={styles.eyebrow}>REVIEW BEFORE SAVING</span><h2>{quote?money(quote.total):'Confirm your total'}</h2><p>{quote?(quote.tax?`${money(quote.subtotal)} food + ${money(quote.tax)} tax`:'Food subtotal. No tax added.'):'Review the current price after choosing your bags.'}</p></div>{!customerLoading&&customer?.needsAccountCreated&&<div className={styles.accountNotice} role='status'><strong>Needs account created</strong><p>The sale can still be saved. Ask the office to create the account.</p></div>}{quote&&<dl><div><dt>Received</dt><dd>{amountCents==null?'—':money(amountCents)}</dd></div><div><dt>Remaining balance</dt><dd>{amountCents==null?'—':money(balance)}</dd></div></dl>}{overpayment&&<p role='status'>Amount collected exceeds the sale total. Check the number of bags and the amount received.</p>}<button type='button' disabled={busy||Boolean(pending)||!draft.items.length} onClick={async()=>{setBusy(true);setError('');try{const priced=(await call('/api/food-sales/',{action:'quote',intakeVersion:draft.intakeVersion,items:draft.items,billingProvider:draft.billingProvider,includeTax:draft.includeTax})).result;setQuote(priced);setDraft(d=>({...d,paymentStatus:paymentStatus(receiptCents(d.amount),priced.total)}));}catch(e){setError(e.message);}finally{setBusy(false);}}}>Review current price</button>{saveBlockedReason&&<p className={styles.hint} role='status'>{saveBlockedReason}</p>}<button className={styles.primary} disabled={busy||Boolean(pending)||!quote||data.inventoryConfigured===false||data.recordingEnabled===false||customerLoading||!customerReady||overpayment||!draft.customerId&&!draft.newCustomer}>Save sale · {quote?money(quote.total):'review first'}</button><small>{pending?'Submission awaiting confirmation.':'Unsaved draft · Stock is reserved only when the save is confirmed.'}</small></section>
+      </form>:<section className={styles.recent}>{data.recent.length?data.recent.map(o=><article key={o.id} className={styles.card}><div className={styles.recentHead}><div><strong>{o.customerName}</strong><small>{o.orderNumber}</small></div><strong>{money(o.totalCents)}</strong></div><div className={styles.badges}><span>{o.paymentStatus==='paid'?'Paid':o.paymentStatus==='partial'?'Partially paid':o.paymentStatus==='refunded'?'Refund recorded':'Unpaid'}</span><span>{o.fulfillmentMethod} · {o.fulfillmentStatus}</span>{o.needsAccountCreated&&<span>Needs account created</span>}</div><p>{money(o.receivedCents)} received · <strong>{money(o.balanceCents)} remaining</strong></p><div className={styles.actions}>{data.office&&o.balanceCents>0&&<button onClick={()=>setRecentAction({kind:'receipt',order:o,amount:'',method:'cash',reference:'',confirmed:false})}>Add receipt</button>}{data.office&&o.fulfillmentStatus==='pending'&&<button onClick={()=>setRecentAction({kind:'handoff',order:o,receivedBy:'',confirmed:false})}>Record handoff</button>}{data.office&&<button onClick={()=>setRecentAction({kind:'correction',order:o,reason:''})}>Request correction</button>}</div></article>):<div className={styles.card}><h2>No entries yet</h2><p>Your confirmed sales will appear here.</p></div>}
+        {data.office&&recentAction&&<form className={styles.card} onSubmit={e=>{e.preventDefault();const a=recentAction;submit({action:a.kind,orderId:a.order.id,commandId:crypto.randomUUID(),...(a.kind==='receipt'?{amountReceivedCents:Math.round(Number(a.amount)*100),paymentMethod:a.method,paymentReference:a.reference,paymentReceivedConfirmed:a.confirmed}:a.kind==='handoff'?{receivedBy:a.receivedBy,handoffConfirmed:a.confirmed}:{reason:a.reason})});}}><h2>{recentAction.kind==='receipt'?'Add actual receipt':recentAction.kind==='handoff'?'Confirm physical handoff':'Office correction request'}</h2><p>{recentAction.order.orderNumber}</p>{recentAction.kind==='receipt'?<><label>Amount received ($)<input inputMode='decimal' required value={recentAction.amount} onChange={e=>setRecentAction({...recentAction,amount:e.target.value})}/></label><label>Method<select value={recentAction.method} onChange={e=>setRecentAction({...recentAction,method:e.target.value})}>{FOOD_RECEIPT_METHODS.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>{recentAction.method!=='cash'&&<label>Reference<input required value={recentAction.reference} onChange={e=>setRecentAction({...recentAction,reference:e.target.value})}/></label>}</>:recentAction.kind==='handoff'?<label>Received by<input required value={recentAction.receivedBy} onChange={e=>setRecentAction({...recentAction,receivedBy:e.target.value})}/></label>:<label>What needs correcting?<textarea required maxLength={1000} value={recentAction.reason} onChange={e=>setRecentAction({...recentAction,reason:e.target.value})}/></label>}{recentAction.kind!=='correction'&&<label className={styles.check}><input type='checkbox' required checked={recentAction.confirmed} onChange={e=>setRecentAction({...recentAction,confirmed:e.target.checked})}/>I confirm this {recentAction.kind==='receipt'?'money was actually received':'physical handoff happened'}.</label>}<div className={styles.actions}><button className={styles.primary} disabled={busy||Boolean(pending)}>Save confirmation</button><button type='button' onClick={()=>setRecentAction(null)}>Cancel</button></div></form>}
+      </section>}
+      </>}
+      {!signedIn&&<div ref={notice}>{message&&<div className={styles.notice} role='status'>{message}</div>}{error&&<div className={styles.error} role='alert'>{error}</div>}</div>}
+      <footer className={styles.footer}>Ohio Pet Waste Pros · Food sales workspace<br/>Questions or corrections? Contact the office.</footer>
+    </div>
+  </div>;
+}

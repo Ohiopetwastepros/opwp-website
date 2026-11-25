@@ -19,7 +19,7 @@
 .muted{color:var(--muted)}
 .fine{font-size:12px!important;color:var(--muted);line-height:1.6}
 .header{max-width:1320px;margin:auto;display:flex;align-items:center;justify-content:space-between;padding:26px 40px;gap:24px}
-.header>a:last-child{display:flex;align-items:center;gap:12px;text-decoration:none;font-size:13px;font-weight:600}
+.header>a:last-child{display:flex;align-items:center;gap:12px;text-decoration:none;font-size:16px;font-weight:700;min-height:48px}
 .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--ink)!important;font-size:17px;font-weight:750;letter-spacing:-.4px}
 .brand img{width:64px;height:48px;object-fit:contain;border-radius:6px}
 .brand small{display:block;font-size:8px;letter-spacing:1.3px;color:var(--muted);font-weight:600;margin-top:4px}
@@ -33,7 +33,7 @@
 .bags{display:flex;align-items:flex-end;justify-content:center;gap:0;position:relative;z-index:1}
 .bags img{width:25%;height:210px;object-fit:contain;filter:none}
 .stageCaption{display:flex;justify-content:space-between;gap:10px;margin-top:24px;font-size:9px;letter-spacing:1.4px;font-weight:750;color:#415b75}
-.stageCaption>span{font-weight:500;font-size:8px;letter-spacing:1px}
+.stageCaption>span{font-weight:500;font-size:12px;letter-spacing:0}
 .welcomeBenefits{display:flex;gap:24px;font-size:12px;font-weight:500;color:var(--navy)}
 .welcomeBenefits>span{display:flex;align-items:center;gap:7px}
 .welcomeBenefits svg{width:15px;height:15px}
@@ -210,7 +210,8 @@
 .sidebar .tabs button{color:#c1d0df}.sidebar .tabs button:hover:not(:disabled){background:#263f5b;color:#fff}.sidebar .tabs .selected{background:#c5d9e9;color:#183651}.sidebar .tabs button i{background:#315d82}
 .sidebar .localSupport{background:#223c58}.sidebar .localSupport p{color:#b7c8d9}.sidebar .localSupport a,.sidebar .localSupport>svg{color:#d4e5f3}.sidebar .identity{border-color:#3a506b}.sidebar .identity button{color:#cedcea}.sidebar .avatar{background:#365370;color:#e5edf5}
 .topbar{background:#d6e3ef}.deliveryCard{background:#dce7f0;border-color:#b6cadc}.deliveryBottom{background:#d2e0ec;border-color:#b6cadc}.deliveryPill{background:#e6eef5}.finderBanner{background:#ceddeb}
-.header{background:#172e49;max-width:none}.header .brand,.header>a:last-child{color:#e5edf5!important}.header .brand small{color:#a9bdd1}
+/* The sign-in header uses a light surface, so its links must stay dark. */
+.header{background:var(--surface);max-width:none}.page .header .brand,.page .header>a:last-child{color:var(--ink)}.page .header .brand small{color:var(--muted)}
 .product{--formula:#617a93;--formula-tint:#e3eaf1;border-left:4px solid var(--formula);background:var(--formula-tint)}
 .product[data-color=pink]{--formula:#a35d80;--formula-tint:#efe5eb}.product[data-color=blue]{--formula:#537fa7;--formula-tint:#dde8f1}.product[data-color=green]{--formula:#64876d;--formula-tint:#e3ebe5}.product[data-color=red]{--formula:#a46161;--formula-tint:#efe3e3}
 .formulaLabel{display:flex;align-items:center;gap:7px;font-size:10px;font-weight:700;color:#384e64;text-transform:capitalize}.formulaLabel i{width:9px;height:9px;border-radius:50%;background:var(--formula);flex-shrink:0}
@@ -361,7 +362,7 @@
 .nutrition dd{margin:0}
 .srOnly{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .loginLayout{padding:36px 0 60px;gap:70px}
-.welcome h1 em{color:#657a70}
+.welcome h1 em{color:#315f49}
 .bagStage{background:#f3f3ec;border-radius:6px}
 .footer{border-top:1px solid var(--line);margin-top:32px;padding-top:24px}
 @media(max-width:1050px){.homeGrid{grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr)}.favoriteCard{padding:26px 22px}.favoriteCopy h2{font-size:29px}.shopGrid{gap:12px}.productBody{padding:14px}.productActions{gap:6px}.productQuantity{font-size:0!important}.productQuantity select{width:52px!important}.productBody>p{min-height:100px}.recentOrder{grid-template-columns:60px minmax(0,1fr) 100px auto auto}.recentOrder>button:last-child{grid-column:-2/-1}.accountNav{gap:25px}}
@@ -388,8 +389,8 @@
 .repeatItems article>strong{margin:0;white-space:nowrap}
 @media(max-width:760px){.repeatReview{padding:22px}.repeatItems article{grid-template-columns:50px minmax(0,1fr);gap:15px}.repeatItems article>div{min-width:0}.repeatItems article>strong{grid-column:2;grid-row:2;justify-self:start}.repeatItems img{width:50px;height:90px}.repeatItems label{font-size:12px;display:block}.repeatItems input{margin-top:7px!important;min-height:44px!important;max-width:100px}.repeatItems p{font-size:12px!important}.repeatItems h3{font-size:18px}.repeatIntro h2{font-size:24px}}
 
-/* Preview only. Appended to the captured CSS module, scoped by .page. */
-.page{--ink:#142D46;--navy:#142D46;--paper:#F1F4F6;--surface:#FFFFFF;--muted:#52616D;--line:#D5DDE2;--action:#246847;--control:#7C8C97;--bottom-nav:80px;background:var(--paper);font-size:16px;line-height:1.5}
+/* Shared customer portal colors and accessible controls. */
+.page{--ink:#142D46;--navy:#142D46;--paper:#F1F4F6;--surface:#FFFFFF;--muted:#425466;--line:#BCC9D2;--action:#246847;--control:#647787;--bottom-nav:80px;background:var(--paper);font-size:16px;line-height:1.5}
 .page *{box-sizing:border-box}
 .page h1,.page h2,.page h3{font-family:var(--font-hanken,Arial),sans-serif;overflow-wrap:anywhere;letter-spacing:-.025em}
 .page h1,.heading h1{font-size:36px;line-height:1.15;margin:0 0 12px}

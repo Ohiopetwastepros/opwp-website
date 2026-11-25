@@ -1,5 +1,10 @@
+import * as intakeHelpers from '../lib/food-customer-intake.mjs';
+import * as launchHelpers from '../lib/food-launch-readiness.mjs';
+import * as sourceHelpers from '../lib/food-source-reconciliation.mjs';
+import * as legacyPlans from '../lib/dog-food-legacy-plans.mjs';
+import * as websiteStore from '../lib/dog-food-website-store.mjs';
 import {runPrivateInNewContext} from './helpers/private-vm.mjs';
-import {foodProfileComplete,FOOD_STATES} from '../lib/dog-food-profile.mjs';
+import {foodProfileComplete,FOOD_STATES,foodAddressInput,foodPhone} from '../lib/dog-food-profile.mjs';
 import {foodCheckoutTotals,foodDeliveryPreference,FOOD_DELIVERY_OPTIONS,FOOD_TAX_BASIS_POINTS,foodSameDayOpen} from '../lib/dog-food-checkout.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,7 +25,7 @@ function portalFixture(stock=10) {
   const model={sync:{dirty:0,last_success_at:new Date().toISOString()},products:[{websiteId:'edf-22-12-pink-40',confirmed:true,onHand:stock,reserved:0}]};
   f.sql.prepare("INSERT INTO dog_food_stock_lots(id,product_id,lot_number,best_before,usable_bags,counted_date,confirmed_by) VALUES ('lot','edf-22-12-pink-40','TEST','2030-01-01',?,date('now'),'test')").run(stock);
   const fulfillment=runPrivateInNewContext(fs.readFileSync(new URL('../lib/dog-food-fulfillment.js',import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'')+'\n({reserveFoodLots,checkFoodLotReconciliation})',{FoodError:FoodAccountError,Date,foodDate:()=>easternFoodDate()});
-  f.api=runPrivateInNewContext(source+'\n({readFoodPortal,saveFoodProfile,createFoodPortalOrder,manageFoodSubscription})',{...fulfillment,foodProfileComplete,FOOD_STATES,locateFoodAddress:async()=>null,readFoodDeliveryChoices:async()=>({deliveryAvailable:true,days:[{day:'Tuesday',weekday:2}],tonyDates:[]}),crypto,Map,Date,Number,String,Object,Array,JSON,foodCheckoutTotals,foodDeliveryPreference,FOOD_DELIVERY_OPTIONS,FOOD_TAX_BASIS_POINTS,foodSameDayOpen,FoodAccountError,foodTokenHash,nextFoodDelivery,shiftFoodDays,easternFoodDate,readFoodOperations:async()=>model});
+  f.api=runPrivateInNewContext(source+'\n({readFoodPortal,saveFoodProfile,createFoodPortalOrder,manageFoodSubscription})',{...intakeHelpers,...launchHelpers,...sourceHelpers,...legacyPlans,...websiteStore,...fulfillment,foodProfileComplete,FOOD_STATES,foodAddressInput,foodPhone,locateFoodAddress:async()=>null,readFoodDeliveryChoices:async()=>({deliveryAvailable:true,days:[{day:'Tuesday',weekday:2}],tonyDates:[]}),crypto,Map,Date,Number,String,Object,Array,JSON,foodCheckoutTotals,foodDeliveryPreference,FOOD_DELIVERY_OPTIONS,FOOD_TAX_BASIS_POINTS,foodSameDayOpen,FoodAccountError,foodTokenHash,nextFoodDelivery,shiftFoodDays,easternFoodDate,readFoodOperations:async()=>model});
   f.account={id:'account',customer_id:'buyer',email:'buyer@example.com'};
   return f;
 }
@@ -97,4 +102,15 @@ test('customer APIs reject missing/cross-site origins and non-customer sessions 
   const POST=runPrivateInNewContext(src+'\nPOST',{Response,URL,FoodAccountError,getDb:()=>({}),foodAccountSession:async()=>null,protectJsonRequest:async()=>({body:{action:'order'}}),stripeConfigured:()=>{calls++;return true;}});
   const url='https://www.ohiopetwastepros.com/api/dog-food/account/';for(const headers of [{},{origin:'https://evil.test'},{origin:'https://www.ohiopetwastepros.com','sec-fetch-site':'cross-site'}])assert.equal((await POST(new Request(url,{method:'POST',headers}))).status,403);
   for(const cookie of ['', '__Host-opwp-food=expired','opwp_office_session=valid-other-role'])assert.equal((await POST(new Request(url,{method:'POST',headers:{origin:new URL(url).origin,cookie}}))).status,401);assert.equal(calls,0);
+});
+
+test('portal profile edits can leave contact and address blank and preserve order addresses',async()=>{
+  const f=portalFixture();
+  const order=await f.api.createFoodPortalOrder(f.db,f.account,body());
+  await f.api.saveFoodProfile(f.db,f.account,{profile:{firstName:'',lastName:'',phone:'',address:'',city:'',zip:''}});
+  const saved=await f.api.readFoodPortal(f.db,f.account);
+  assert.equal(saved.customer.first_name+saved.customer.last_name+saved.customer.phone,'');
+  assert.equal(saved.addresses.length,0);
+  assert.equal(saved.profileRequired,true);
+  assert.equal(f.sql.prepare('SELECT address_id FROM dog_food_orders WHERE id=?').get(order.orderId).address_id,'address');
 });

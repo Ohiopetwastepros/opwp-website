@@ -1,3 +1,4 @@
+import * as websiteStore from '../lib/dog-food-website-store.mjs';
 import {runPrivateInNewContext} from './helpers/private-vm.mjs';
 import staffPrivate from '../lib/staff-private.json' with {type:'json'};
 import test from 'node:test';
@@ -56,7 +57,7 @@ function customer(f){
 }
 test('shared profile review is durable, unchanged saves stay reviewed, changes reopen review and stale approvals fail',async()=>{
   const f=fixture();customer(f);let review=f.sql.prepare('SELECT * FROM dog_food_customer_reviews').get();assert.equal(review.revision,1);
-  const fn=runPrivateInNewContext(source('dog-food-customer-review.js')+'\n({foodCustomerReview})',{FoodError,text:v=>String(v||''),readLiveDensity:async()=>({status:'success',stale:false,clients:[]})}).foodCustomerReview;
+  const fn=runPrivateInNewContext(source('dog-food-customer-review.js')+'\n({foodCustomerReview})',{...websiteStore,FoodError,text:v=>String(v||''),readLiveDensity:async()=>({status:'success',stale:false,clients:[]})}).foodCustomerReview;
   await fn(f.env,{confirm:true,revision:1,relationship:'food_only',customerId:'buyer'},'office');
   f.sql.exec("UPDATE dog_food_accounts SET profile_completed_at=CURRENT_TIMESTAMP WHERE id='account'");assert.equal(f.sql.prepare('SELECT status FROM dog_food_customer_reviews').get().status,'reviewed');
   f.sql.exec("UPDATE dog_food_customers SET phone='4195550199' WHERE id='buyer'; UPDATE dog_food_accounts SET profile_completed_at=CURRENT_TIMESTAMP WHERE id='account'");
@@ -68,7 +69,7 @@ test('shared profile review is durable, unchanged saves stay reviewed, changes r
 test('shared identity review reads the fixed OPWP source, rejects mismatch and preserves native billing identity',async()=>{
   const f=fixture();customer(f);const id='rec12345678901234';let name='Different Customer';
   const fn=runPrivateInNewContext(source('dog-food-customer-review.js')+'\n({foodCustomerReview})',{
-    FoodError,text:v=>String(v||''),readLiveDensity:async()=>({status:'success',stale:false,clients:[{id}]}),
+    ...websiteStore,FoodError,text:v=>String(v||''),readLiveDensity:async()=>({status:'success',stale:false,clients:[{id}]}),
     foodAirtable:async(env,path)=>{assert.equal(env.DOG_FOOD_AIRTABLE_TOKEN,undefined);assert.equal(env.AIRTABLE_API_KEY,'synthetic-opwp-token');assert.equal(path,`appcAWPBQB8GmOrcT/tblhi8MGUOsWNmd37/${id}`);return {id,fields:{Status:'Active','Client Name':name,Address:'123 Main',City:'Toledo',ZIP:'43614'}};},
   }).foodCustomerReview;
   const env={...f.env,AIRTABLE_API_KEY:'synthetic-opwp-token',DOG_FOOD_AIRTABLE_TOKEN:'synthetic-food-only-token'},body={customerId:'buyer',revision:1,confirm:true,relationship:'linked',opwpRecordId:id};

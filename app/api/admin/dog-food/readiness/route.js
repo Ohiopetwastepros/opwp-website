@@ -1,0 +1,5 @@
+import {verifyAdminRequest} from '@/lib/admin-auth';import {getRuntimeEnv} from '@/lib/cloudflare';
+import {readFoodOperations} from '@/lib/dog-food-ops-store';import {readFoodLaunchReadiness} from '@/lib/food-launch-readiness.mjs';
+import {checkRateLimit,rateLimitResponse} from '@/lib/rate-limit';
+export const dynamic='force-dynamic';
+export async function GET(request){const headers={'Cache-Control':'no-store, private','X-Content-Type-Options':'nosniff'};const auth=await verifyAdminRequest(request.headers);if(!auth.authorized)return Response.json({ok:false,error:'Owner MFA required.'},{status:401,headers});const rate=await checkRateLimit(request,{scope:'food_launch_readiness',identity:auth.email,limit:30,windowSeconds:60,failClosed:true});if(!rate.allowed)return rateLimitResponse(rate);try{const env=getRuntimeEnv(),data=await readFoodLaunchReadiness(env.DB,env,await readFoodOperations(env.DB));return Response.json({ok:true,data},{headers});}catch{return Response.json({ok:false,error:'Launch readiness could not be verified.'},{status:503,headers});}}

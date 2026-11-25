@@ -1,0 +1,30 @@
+{
+  "schemaVersion":1,"dataClass":"synthetic","asOf":"2026-11-04T12:00:00Z","coverage":{"native":true,"airtable":true,"sng":true},
+  "native":{
+    "customers":[{"id":"customer-1","email":"synthetic@example.test","sngId":"sng-customer-1"}],
+    "products":[{"id":"product-pink","formula":"22-12","weightLb":40}],
+    "orders":[{"id":"order-1","customerId":"customer-1","totalCents":6357,"date":"2026-10-01","source":"customer_portal"}],
+    "items":[{"id":"line-1","orderId":"order-1","productId":"product-pink","quantity":1,"unitPriceCents":5900}],
+    "payments":[{"id":"payment-1","orderId":"order-1","amountCents":3000,"refundedCents":0,"date":"2026-10-01","reference":"check-101"}],
+    "lots":[{"id":"lot-1","productId":"product-pink","usableBags":8,"reservedBags":1,"bestBefore":"2027-05-01","countedAt":"2026-11-03"}],
+    "subscriptions":[],"movements":[]
+  },
+  "airtable":{
+    "customers":[{"id":"airtable-customer-1","nativeId":"customer-1"}],
+    "products":[{"id":"airtable-pink","nativeId":"product-pink","formula":"22-12","weightLb":40}],
+    "sales":[
+      {"id":"projected-sale","nativeOrderId":"order-1","nativeLineId":"line-1","customerId":"airtable-customer-1","productId":"airtable-pink","quantity":1,"totalCents":6357,"openingReceivedCents":3000,"date":"2026-10-01"},
+      {"id":"legacy-sale","customerId":"airtable-customer-1","productId":"airtable-pink","quantity":2,"totalCents":12000,"openingReceivedCents":2000,"date":"2026-09-01","fulfillment":"delivered"}
+    ],
+    "receipts":[{"id":"legacy-receipt","saleId":"legacy-sale","amountCents":4000,"date":"2026-09-02","reference":"check-102"}],
+    "subscriptions":[{"id":"airtable-plan-1","customerId":"airtable-customer-1","billingProvider":"sng"}],
+    "stock":[{"id":"pink-checkpoint","productId":"airtable-pink","onHand":8}]
+  },
+  "sng":{
+    "customers":[{"id":"sng-customer-1","nativeId":"customer-1"}],
+    "invoices":[{"id":"mixed-invoice","lines":[{"id":"food-line","businessLine":"food"},{"id":"service-line","businessLine":"scooping"}]}],
+    "payments":[{"id":"sng-payment-1","customerId":"sng-customer-1","amountCents":3000,"verified":true,"reference":"check-101"},{"id":"ambiguous-payment","customerId":"sng-customer-1","amountCents":6357,"verified":true}],
+    "plans":[{"id":"sng-plan-1","customerId":"sng-customer-1","amountCents":12000}]
+  },
+  "reviewedMappings":{"payments":[{"source":"sng","sourceId":"sng-payment-1","nativeId":"payment-1","evidence":"Synthetic exact check and invoice source link"}]}
+}

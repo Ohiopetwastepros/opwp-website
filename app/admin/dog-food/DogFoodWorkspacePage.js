@@ -5,11 +5,16 @@ import {verifyAdminRequest} from '@/lib/admin-auth';
 import {getDb} from '@/lib/db';
 import {readFoodOperations} from '@/lib/dog-food-ops-store';
 import DogFoodSalesWorkspace from './DogFoodSalesWorkspace';
+import CustomerHub from './CustomerHub';
+import FoodSalesClient from '../../food-sales/FoodSalesClient';
+import styles from './customer-hub.module.css';
 export default async function DogFoodWorkspacePage({initialTab='queue',section='dog-food',destination='/admin/dog-food/'}) {
   const auth=await verifyAdminRequest(await headers());
   if(!auth.authorized)redirect(`/admin/login/?next=${encodeURIComponent(destination)}`);
   const db=getDb();
   if(!db)return <AdminWorkspace section={section} email={auth.email}><main>Dog-food storage is unavailable.</main></AdminWorkspace>;
+  if(initialTab==='customers')return <AdminWorkspace section={section} email={auth.email}><main className={styles.page}><CustomerHub /></main></AdminWorkspace>;
+  if(initialTab==='record')return <AdminWorkspace section={section} email={auth.email}><main><FoodSalesClient embedded /></main></AdminWorkspace>;
   const data=await readFoodOperations(db);
   return <AdminWorkspace section={section} email={auth.email}><DogFoodSalesWorkspace initialData={data} initialTab={initialTab}/></AdminWorkspace>;
 }
