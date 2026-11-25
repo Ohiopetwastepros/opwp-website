@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { localBusinessId, site } from "@/lib/site";
 
 export const metadata = {
   title: {
@@ -17,7 +18,7 @@ export const metadata = {
     description:
       "A family-owned, eco-friendly dog waste removal team serving Greater Toledo & SE Michigan.",
     images: [
-      "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
+      site.url + site.logoPath,
     ],
   },
 };
@@ -26,24 +27,7 @@ const aboutJsonLd = {
   "@context": "https://schema.org",
   "@type": "AboutPage",
   name: "About Ohio Pet Waste Pros",
-  mainEntity: {
-    "@type": "LocalBusiness",
-    name: "Ohio Pet Waste Pros",
-    telephone: "+14192622371",
-    email: "Craig@ohiopetwastepros.com",
-    founder: [
-      { "@type": "Person", name: "Craig Bridgman" },
-      { "@type": "Person", name: "Amanda Bridgman" },
-    ],
-    address: {
-      "@type": "PostalAddress",
-      addressLocality: "Holland",
-      addressRegion: "OH",
-      addressCountry: "US",
-    },
-    areaServed: "Perrysburg, Toledo, Holland and surrounding NW Ohio",
-    sameAs: ["https://www.facebook.com/profile.php?id=61575239054687"],
-  },
+  mainEntity: { "@id": localBusinessId },
 };
 
 export default function AboutPage() {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { localBusinessId, site } from "@/lib/site";
 
 export const metadata = {
   title:
@@ -16,7 +17,7 @@ export const metadata = {
     url: "https://www.ohiopetwastepros.com/commercial-services/",
     siteName: "Ohio Pet Waste Pros",
     images: [
-      "https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png",
+      site.url + site.logoPath,
     ],
   },
   twitter: { card: "summary_large_image" },
@@ -30,11 +31,7 @@ const serviceLd = {
   "@context": "https://schema.org",
   "@type": "Service",
   serviceType: "Commercial pet waste removal and pet waste stations",
-  provider: {
-    "@type": "LocalBusiness",
-    name: "Ohio Pet Waste Pros",
-    telephone: "+14192622371",
-  },
+  provider: { "@id": localBusinessId },
   areaServed: [
     "Toledo OH",
     "Sylvania OH",

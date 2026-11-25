@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { localBusinessId, site } from "@/lib/site";
 
 export const metadata = {
   title: "Bi-Weekly Dog Poop Removal in Toledo, Sylvania & Perrysburg | Ohio Pet Waste Pros",
@@ -11,7 +12,7 @@ export const metadata = {
     description: "Every-other-week pooper scooper service for lighter-use yards across Greater Toledo & SE Michigan.",
     url: "https://www.ohiopetwastepros.com/bi-weekly-dog-poop-removal/",
     siteName: "Ohio Pet Waste Pros",
-    images: ["https://www.ohiopetwastepros.com/wp-content/uploads/2025/05/cropped-OPWP-CIRCLE-LOGO-11111111.png"],
+    images: [site.url + site.logoPath],
   },
   twitter: { card: "summary_large_image" },
   other: {
@@ -24,12 +25,7 @@ const serviceLd = {
   "@context": "https://schema.org",
   "@type": "Service",
   serviceType: "Bi-weekly dog poop removal",
-  provider: {
-    "@type": "LocalBusiness",
-    name: "Ohio Pet Waste Pros",
-    telephone: "+14192622371",
-    areaServed: "Greater Toledo, OH and SE Michigan",
-  },
+  provider: { "@id": localBusinessId },
   areaServed: ["Toledo OH", "Sylvania OH", "Perrysburg OH", "Maumee OH", "Holland OH"],
   description: "Every-other-week residential dog waste removal with gate photos, double-bagging and text updates. A lighter-frequency plan for low-traffic yards. No contracts.",
 };

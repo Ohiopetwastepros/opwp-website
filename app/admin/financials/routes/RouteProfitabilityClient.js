@@ -5,7 +5,7 @@ import { ROUTE_DAYS, routeDay, routeWeek, shiftRouteDate, summarizeRouteProfit, 
 import { applyTechnicianRouteCosts, combineTechnicianDays } from "@/lib/quickbooks-route-cost-calculations.mjs";
 import TechnicianWeekdays from "./TechnicianWeekdays";
 import TechnicianComparison from "./TechnicianComparison";
-import { technicianStatus } from "@/lib/route-technicians.mjs";
+import { technicianHourlyTarget, technicianStatus } from "@/lib/route-technicians.mjs";
 import RouteCostPanel from "./RouteCostPanel";
 import RouteDataReview from "./RouteDataReview";
 import RouteRevenueMix, { RevenueBreakdown, RevenueDetailDialog } from "./RouteRevenueMix";
@@ -52,6 +52,7 @@ export default function RouteProfitabilityClient({ initialData }) {
   const technicians = [...new Set(technicianRows.map(row => row.name))].sort();
   const priced = combineTechnicianDays(technicianRows.filter(row => !technician || row.name === technician));
   const technicianWindow = selectRouteWindow(technicianRows, from, through).filter(row => !technician || row.name === technician);
+  const hourlyTarget = technicianHourlyTarget(technician, data?.technicianTargets);
   const windowRows = selectRouteWindow(priced, from, through);
   const selected = selectRouteWindow(priced, from, through, dayFilter);
   const total = summarizeRouteProfit(selected);
@@ -99,7 +100,7 @@ export default function RouteProfitabilityClient({ initialData }) {
     <section className={styles.kpis} aria-label="Route financial summary">
       <Kpi title="Service revenue" value={total.routeDays ? money(total.revenue) : "—"} primary detail={total.missingValues ? "Incomplete · service prices need review" : comparison === null ? `${number(total.jobs)} completed visits` : `${comparison >= 0 ? "+" : ""}${number(comparison)}% vs previous ${duration} days`} />
       <Kpi title={profitabilityView ? "Estimated route profit" : "Average / service day"} value={money(profitabilityView ? total.profit : total.averageRevenue)} detail={profitabilityView ? total.margin == null ? "Awaiting complete costs & service values" : `${number(total.margin)}% margin · allocated company costs` : `${number(total.routeDays)} recorded service ${total.routeDays === 1 ? "day" : "days"}`} />
-      <Kpi title="Revenue / tech hour" value={money(total.revenuePerHour, 2)} detail={total.revenuePerHour == null ? rateReason(total) : `${number(total.hours)} tech hours · $100/hr target`} />
+      <Kpi title="Revenue / tech hour" value={money(total.revenuePerHour, 2)} detail={`${total.revenuePerHour == null ? rateReason(total) : `${number(total.hours)} tech hours`}${technician ? ` · ${hourlyTarget == null ? "Target unavailable" : `${money(hourlyTarget, 2)}/hr target`}` : ""}`} />
       <Kpi title={profitabilityView ? "Profit / tech hour" : "Completed visits"} value={profitabilityView ? money(total.profitPerHour, 2) : number(total.jobs)} detail={profitabilityView ? "Estimate after allocated expenses" : `${total.estimatedJobs ? `${total.estimatedJobs} estimated prices` : (technician || "All serviced accounts")} · ${dayFilter.toLowerCase()}`} />
     </section>
     <p className={styles.measurementNote}>{technician || "All-account revenue / employee hours; owner time excluded"} · Historical visit assignments · {dateLabel(from)} – {dateLabel(through)}{dayFilter !== "All days" ? ` · ${dayFilter} only` : ""}</p>
@@ -111,8 +112,8 @@ export default function RouteProfitabilityClient({ initialData }) {
       {selected.some(row => ["Saturday", "Sunday"].includes(routeDay(row.date))) ? <p className={styles.note}>Weekend service is included in totals and the ledger below.</p> : null}
     </section>
 
-    <TechnicianComparison rows={technicianRows} roster={data?.technicians} from={from} through={through} />
-    <TechnicianWeekdays reliefName={data.staffing?.reliefName} rows={technicianWindow} profitabilityView={profitabilityView} onSelect={selectTechnician} />
+    <TechnicianComparison rows={technicianRows} roster={data?.technicians} targets={data?.technicianTargets} from={from} through={through} />
+    <TechnicianWeekdays reliefName={data.staffing?.reliefName} rows={technicianWindow} targets={data?.technicianTargets} profitabilityView={profitabilityView} onSelect={selectTechnician} />
 
     <RouteRevenueMix total={total} mrrAudit={data?.mrrAudit} subscriptions={data?.subscriptions || []} through={through} onOpen={(category, label) => openDetail(category, label, from, through, total.revenueMix[category].revenue)} />
     <BillingRevenueMix data={data?.billings} from={from} through={through} />

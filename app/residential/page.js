@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { localBusinessId } from "@/lib/site";
 
 export const metadata = {
   title: "Residential Dog Poop Removal in Toledo, Sylvania & Perrysburg | Ohio Pet Waste Pros",
@@ -29,7 +30,7 @@ const serviceJsonLd = {
   "@context": "https://schema.org",
   "@type": "Service",
   serviceType: "Residential dog poop removal",
-  provider: { "@type": "LocalBusiness", name: "Ohio Pet Waste Pros", telephone: "+14192622371", areaServed: "Greater Toledo, OH and SE Michigan" },
+  provider: { "@id": localBusinessId },
   areaServed: ["Toledo OH", "Sylvania OH", "Perrysburg OH", "Maumee OH", "Holland OH"],
   description: "Weekly, bi-weekly and one-time residential dog waste removal with gate photos, double-bagging and eco-friendly sanitizing.",
 };
