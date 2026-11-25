@@ -12,7 +12,6 @@ export const metadata = {
   },
   description:
     "Ohio Pet Waste Pros is a family-owned dog poop removal service in Toledo, Perrysburg, Sylvania and across NW Ohio & SE Michigan. Weekly, biweekly & one-time yard cleanups. Get your exact price with our instant quote.",
-  alternates: { canonical: "/" },
   robots: { index: true, follow: true },
   icons: { icon: "/assets/opwp-logo.webp" },
   openGraph: {

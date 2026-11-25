@@ -50,4 +50,20 @@ jobs:
           npm run test:http-security
       - run: npm run build:cloudflare
       - run: npm run check:worker-startup
+      - name: Production Worker SEO smoke tests
+        shell: bash
+        env:
+          SEO_LOCAL_ORIGIN: https://127.0.0.1:8788
+        run: |
+          npx --no-install wrangler dev --local --ip 127.0.0.1 --port 8788 --local-protocol https --infer-origin-from-routes false --show-interactive-dev-session false > /tmp/opwp-seo-worker.log 2>&1 &
+          worker_pid=$!
+          trap 'kill $worker_pid || true' EXIT
+          for attempt in {1..40}; do
+            if curl --silent --insecure --fail "$SEO_LOCAL_ORIGIN/" > /dev/null; then break; fi
+            sleep 1
+          done
+          if ! node scripts/seo-http-smoke.mjs; then
+            tail -80 /tmp/opwp-seo-worker.log
+            exit 1
+          fi
       - run: git diff --check
