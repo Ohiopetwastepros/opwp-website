@@ -45,9 +45,8 @@ export default function FailedPaymentReviewClient({ initialRows = [] }) {
   }
 
   async function act(action) {
-    if ((action!=='refresh' && !selected.length) || busy) return;
-    const verb = action === "send" ? "send a separate Quo text to" : "dismiss";
-    if (action!=='refresh' && !window.confirm(`Confirm you want to ${verb} ${selected.length} selected customer${selected.length === 1 ? "" : "s"}?`)) return;
+    if (action === "send" || (action!=='refresh' && !selected.length) || busy) return;
+    if (action!=='refresh' && !window.confirm(`Confirm you want to dismiss ${selected.length} selected customer${selected.length === 1 ? "" : "s"}?`)) return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -63,11 +62,7 @@ export default function FailedPaymentReviewClient({ initialRows = [] }) {
       if(action==='refresh') { setNotice(`Rechecked payment evidence. ${data.recovery?.held||0} checks require attention. No messages sent.`); }
       else if (action === "dismiss") {
         setRows((current) => current.map((row) => selected.includes(row.id) ? { ...row, status: "cancelled" } : row));
-        setNotice(`${data.dismissed} message${data.dismissed === 1 ? " was" : "s were"} dismissed.`);
-      } else {
-        const byId = new Map(data.results.map((result) => [result.id, result.status]));
-        setRows((current) => current.map((row) => byId.has(row.id) ? { ...row, status: byId.get(row.id) } : row));
-        setNotice(`${data.sent} individual Quo message${data.sent === 1 ? " was" : "s were"} sent.${data.failed ? ` ${data.failed} failed and need review.` : ""}${data.skipped ? ` ${data.skipped} became ineligible; check payment/status and refresh.` : ""}`);
+        setNotice(`${data.dismissed} message${data.dismissed === 1 ? " was" : "s were"} dismissed. No text was sent.`);
       }
       setSelected([]);
       if(data.rows) setRows(data.rows);
@@ -91,20 +86,19 @@ export default function FailedPaymentReviewClient({ initialRows = [] }) {
       <button type="button" className={styles.secondary} disabled={busy} aria-pressed={view === 'active'} onClick={() => changeView('active')}>Active failed payments</button>
     </div>
     <div className={styles.toolbar}>
-      <div><strong>{selected.length} selected</strong><span>Select up to 25. Each customer receives an individual message.</span></div>
+      <div><strong>{selected.length} selected</strong><span>Failed-payment texts are handled manually in Quo. Nothing on this page sends a text.</span></div>
       <div className={styles.actions}>
         <button type="button" className={styles.secondary} disabled={busy} onClick={()=>act('refresh')}>Recheck payments</button>
         <button type="button" className={styles.secondary} disabled={!selected.length || busy} onClick={() => act("dismiss")}>Dismiss selected</button>
-        <button type="button" className={styles.primary} disabled={!selected.length || busy} onClick={() => act("send")}>{busy ? "Processing…" : "Send selected in Quo"}</button>
       </div>
     </div>
     <div className={styles.feedback} aria-live="polite">{error ? <span className={styles.error}>{error}</span> : notice}</div>
     <div className={styles.tableWrap}><table>
-      <thead><tr><th><input type="checkbox" disabled={busy || !pending.length} checked={allPendingSelected} onChange={toggleAll} aria-label="Select pending messages in this view" /></th><th>Customer</th><th>Amount</th><th>Failure</th><th>Phone</th><th>Message preview</th><th>Status</th></tr></thead>
+      <thead><tr><th><input type="checkbox" disabled={busy || !pending.length} checked={allPendingSelected} onChange={toggleAll} aria-label="Select records to dismiss" /></th><th>Customer</th><th>Amount</th><th>Failure</th><th>Phone</th><th>Message preview</th><th>Status</th></tr></thead>
       <tbody>{visibleRows.length ? visibleRows.map((row) => {
         const selectable = row.status === "awaiting_approval" && paymentInView(row, 'active');
         return <tr key={row.id}>
-          <td><input type="checkbox" disabled={!selectable || busy} checked={selected.includes(row.id)} onChange={() => toggle(row.id)} aria-label={`Select ${row.client_name || "customer"}`} /></td>
+          <td><input type="checkbox" disabled={!selectable || busy} checked={selected.includes(row.id)} onChange={() => toggle(row.id)} aria-label={`Select ${row.client_name || "customer"} to dismiss`} /></td>
           <td><strong>{row.client_name || "Unknown customer"}</strong><small>Invoice {row.invoice_id}</small></td>
           <td>{money(row.amount)}</td>
           <td><span>{row.decline_message || row.decline_code || "Card declined"}</span>{row.failed_charge_count ? <small>{row.failed_charge_count} failed attempt{Number(row.failed_charge_count) === 1 ? "" : "s"}</small> : null}</td>
