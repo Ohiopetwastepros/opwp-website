@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
-import { readFileSync } from 'node:fs';
-import { e164, failedPaymentMessage, listFailedPaymentSms, queueFailedPaymentSms, sendFailedPaymentSmsBatch } from "../lib/failed-payment-sms.js";
+import { readFileSync } from "node:fs";
+import { e164, FAILED_PAYMENT_SMS_DISABLED_REASON, failedPaymentMessage, listFailedPaymentSms, queueFailedPaymentSms, sendFailedPaymentSmsBatch } from "../lib/failed-payment-sms.js";
 
 test("failed-payment message personalizes the approved wording", () => {
   assert.equal(
@@ -18,7 +18,7 @@ test("phone normalization accepts bounded North American and international numbe
   assert.equal(e164("123"), "");
 });
 
-test("declined-payment messages require approval and are idempotent by invoice", async () => {
+test("declined-payment records are stored cancelled and are idempotent by invoice", async () => {
   const calls = [];
   const db = {
     prepare(sql) {
@@ -35,54 +35,61 @@ test("declined-payment messages require approval and are idempotent by invoice",
     eventId: "event-1",
     body: { data: { invoice_id: 42, client: 7, client_name: "Marvella Example", cell_phone: "419-555-0100" } },
   });
-  assert.equal(result.awaitingApproval, true);
-  assert.equal(result.status, "awaiting_approval");
+  assert.equal(result.awaitingApproval, false);
+  assert.equal(result.sendingDisabled, true);
+  assert.equal(result.status, "cancelled");
   assert.equal(result.invoiceId, "42");
   assert.match(calls[0].sql, /ON CONFLICT\(invoice_id\) DO NOTHING/);
+  assert.match(calls[0].sql, /cancelled_at/);
+  assert.doesNotMatch(calls[0].sql, /awaiting_approval/);
   assert.equal(calls[0].values[1], "42");
   assert.equal(calls[0].values[5], "+14195550100");
-  assert.equal(calls[0].values[6], "awaiting_approval");
+  assert.equal(calls[0].values[6], "cancelled");
+  assert.equal(calls[0].values[7], FAILED_PAYMENT_SMS_DISABLED_REASON);
 });
 
-test("approved bulk sends remain separate personalized Quo messages", async () => {
+test("failed-payment SMS cannot be sent, even for awaiting_approval rows", async () => {
   const id = "20000000-0000-1000-1000-000000000004";
-  const writes = [];
+  let dbCalls = 0;
   const db = {
-    prepare(sql) {
-      const statement = {
-        values: [],
-        bind(...values) { this.values = values; return this; },
-        async first() {
-          if (sql.includes("SELECT COUNT(*) count")) return { count: 1 };
-          if (sql.includes("failed_payment_sms_usage")) return { send_count: 1 };
-          if (sql.includes("RETURNING id,invoice_id")) return { id, invoice_id: "42", client_name: "Marvella Example", recipient: "+14195550100" };
-          return null;
-        },
-        async run() { writes.push({ sql, values: this.values }); return { meta: { changes: 1 } }; },
-      };
-      return statement;
+    prepare() {
+      dbCalls += 1;
+      throw new Error("send must not touch the database");
     },
   };
   const originalFetch = globalThis.fetch;
-  const requests = [];
-  globalThis.fetch = async (_url, options) => {
-    requests.push(JSON.parse(options.body));
-    return Response.json({ data: { id: "quo-message-1" } });
-  };
+  let requests = 0;
+  globalThis.fetch = async () => { requests += 1; return Response.json({ data: { id: "quo-message-1" } }); };
   try {
     const result = await sendFailedPaymentSmsBatch({
-      env: { DB: db, SMS_PROVIDER: "quo", QUO_API_KEY: "test", QUO_FROM_NUMBER: "+14192622371" },
+      env: { DB: db, SMS_PROVIDER: "quo", QUO_API_KEY: "test", QUO_FROM_NUMBER: "+14192622371", QUO_API_BASE_URL: "https://api.openphone.com" },
       ids: [id],
       actor: "owner@example.com",
-    },async()=>true);
-    assert.equal(result.sent, 1);
-    assert.equal(requests.length, 1);
-    assert.deepEqual(requests[0].to, ["+14195550100"]);
-    assert.equal(requests[0].content, failedPaymentMessage("Marvella Example"));
-    assert.ok(writes.some((write) => write.sql.includes("status='sent'")));
+    }, async () => true);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "SMS_DISABLED");
+    assert.equal(result.sent, 0);
+    assert.equal(result.reason, FAILED_PAYMENT_SMS_DISABLED_REASON);
+    assert.equal(requests, 0);
+    assert.equal(dbCalls, 0);
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("admin send control and Quo delivery are removed from the failed-payment path", () => {
+  const client = readFileSync(new URL("../app/admin/failed-payments/FailedPaymentReviewClient.js", import.meta.url), "utf8");
+  const page = readFileSync(new URL("../app/admin/failed-payments/page.js", import.meta.url), "utf8");
+  const route = readFileSync(new URL("../app/api/admin/failed-payments/route.js", import.meta.url), "utf8");
+  const sender = readFileSync(new URL("../lib/failed-payment-sms.js", import.meta.url), "utf8");
+  assert.match(client, /handled manually in Quo/);
+  assert.doesNotMatch(client, /Send selected in Quo/);
+  assert.match(page, /handled manually in Quo/);
+  assert.match(route, /SMS_DISABLED/);
+  assert.match(route, /handled manually in Quo/);
+  assert.doesNotMatch(sender, /send_failed_payment_sms/);
+  assert.doesNotMatch(sender, /api\.openphone\.com/);
+  assert.match(sender, /return \{ ok: false, code: "SMS_DISABLED"/);
 });
 
 test("unapproved or malformed selections cannot call Quo", async () => {
@@ -96,7 +103,8 @@ test("unapproved or malformed selections cannot call Quo", async () => {
       actor: "owner@example.com",
     });
     assert.equal(result.ok, false);
-    assert.equal(result.code, "INVALID_SELECTION");
+    assert.equal(result.code, "SMS_DISABLED");
+    assert.equal(result.sent, 0);
     assert.equal(called, false);
   } finally {
     globalThis.fetch = originalFetch;
@@ -178,21 +186,17 @@ test("D1 payment evidence removes paid customers from approval and blocks stale 
     assert.equal(status[ids.laterDecline], "awaiting_approval");
     assert.equal(status[ids.ledgerPaid], "payment_recorded");
     assert.equal(status[ids.failedThenPaid], "payment_recorded");
+    const before = sqlite.prepare("SELECT id,status FROM failed_payment_sms").all();
     const result = await sendFailedPaymentSmsBatch({
       env: { DB: db, SMS_PROVIDER: "quo", QUO_API_KEY: "test", QUO_FROM_NUMBER: "+14192622371" },
-      ids: [ids.paid, ids.ledgerPaid],
+      ids: [ids.paid, ids.ledgerPaid, ids.cassie],
       actor: "owner@example.com",
-    },async()=>true);
+    }, async () => true);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "SMS_DISABLED");
     assert.equal(result.sent, 0);
-    assert.equal(result.skipped, 2);
     assert.equal(requests, 0);
-    const active = await sendFailedPaymentSmsBatch({
-      env: { DB: db, SMS_PROVIDER: "quo", QUO_API_KEY: "test", QUO_FROM_NUMBER: "+14192622371" },
-      ids: [ids.cassie],
-      actor: "owner@example.com",
-    },async()=>true);
-    assert.equal(active.sent, 1);
-    assert.equal(requests, 1);
+    assert.deepEqual(sqlite.prepare("SELECT id,status FROM failed_payment_sms").all(), before);
   } finally {
     globalThis.fetch = originalFetch;
     sqlite.close();

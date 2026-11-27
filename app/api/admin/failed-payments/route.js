@@ -1,7 +1,7 @@
 import { verifyAdminRequest } from "@/lib/admin-auth";
 import { getRuntimeEnv } from "@/lib/cloudflare";
 import { getDb } from "@/lib/db";
-import { dismissFailedPaymentSmsBatch, sendFailedPaymentSmsBatch, listFailedPaymentSms } from "@/lib/failed-payment-sms";
+import { dismissFailedPaymentSmsBatch, FAILED_PAYMENT_SMS_DISABLED_REASON, sendFailedPaymentSmsBatch, listFailedPaymentSms } from "@/lib/failed-payment-sms";
 import { readBoundedBytes } from '@/lib/bounded-body.mjs';
 import { runFailedPaymentRecovery } from '@/lib/failed-payment-reconciliation';
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
@@ -21,6 +21,7 @@ async function boundedJson(request) {
 }
 
 function errorFor(code) {
+  if (code === "SMS_DISABLED") return [409, `Failed-payment texts are handled manually in Quo. ${FAILED_PAYMENT_SMS_DISABLED_REASON}`];
   if (code === "QUO_UNAVAILABLE") return [503, "Quo messaging is not configured."];
   if (code === "DATABASE_UNAVAILABLE") return [503, "The approval queue is unavailable."];
   if (code === "DAILY_LIMIT") return [429, "The daily failed-payment messaging limit would be exceeded."];

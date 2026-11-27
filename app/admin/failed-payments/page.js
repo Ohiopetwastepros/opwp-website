@@ -19,8 +19,8 @@ export default async function FailedPaymentMessagesPage() {
   return <AdminWorkspace section="failed-payments" email={auth.email}><main className={styles.shell}>
     <div className={styles.topline}><Link href="/admin/">← Executive cockpit</Link><span>Signed in as {auth.email}</span></div>
     <header className={styles.header}>
-      <div><div className={styles.eyebrow}>Billing controls</div><h1>Failed payment messages</h1><p>Review every customer and message before anything is sent through Quo.</p></div>
-      <div className={styles.safety}><strong>Approval mode is on</strong><span>New payment failures cannot send automatically.</span></div>
+      <div><div className={styles.eyebrow}>Billing controls</div><h1>Failed payment messages</h1><p>Failed invoices stay here for reconciliation. The website does not text customers about them.</p></div>
+      <div className={styles.safety}><strong>Texts are off</strong><span>Failed-payment texts are handled manually in Quo.</span></div>
     </header>
     {!queue.configured ? <div className={styles.error}>The D1 approval queue is not configured.</div> : <FailedPaymentReviewClient initialRows={queue.rows} />}
   </main></AdminWorkspace>;
